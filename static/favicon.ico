@@ -1,0 +1,45 @@
+<!-- EELS MAITENANCE PAGE -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dungeons & Dragons | The Official Home of D&D</title>
+    <link rel="icon" href="./images/favicon.png" type="image/png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <img class="logo" src="./images/ddbgoldlogo.png" alt="D&D Beyond" />
+      <picture class="eels">
+        <source media="(min-width: 1024px)" srcset="./images/eelDesktop.png" />
+        <source media="(min-width: 600px)" srcset="./images/eelTablet.png" />
+        <img
+          src="./images/eelMobile.png"
+          alt="Space eel emerging from a fiery hole in the background through which D&D Beyond can be seen."
+        />
+      </picture>
+      <h1 class="title">
+        D&D Beyond is infested with Eels! <span>Giant space eels!</span>
+      </h1>
+      <div class="text">
+        <p>
+          We will be down for maintenance while we cleanse the site of eels.
+        </p>
+        <p>
+          <a
+            href="https://status.dndbeyond.com"
+            aria-label="Check our status page."
+            >Check back soon.</a
+          >
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
