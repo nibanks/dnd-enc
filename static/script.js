@@ -681,7 +681,7 @@ function renderPlayers() {
             <td><input type="text" value="${player.playerName || ''}" onchange="updatePlayer(${index}, 'playerName', this.value)" style="width: 100px;"></td>
             <td><input type="text" value="${player.name || ''}" onchange="updatePlayer(${index}, 'name', this.value)" style="width: 100px;"></td>
             <td><select onchange="updatePlayer(${index}, 'race', this.value)" style="width: 100px;"><option value="">Select Race</option>${raceOptions}</select></td>
-            <td><select onchange="updatePlayer(${index}, 'class', this.value)" style="width: 100px;"><option value="">Select Class</option>${classOptions}</select></td>
+            <td><select onchange="updatePlayer(${index}, 'class', this.value)" style="width: 110px;"><option value="">Select Class</option>${classOptions}</select></td>
             <td><input type="number" value="${player.level || 1}" onchange="updatePlayer(${index}, 'level', parseInt(this.value))" style="width: 38px;"></td>
             <td><input type="number" value="${player.maxHp || 0}" onchange="updatePlayer(${index}, 'maxHp', parseInt(this.value))" style="width: 45px;"></td>
             <td><input type="number" value="${player.ac || 10}" onchange="updatePlayer(${index}, 'ac', parseInt(this.value))" style="width: 38px;"></td>
@@ -765,6 +765,10 @@ function renderEncounters() {
         .filter(({ encounter }) => encounter.chapter === currentChapter);
     
     chapterEncounters.forEach(({ encounter, index }) => {
+        // Set default minimized state: minimized unless encounter is started
+        if (encounter.minimized === undefined) {
+            encounter.minimized = encounter.state !== 'started';
+        }
         const card = createEncounterCard(encounter, index);
         container.appendChild(card);
     });
@@ -812,10 +816,13 @@ function createEncounterCard(encounter, encounterIndex) {
         `;
     }
     
+    const minimizeIcon = encounter.minimized ? '▶' : '▼';
+    
     header.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 600px;">
+                    <button class="btn-small" onclick="toggleEncounterMinimize(${encounterIndex})" title="${encounter.minimized ? 'Expand' : 'Minimize'}" style="background: #95a5a6; padding: 4px 8px; font-size: 14px;">${minimizeIcon}</button>
                     <input type="text" class="encounter-title" value="${encounter.name || 'New Encounter'}" 
                            onchange="updateEncounterName(${encounterIndex}, this.value)" style="border: 1px solid #ddd; padding: 5px; flex: 1;">
                     <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap;">XP: ${calculateEncounterXP(encounter)}</span>
@@ -826,7 +833,7 @@ function createEncounterCard(encounter, encounterIndex) {
                     <button class="btn-small btn-danger" onclick="removeEncounter(${encounterIndex})" title="Delete Encounter">×</button>
                 </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="display: ${encounter.minimized ? 'none' : 'flex'}; align-items: center; gap: 15px;">
                 <div class="encounter-controls">
                     ${encounterButtons}
                 </div>
@@ -839,6 +846,9 @@ function createEncounterCard(encounter, encounterIndex) {
     // Combatants table
     const tableContainer = document.createElement('div');
     tableContainer.className = 'table-container';
+    if (encounter.minimized) {
+        tableContainer.style.display = 'none';
+    }
     
     const table = document.createElement('table');
     table.innerHTML = `
@@ -943,8 +953,17 @@ function addEncounter() {
         name: 'New Encounter',
         chapter: currentChapter,
         combatants: combatants,
-        currentTurn: 0
+        currentTurn: 0,
+        minimized: true
     });
+    renderEncounters();
+    autoSave();
+}
+
+// Toggle encounter minimize state
+function toggleEncounterMinimize(encounterIndex) {
+    const encounter = currentAdventure.encounters[encounterIndex];
+    encounter.minimized = !encounter.minimized;
     renderEncounters();
     autoSave();
 }
