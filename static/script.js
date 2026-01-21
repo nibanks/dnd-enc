@@ -1479,16 +1479,21 @@ function sortInitiative(encounterIndex) {
 function refreshPlayers(encounterIndex) {
     const encounter = currentAdventure.encounters[encounterIndex];
     
-    // Update each player combatant with current stats from players list
-    encounter.combatants.forEach(combatant => {
-        if (isPlayerCombatant(combatant)) {
-            const player = currentAdventure.players.find(p => p.name === combatant.name);
-            if (player) {
-                combatant.maxHp = player.maxHp || 0;
-                combatant.ac = player.ac || 10;
-                combatant.dndBeyondUrl = player.dndBeyondUrl || '';
-            }
-        }
+    // Remove all player combatants from the encounter
+    encounter.combatants = encounter.combatants.filter(c => !isPlayerCombatant(c));
+    
+    // Add all players from the Players section
+    currentAdventure.players.forEach(player => {
+        encounter.combatants.push({
+            name: player.name,
+            initiative: 0,
+            hp: player.maxHp || 0,
+            maxHp: player.maxHp || 0,
+            ac: player.ac || 10,
+            notes: '',
+            isPlayer: true,
+            dndBeyondUrl: player.dndBeyondUrl || ''
+        });
     });
     
     // Reset encounter to never started state
