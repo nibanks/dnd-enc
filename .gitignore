@@ -22,5 +22,6 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Adventures (user data - optional, remove if you want to commit)
+# Adventures (user data - exclude all except Sample)
 adventures/*.json
+!adventures/Sample Adventure.json

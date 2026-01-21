@@ -709,18 +709,18 @@ function renderPlayers() {
         row = tbody.insertRow();
         row.innerHTML = `
             <td><button class="btn-small" onclick="editPlayerUrl(${index})" style="padding: 4px 8px; font-size: 16px; background: #3498db;" title="Edit D&D Beyond URL">🔗</button></td>
-            <td><input type="text" value="${player.playerName || ''}" onchange="updatePlayer(${index}, 'playerName', this.value)" style="width: 100px;"></td>
+            <td><input type="text" value="${player.playerName || ''}" onchange="updatePlayer(${index}, 'playerName', this.value)" style="width: 90px;"></td>
             <td><input type="text" value="${player.name || ''}" onchange="updatePlayer(${index}, 'name', this.value)" style="width: 100px;"></td>
-            <td><select onchange="updatePlayer(${index}, 'race', this.value)" style="width: 100px;"><option value="">Select Race</option>${raceOptions}</select></td>
+            <td><select onchange="updatePlayer(${index}, 'race', this.value)" style="width: 110px;"><option value="">Select Race</option>${raceOptions}</select></td>
             <td><select onchange="updatePlayer(${index}, 'class', this.value)" style="width: 110px;"><option value="">Select Class</option>${classOptions}</select></td>
-            <td><input type="number" value="${player.level || 1}" onchange="updatePlayer(${index}, 'level', parseInt(this.value))" style="width: 38px;"></td>
-            <td><input type="number" value="${player.maxHp || 0}" onchange="updatePlayer(${index}, 'maxHp', parseInt(this.value))" style="width: 45px;"></td>
-            <td><input type="number" value="${player.ac || 10}" onchange="updatePlayer(${index}, 'ac', parseInt(this.value))" style="width: 38px;"></td>
-            <td><input type="number" value="${player.speed || 30}" onchange="updatePlayer(${index}, 'speed', parseInt(this.value))" style="width: 38px;"></td>
-            <td><input type="number" value="${player.initiativeBonus || 0}" onchange="updatePlayer(${index}, 'initiativeBonus', parseInt(this.value))" style="width: 38px;"></td>
-            <td><input type="number" value="${player.passivePerception || 10}" onchange="updatePlayer(${index}, 'passivePerception', parseInt(this.value))" style="width: 38px;"></td>
-            <td><input type="number" value="${player.passiveInsight || 10}" onchange="updatePlayer(${index}, 'passiveInsight', parseInt(this.value))" style="width: 38px;"></td>
-            <td><input type="number" value="${player.passiveInvestigation || 10}" onchange="updatePlayer(${index}, 'passiveInvestigation', parseInt(this.value))" style="width: 38px;"></td>
+            <td><input type="number" value="${player.level || 1}" onchange="updatePlayer(${index}, 'level', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+            <td><input type="number" value="${player.maxHp || 0}" onchange="updatePlayer(${index}, 'maxHp', parseInt(this.value))" style="width: 45px; text-align: center;"></td>
+            <td><input type="number" value="${player.ac || 10}" onchange="updatePlayer(${index}, 'ac', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+            <td><input type="number" value="${player.speed || 30}" onchange="updatePlayer(${index}, 'speed', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+            <td><input type="number" value="${player.initiativeBonus || 0}" onchange="updatePlayer(${index}, 'initiativeBonus', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+            <td><input type="number" value="${player.passivePerception || 10}" onchange="updatePlayer(${index}, 'passivePerception', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+            <td><input type="number" value="${player.passiveInsight || 10}" onchange="updatePlayer(${index}, 'passiveInsight', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+            <td><input type="number" value="${player.passiveInvestigation || 10}" onchange="updatePlayer(${index}, 'passiveInvestigation', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
             <td style="width: 150px;"><input type="text" value="${player.notes || ''}" onchange="updatePlayer(${index}, 'notes', this.value)" style="width: 150px;"></td>
             <td><button class="btn-small" onclick="removePlayer(${index})" style="background: #e74c3c; padding: 4px 8px;" title="Delete this player">×</button></td>
         `;

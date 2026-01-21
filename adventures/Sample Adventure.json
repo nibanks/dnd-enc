@@ -1,0 +1,303 @@
+{
+  "chapterNotes": {
+    "Chapter 1: The Beginning": "The party arrives in the village of Greenrest under attack by cultists. They must defend the keep and rescue civilians.\n\nKey NPCs:\n- Governor Nighthill: Leader of Greenrest\n- Castellan Escobert: In charge of defense\n- Leosin Erlanthar: Monk investigating the cult",
+    "Chapter 2: The Journey": "Following the cultists to their camp, the party must infiltrate and gather intelligence about the Dragon Cult's plans.\n\nObjectives:\n- Find Leosin in the camp\n- Discover information about the cult's treasure hoard\n- Escape without raising alarm",
+    "Chapter 3: The Finale": "The final confrontation approaches as the party tracks the cult to their stronghold."
+  },
+  "chapters": [
+    "Chapter 1: The Beginning",
+    "Chapter 2: The Journey",
+    "Chapter 3: The Finale"
+  ],
+  "encounters": [
+    {
+      "activeCombatant": null,
+      "chapter": "Chapter 1: The Beginning",
+      "combatants": [
+        {
+          "hp": 28,
+          "initiative": 22,
+          "isPlayer": true,
+          "maxHp": 35,
+          "name": "Finn Quickfoot",
+          "notes": "Used Second Wind"
+        },
+        {
+          "hp": 28,
+          "initiative": 19,
+          "isPlayer": true,
+          "maxHp": 28,
+          "name": "Elara Moonwhisper",
+          "notes": ""
+        },
+        {
+          "hp": 0,
+          "initiative": 15,
+          "isPlayer": false,
+          "maxHp": 9,
+          "name": "Cultist 1",
+          "notes": "Defeated"
+        },
+        {
+          "hp": 40,
+          "initiative": 14,
+          "isPlayer": true,
+          "maxHp": 40,
+          "name": "Brother Aldric",
+          "notes": ""
+        },
+        {
+          "hp": 0,
+          "initiative": 12,
+          "isPlayer": false,
+          "maxHp": 9,
+          "name": "Cultist 2",
+          "notes": "Defeated"
+        },
+        {
+          "hp": 35,
+          "initiative": 11,
+          "isPlayer": true,
+          "maxHp": 48,
+          "name": "Thorin Ironshield",
+          "notes": "Took 13 damage"
+        }
+      ],
+      "currentRound": 6,
+      "currentTurn": 0,
+      "name": "Keep Defense",
+      "state": "complete",
+      "minimized": true
+    },
+    {
+      "activeCombatant": 1,
+      "chapter": "Chapter 1: The Beginning",
+      "combatants": [
+        {
+          "hp": 35,
+          "initiative": 21,
+          "isPlayer": true,
+          "maxHp": 35,
+          "name": "Finn Quickfoot",
+          "notes": "Hidden (advantage on next attack)"
+        },
+        {
+          "hp": 39,
+          "initiative": 16,
+          "isPlayer": false,
+          "maxHp": 39,
+          "name": "Dragonclaw 1",
+          "notes": ""
+        },
+        {
+          "hp": 28,
+          "initiative": 15,
+          "isPlayer": true,
+          "maxHp": 28,
+          "name": "Elara Moonwhisper",
+          "notes": "Concentrating on Haste"
+        },
+        {
+          "hp": 40,
+          "initiative": 13,
+          "isPlayer": true,
+          "maxHp": 40,
+          "name": "Brother Aldric",
+          "notes": "Bless active on party"
+        },
+        {
+          "hp": 20,
+          "initiative": 12,
+          "isPlayer": false,
+          "maxHp": 39,
+          "name": "Dragonclaw 2",
+          "notes": "Injured"
+        },
+        {
+          "hp": 48,
+          "initiative": 9,
+          "isPlayer": true,
+          "maxHp": 48,
+          "name": "Thorin Ironshield",
+          "notes": ""
+        }
+      ],
+      "currentRound": 2,
+      "currentTurn": 1,
+      "name": "Ambush on the Road",
+      "state": "started",
+      "minimized": false
+    },
+    {
+      "chapter": "Chapter 2: The Journey",
+      "combatants": [
+        {
+          "hp": 48,
+          "initiative": 0,
+          "isPlayer": true,
+          "maxHp": 48,
+          "name": "Thorin Ironshield",
+          "notes": ""
+        },
+        {
+          "hp": 28,
+          "initiative": 0,
+          "isPlayer": true,
+          "maxHp": 28,
+          "name": "Elara Moonwhisper",
+          "notes": ""
+        },
+        {
+          "hp": 35,
+          "initiative": 0,
+          "isPlayer": true,
+          "maxHp": 35,
+          "name": "Finn Quickfoot",
+          "notes": ""
+        },
+        {
+          "hp": 40,
+          "initiative": 0,
+          "isPlayer": true,
+          "maxHp": 40,
+          "name": "Brother Aldric",
+          "notes": ""
+        },
+        {
+          "hp": 39,
+          "initiative": 0,
+          "isPlayer": false,
+          "maxHp": 39,
+          "name": "Guard Drake",
+          "notes": ""
+        },
+        {
+          "hp": 9,
+          "initiative": 0,
+          "isPlayer": false,
+          "maxHp": 9,
+          "name": "Cultist",
+          "notes": ""
+        },
+        {
+          "hp": 9,
+          "initiative": 0,
+          "isPlayer": false,
+          "maxHp": 9,
+          "name": "Cultist",
+          "notes": ""
+        }
+      ],
+      "name": "Cave Entrance Guards",
+      "state": "unstarted",
+      "minimized": true
+    },
+    {
+      "chapter": "Chapter 3: The Finale",
+      "combatants": [
+        {
+          "hp": 48,
+          "initiative": 0,
+          "isPlayer": true,
+          "maxHp": 48,
+          "name": "Thorin Ironshield",
+          "notes": ""
+        },
+        {
+          "hp": 28,
+          "initiative": 0,
+          "isPlayer": true,
+          "maxHp": 28,
+          "name": "Elara Moonwhisper",
+          "notes": ""
+        },
+        {
+          "hp": 35,
+          "initiative": 0,
+          "isPlayer": true,
+          "maxHp": 35,
+          "name": "Finn Quickfoot",
+          "notes": ""
+        },
+        {
+          "hp": 40,
+          "initiative": 0,
+          "isPlayer": true,
+          "maxHp": 40,
+          "name": "Brother Aldric",
+          "notes": ""
+        }
+      ],
+      "name": "Boss: Langdedrosa Cyanwrath",
+      "state": "unstarted",
+      "minimized": true
+    }
+  ],
+  "name": "Sample Adventure",
+  "players": [
+    {
+      "ac": 18,
+      "class": "Fighter",
+      "dndBeyondUrl": "",
+      "initiativeBonus": 1,
+      "level": 5,
+      "maxHp": 48,
+      "name": "Thorin Ironshield",
+      "notes": "Great Weapon Master feat, uses magic greatsword +1",
+      "passiveInsight": 11,
+      "passiveInvestigation": 11,
+      "passivePerception": 13,
+      "playerName": "Alice",
+      "race": "Dwarf",
+      "speed": 25
+    },
+    {
+      "ac": 13,
+      "class": "Wizard",
+      "dndBeyondUrl": "",
+      "initiativeBonus": 3,
+      "level": 5,
+      "maxHp": 28,
+      "name": "Elara Moonwhisper",
+      "notes": "Sculpt Spells feature, has Fireball and Counterspell prepared",
+      "passiveInsight": 12,
+      "passiveInvestigation": 17,
+      "passivePerception": 14,
+      "playerName": "Bob",
+      "race": "Half-Elf",
+      "speed": 30
+    },
+    {
+      "ac": 16,
+      "class": "Rogue",
+      "dndBeyondUrl": "",
+      "initiativeBonus": 4,
+      "level": 5,
+      "maxHp": 35,
+      "name": "Finn Quickfoot",
+      "notes": "Sneak attack 3d6, has poisoner's kit and thieves' tools",
+      "passiveInsight": 15,
+      "passiveInvestigation": 13,
+      "passivePerception": 18,
+      "playerName": "Charlie",
+      "race": "Halfling",
+      "speed": 25
+    },
+    {
+      "ac": 18,
+      "class": "Cleric",
+      "dndBeyondUrl": "",
+      "initiativeBonus": 0,
+      "level": 5,
+      "maxHp": 40,
+      "name": "Brother Aldric",
+      "notes": "Channel Divinity available, prepared healing spells",
+      "passiveInsight": 17,
+      "passiveInvestigation": 10,
+      "passivePerception": 15,
+      "playerName": "Dana",
+      "race": "Human",
+      "speed": 30
+    }
+  ]
+}
