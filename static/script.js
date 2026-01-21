@@ -359,6 +359,7 @@ function setupEventListeners() {
     document.getElementById('newAdventureBtn').addEventListener('click', createNewAdventure);
     document.getElementById('deleteAdventureBtn').addEventListener('click', deleteCurrentAdventure);
     document.getElementById('chapterSelect').addEventListener('change', handleChapterChange);
+    document.getElementById('chapterNotes').addEventListener('input', handleChapterNotesChange);
     document.getElementById('addPlayerBtn').addEventListener('click', addPlayer);
     document.getElementById('addEncounterBtn').addEventListener('click', addEncounter);
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
@@ -502,6 +503,8 @@ async function handleAdventureChange(e) {
     const name = e.target.value;
     if (!name) {
         document.getElementById('adventureContent').style.display = 'none';
+        document.getElementById('adventureSelectionHeader').style.display = 'flex';
+        document.getElementById('adventureHeader').style.display = 'none';
         // Clear URL parameter
         const url = new URL(window.location);
         url.searchParams.delete('adventure');
@@ -511,6 +514,11 @@ async function handleAdventureChange(e) {
     
     const response = await fetch(`/api/adventure/${name}`);
     currentAdventure = await response.json();
+    
+    // Update header to show adventure title
+    document.getElementById('adventureSelectionHeader').style.display = 'none';
+    document.getElementById('adventureHeader').style.display = 'flex';
+    document.getElementById('adventureTitleText').textContent = currentAdventure.name;
     
     // Initialize chapters if not present
     if (!currentAdventure.chapters) {
@@ -595,7 +603,27 @@ function handleChapterChange(event) {
     url.searchParams.set('chapter', currentChapter);
     window.history.pushState({}, '', url);
     
+    // Update chapter notes display
+    updateChapterNotesDisplay();
+    
     renderEncounters();
+}
+
+// Handle chapter notes change
+function handleChapterNotesChange(event) {
+    if (!currentAdventure.chapterNotes) {
+        currentAdventure.chapterNotes = {};
+    }
+    currentAdventure.chapterNotes[currentChapter] = event.target.value;
+    autoSave();
+}
+
+// Update chapter notes display
+function updateChapterNotesDisplay() {
+    const notesTextarea = document.getElementById('chapterNotes');
+    if (notesTextarea) {
+        notesTextarea.value = (currentAdventure.chapterNotes && currentAdventure.chapterNotes[currentChapter]) || '';
+    }
 }
 
 // Add new chapter
@@ -652,6 +680,7 @@ function deleteChapter() {
 // Render adventure
 function renderAdventure() {
     renderChapterSelector();
+    updateChapterNotesDisplay();
     renderPlayers();
     renderEncounters();
 }
@@ -693,7 +722,7 @@ function renderPlayers() {
             <td><input type="number" value="${player.passiveInsight || 10}" onchange="updatePlayer(${index}, 'passiveInsight', parseInt(this.value))" style="width: 38px;"></td>
             <td><input type="number" value="${player.passiveInvestigation || 10}" onchange="updatePlayer(${index}, 'passiveInvestigation', parseInt(this.value))" style="width: 38px;"></td>
             <td style="width: 150px;"><input type="text" value="${player.notes || ''}" onchange="updatePlayer(${index}, 'notes', this.value)" style="width: 150px;"></td>
-            <td><button class="btn-small btn-danger" onclick="removePlayer(${index})" style="padding: 4px 8px; font-size: 16px;" title="Delete">×</button></td>
+            <td><button class="btn-small" onclick="removePlayer(${index})" style="background: #e74c3c; padding: 4px 8px;" title="Delete this player">×</button></td>
         `;
     });
 }
@@ -772,6 +801,12 @@ function renderEncounters() {
             encounter.minimized = encounter.state !== 'started';
         }
         const card = createEncounterCard(encounter, index);
+        
+        // Set background color for completed encounters
+        if (encounter.state === 'complete') {
+            card.style.backgroundColor = '#e8f5e9'; // Light green background
+        }
+        
         container.appendChild(card);
     });
 }
@@ -824,6 +859,9 @@ function createEncounterCard(encounter, encounterIndex) {
     
     const minimizeIcon = encounter.minimized ? '▶' : '▼';
     
+    // Show encounter controls only if not started or completed
+    const showControls = !encounter.state || encounter.state === 'unstarted';
+    
     header.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -833,11 +871,13 @@ function createEncounterCard(encounter, encounterIndex) {
                            onchange="updateEncounterName(${encounterIndex}, this.value)" style="border: 1px solid #ddd; padding: 5px; flex: 1;">
                     <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap;">XP: ${calculateEncounterXP(encounter)}</span>
                 </div>
+                ${showControls ? `
                 <div class="encounter-controls">
-                    <button class="btn-small" onclick="addMonsterFromLibrary(${encounterIndex})" title="Add Monster">+</button>
+                    <button class="btn-small" onclick="addMonsterFromLibrary(${encounterIndex})" style="background: #27ae60;" title="Add a monster to this encounter">+</button>
                     <button class="btn-small" onclick="refreshPlayers(${encounterIndex})" style="background: #3498db;" title="Refresh player stats from Players section">↻</button>
-                    <button class="btn-small btn-danger" onclick="removeEncounter(${encounterIndex})" title="Delete Encounter">×</button>
+                    <button class="btn-small" onclick="removeEncounter(${encounterIndex})" style="background: #e74c3c;" title="Delete this encounter">×</button>
                 </div>
+                ` : ''}
             </div>
             <div style="display: ${encounter.minimized ? 'none' : 'flex'}; align-items: center; gap: 15px;">
                 <div class="encounter-controls">
@@ -955,7 +995,7 @@ function createEncounterCard(encounter, encounterIndex) {
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))"></td>
             <td><input type="text" value="${combatant.notes || ''}" 
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'notes', this.value)"></td>
-            <td><button class="btn-small btn-danger" onclick="removeCombatant(${encounterIndex}, ${combatantIndex})" style="padding: 4px 8px; font-size: 16px;" title="Delete">×</button></td>
+            <td><button class="btn-small" onclick="removeCombatant(${encounterIndex}, ${combatantIndex})" style="background: #e74c3c; padding: 4px 8px;" title="Delete this combatant">×</button></td>
         `;
     });
     

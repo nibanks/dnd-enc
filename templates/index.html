@@ -4,28 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D&D Encounter Tracker</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎲 D&D Encounter Tracker</h1>
-            <div class="header-controls">
-                <select id="adventureSelect">
+            <!-- Base page: Adventure selection -->
+            <div id="adventureSelectionHeader" style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                <h1 style="margin: 0; flex-shrink: 0;">🎲 D&D Encounter Tracker</h1>
+                <select id="adventureSelect" style="flex: 1; max-width: 400px;">
                     <option value="">-- Select Adventure --</option>
                 </select>
-                <button id="newAdventureBtn">New Adventure</button>
-                <button id="deleteAdventureBtn">Delete Adventure</button>
-                <button id="settingsBtn" style="background: #9b59b6;">⚙️ Settings</button>
+                <button id="newAdventureBtn" style="background: #27ae60;" title="Create a new adventure">+</button>
+            </div>
+            
+            <!-- Adventure page: Title with controls -->
+            <div id="adventureHeader" style="display: none; justify-content: space-between; align-items: center;">
+                <h1 id="adventureTitle" style="margin: 0;">
+                    <a href="/" style="text-decoration: none; cursor: pointer;" title="Return to adventure selection">🎲</a>
+                    <span id="adventureTitleText">Adventure Name</span>
+                </h1>
+                <div class="header-controls">
+                    <button id="deleteAdventureBtn" style="background: #e74c3c;" title="Delete current adventure">×</button>
+                    <button id="settingsBtn" style="background: #9b59b6;" title="Open settings">⚙️</button>
+                </div>
             </div>
         </header>
 
         <div id="adventureContent" style="display: none;">
             <!-- Players Section -->
             <section class="section">
-                <h2>Players</h2>
-                <button id="addPlayerBtn" class="btn-add">+ Add Player</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Players</h2>
+                    <button id="addPlayerBtn" class="btn-add" style="background: #27ae60;" title="Add a new player">+</button>
+                </div>
                 <div class="table-container">
                     <table id="playersTable">
                         <thead>
@@ -53,20 +66,34 @@
                 </div>
             </section>
 
+            <!-- Chapter Section -->
+            <section class="section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Chapter</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="addChapter()" style="padding: 8px 12px; background: #27ae60;" title="Add a new chapter">+</button>
+                        <button onclick="deleteChapter()" style="padding: 8px 12px; background: #e74c3c;" title="Delete current chapter">×</button>
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <select id="chapterSelect" style="padding: 8px 12px; width: 100%;">
+                        <option value="">-- Select Chapter --</option>
+                    </select>
+                </div>
+                <div style="margin-top: 15px;">
+                    <label style="font-weight: 500; display: block; margin-bottom: 5px;">Notes:</label>
+                    <textarea id="chapterNotes" 
+                              style="width: 100%; min-height: 150px; padding: 10px; font-family: inherit; font-size: 14px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;"
+                              placeholder="Add chapter notes here..."></textarea>
+                </div>
+            </section>
+
             <!-- Encounters Section -->
             <section class="section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h2 style="margin: 0;">Encounters</h2>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <label style="font-weight: 500;">Chapter:</label>
-                        <select id="chapterSelect" style="padding: 8px 12px;">
-                            <option value="">-- Select Chapter --</option>
-                        </select>
-                        <button onclick="addChapter()" style="padding: 8px 12px; background: #9b59b6;" title="Add new chapter">+ Chapter</button>
-                        <button onclick="deleteChapter()" style="padding: 8px 12px; background: #e74c3c;" title="Delete current chapter">Delete Chapter</button>
-                    </div>
+                    <h3 style="margin: 0;">Encounters</h3>
+                    <button id="addEncounterBtn" class="btn-add" style="background: #27ae60;" title="Add a new encounter">+</button>
                 </div>
-                <button id="addEncounterBtn" class="btn-add">+ Add Encounter</button>
                 <div id="encountersContainer"></div>
             </section>
         </div>
