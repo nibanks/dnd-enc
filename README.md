@@ -67,20 +67,32 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
 4. **Open in browser**:
    Navigate to `http://localhost:5000`
 
+5. **⚠️ REQUIRED: Configure D&D Beyond Authentication**
+   - The app **requires** D&D Beyond cookies to function
+   - On first launch, you'll see a warning and must configure cookies before proceeding
+   - See "First-Time Setup" section below for detailed instructions
+
 ## Usage
 
-### First-Time Setup: D&D Beyond Integration
+### First-Time Setup: D&D Beyond Integration (REQUIRED)
 
-1. **Export Cookies** from your browser while logged into D&D Beyond:
-   - Install a cookie export extension (e.g., "Cookie Editor" or "EditThisCookie")
-   - Visit dndbeyond.com while logged in
-   - Export all cookies as JSON
+**⚠️ This step is mandatory** - the app cannot create adventures or fetch monster data without authentication.
 
-2. **Import Cookies** into the app:
-   - Click the ⚙️ Settings button
-   - Paste your cookies JSON into the text area
-   - Click "Save & Test Connection"
-   - Monster stats will now be fetched automatically when you add them
+1. **Get your cookies** from D&D Beyond:
+   - Open [dndbeyond.com](https://www.dndbeyond.com) in your browser
+   - **Log in** to your D&D Beyond account
+   - Press **F12** to open Developer Tools
+   - Go to the **Console** tab
+   - Copy and paste this command: `document.cookie`
+   - Press **Enter** and copy the entire result (a long string with multiple cookies)
+
+2. **Configure the app**:
+   - Click the ⚙️ Settings button (available on all pages)
+   - Paste the cookie string into the text area
+   - Click "Save Cookies"
+   - Once successful, you can create adventures and add monsters
+
+**Note:** The cookie string contains all authentication tokens needed to access D&D Beyond content. Monster details are fetched on-demand when you add them to encounters.
 
 ### Creating an Adventure
 1. From the home page, click the + button

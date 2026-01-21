@@ -4,6 +4,7 @@ let currentChapter = null;
 let autoSaveTimeout = null;
 let DND_MONSTERS = {}; // Will be populated dynamically or use fallback
 let monstersLoaded = false;
+let hasCookies = false; // Track cookie authentication status
 
 // D&D 5e/2024 Classes
 const DND_CLASSES = [
@@ -330,6 +331,9 @@ function updateAuthButton(authenticated) {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    // Check cookie status first
+    await checkCookieStatus();
+    
     await loadAdventuresList();
     setupEventListeners();
     // Load monsters from D&D Beyond
@@ -347,10 +351,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const url = new URL(window.location);
     const adventureName = url.searchParams.get('adventure');
     if (adventureName) {
-        const select = document.getElementById('adventureSelect');
-        select.value = adventureName;
-        // Trigger the change event to load the adventure
-        await handleAdventureChange({ target: select });
+        // Only auto-load if we have cookies
+        if (hasCookies) {
+            const select = document.getElementById('adventureSelect');
+            select.value = adventureName;
+            // Trigger the change event to load the adventure
+            await handleAdventureChange({ target: select });
+        } else {
+            // Redirect to home and show settings
+            window.history.replaceState({}, '', '/');
+            openSettingsModal();
+        }
     }
 });
 
@@ -363,6 +374,7 @@ function setupEventListeners() {
     document.getElementById('addPlayerBtn').addEventListener('click', addPlayer);
     document.getElementById('addEncounterBtn').addEventListener('click', addEncounter);
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
+    document.getElementById('settingsBtnSelection').addEventListener('click', openSettingsModal);
 }
 
 // Settings Modal
@@ -374,6 +386,58 @@ function openSettingsModal() {
 function closeSettingsModal() {
     const modal = document.getElementById('settingsModal');
     modal.style.display = 'none';
+}
+
+// Check cookie status
+async function checkCookieStatus() {
+    try {
+        const response = await fetch('/api/dndbeyond/cookie-status');
+        const result = await response.json();
+        hasCookies = result.hasCookies;
+        updateUIForCookieStatus();
+    } catch (error) {
+        console.error('Error checking cookie status:', error);
+        hasCookies = false;
+        updateUIForCookieStatus();
+    }
+}
+
+// Update UI based on cookie authentication status
+function updateUIForCookieStatus() {
+    const adventureSelect = document.getElementById('adventureSelect');
+    const newAdventureBtn = document.getElementById('newAdventureBtn');
+    const adventureSelectionHeader = document.getElementById('adventureSelectionHeader');
+    
+    if (!hasCookies) {
+        // Disable adventure controls
+        adventureSelect.disabled = true;
+        newAdventureBtn.disabled = true;
+        
+        // Add warning message if not already present
+        if (!document.getElementById('cookieWarning')) {
+            const warning = document.createElement('div');
+            warning.id = 'cookieWarning';
+            warning.style.cssText = 'background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;';
+            warning.innerHTML = `
+                <h3 style="margin: 0 0 10px 0; color: #856404;">⚠️ Authentication Required</h3>
+                <p style="margin: 0 0 10px 0; color: #856404;">You must configure D&D Beyond cookies before using this app.</p>
+                <button onclick="openSettingsModal()" style="background: #9b59b6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                    ⚙️ Open Settings to Configure
+                </button>
+            `;
+            adventureSelectionHeader.parentNode.insertBefore(warning, adventureSelectionHeader.nextSibling);
+        }
+    } else {
+        // Enable adventure controls
+        adventureSelect.disabled = false;
+        newAdventureBtn.disabled = false;
+        
+        // Remove warning if present
+        const warning = document.getElementById('cookieWarning');
+        if (warning) {
+            warning.remove();
+        }
+    }
 }
 
 async function saveCookies() {
@@ -405,7 +469,9 @@ async function saveCookies() {
         const result = await response.json();
         
         if (result.success) {
-            showCookieStatus(`✓ Cookies saved! You can now add monsters and their details will be fetched automatically.`, 'success');
+            showCookieStatus(`✓ Cookies saved! You can now create adventures and add monsters.`, 'success');
+            // Update cookie status and UI
+            await checkCookieStatus();
         } else {
             showCookieStatus('Failed to save cookies: ' + result.error, 'error');
         }
@@ -415,10 +481,14 @@ async function saveCookies() {
 }
 
 function clearCookies() {
-    if (confirm('Clear saved D&D Beyond cookies?')) {
+    if (confirm('Clear saved D&D Beyond cookies? This will prevent you from using the app until you reconfigure.')) {
         fetch('/api/dndbeyond/clear-cookies', { method: 'POST' });
         document.getElementById('cookieInput').value = '';
-        showCookieStatus('Cookies cleared. Will use fallback monster list.', 'info');
+        showCookieStatus('Cookies cleared. You must reconfigure to use the app.', 'warning');
+        
+        // Update cookie status and UI
+        hasCookies = false;
+        updateUIForCookieStatus();
         
         // Reset to fallback
         monstersLoaded = false;
@@ -512,6 +582,14 @@ async function handleAdventureChange(e) {
         return;
     }
     
+    // Check if cookies are configured
+    if (!hasCookies) {
+        alert('You must configure D&D Beyond cookies before loading adventures. Click Settings (⚙️) to set up.');
+        openSettingsModal();
+        e.target.value = ''; // Reset selection
+        return;
+    }
+    
     const response = await fetch(`/api/adventure/${name}`);
     currentAdventure = await response.json();
     
@@ -556,6 +634,13 @@ async function handleAdventureChange(e) {
 
 // Create new adventure
 async function createNewAdventure() {
+    // Check if cookies are configured
+    if (!hasCookies) {
+        alert('You must configure D&D Beyond cookies before creating adventures. Click Settings (⚙️) to set up.');
+        openSettingsModal();
+        return;
+    }
+    
     const name = prompt('Enter adventure name:');
     if (!name) return;
     
@@ -1016,15 +1101,33 @@ function addEncounter() {
         dndBeyondUrl: player.dndBeyondUrl || ''
     }));
     
+    const newEncounterIndex = currentAdventure.encounters.length;
+    
     currentAdventure.encounters.push({
         name: 'New Encounter',
         chapter: currentChapter,
         combatants: combatants,
         currentTurn: 0,
-        minimized: true
+        minimized: false  // Expanded by default for new encounters
     });
     renderEncounters();
     autoSave();
+    
+    // Focus the title input of the newly added encounter
+    setTimeout(() => {
+        const encounterCards = document.querySelectorAll('.encounter-title');
+        // Find the encounter card for this chapter
+        const chapterEncounters = currentAdventure.encounters
+            .map((encounter, index) => ({ encounter, index }))
+            .filter(({ encounter }) => encounter.chapter === currentChapter);
+        
+        // The new encounter is the last one in the filtered list
+        const newEncounterPosition = chapterEncounters.findIndex(({ index }) => index === newEncounterIndex);
+        if (newEncounterPosition >= 0 && encounterCards[newEncounterPosition]) {
+            encounterCards[newEncounterPosition].focus();
+            encounterCards[newEncounterPosition].select();
+        }
+    }, 50);
 }
 
 // Toggle encounter minimize state

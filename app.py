@@ -58,6 +58,16 @@ def clear_dndbeyond_cookies():
     print("Cleared D&D Beyond cookies and cache file")
     return jsonify({"success": True})
 
+@app.route('/api/dndbeyond/cookie-status', methods=['GET'])
+def check_cookie_status():
+    """Check if cookies are configured"""
+    has_cookies = len(DNDBEYOND_COOKIES) > 0
+    return jsonify({
+        "success": True,
+        "hasCookies": has_cookies,
+        "cookieCount": len(DNDBEYOND_COOKIES)
+    })
+
 @app.route('/api/dndbeyond/monsters', methods=['GET'])
 def get_dndbeyond_monsters():
     """Scrape monsters from D&D Beyond and cache them"""
