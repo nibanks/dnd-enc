@@ -474,6 +474,8 @@ function showToast(message, type = 'info', duration = 3000) {
     }, duration);
 }
 
+
+
 // Authenticate with D&D Beyond
 function authenticateDndBeyond() {
     openSettingsModal();
@@ -779,9 +781,13 @@ function calculateEncounterXP(encounter) {
     if (!encounter.combatants) return 0;
     
     const totalXP = encounter.combatants
-        .filter(combatant => !isPlayerCombatant(combatant) && combatant.cr)
+        .filter(combatant => !isPlayerCombatant(combatant))
         .reduce((sum, combatant) => {
-            const xp = CR_TO_XP[combatant.cr] || 0;
+            // Look up CR from monster list
+            const baseName = combatant.name.split(' ')[0]; // Get base name
+            const monster = DND_MONSTERS[baseName];
+            const cr = monster?.cr || combatant.cr || ''; // Fallback to combatant.cr if stored
+            const xp = CR_TO_XP[cr] || 0;
             return sum + xp;
         }, 0);
     
@@ -878,8 +884,31 @@ function createEncounterCard(encounter, encounterIndex) {
     encounter.combatants.forEach((combatant, combatantIndex) => {
         const row = tbody.insertRow();
         const isPlayer = isPlayerCombatant(combatant);
-        const isActive = encounter.state === 'started' && combatant.isActive;
+        const isActive = encounter.state === 'started' && encounter.activeCombatant === combatant.name;
         row.className = isActive ? 'combatant-row active' : 'combatant-row';
+        
+        // Look up details from player list or monster list
+        let ac = combatant.ac || 10;
+        let cr = combatant.cr || '';
+        let dndBeyondUrl = combatant.dndBeyondUrl || '';
+        
+        if (isPlayer) {
+            // Look up player details from players array
+            const player = currentAdventure.players?.find(p => p.name === combatant.name);
+            if (player) {
+                ac = player.ac || 10;
+                dndBeyondUrl = player.dndBeyondUrl || '';
+            }
+        } else {
+            // Look up monster details from DND_MONSTERS
+            const baseName = combatant.name.split(' ')[0]; // Get base name (e.g., "Cultist" from "Cultist 2")
+            const monster = DND_MONSTERS[baseName];
+            if (monster) {
+                ac = monster.ac || 10;
+                cr = monster.cr || '';
+                dndBeyondUrl = monster.url || '';
+            }
+        }
         
         // Apply player background only if not active
         if (isPlayer && !isActive) {
@@ -894,34 +923,33 @@ function createEncounterCard(encounter, encounterIndex) {
         
         if (isPlayer) {
             // Players: always show as link if they have URL, otherwise just text (not input box)
-            if (combatant.dndBeyondUrl) {
-                nameHTML = `<a href="${combatant.dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
+            if (dndBeyondUrl) {
+                const escapedUrl = dndBeyondUrl.replace(/'/g, "\\'");
+                nameHTML = `<a href="${dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
                     class="monster-name-hover" 
-                    onmouseenter="showMonsterTooltip('${combatant.name.replace(/'/g, "\\'")}', '${combatant.dndBeyondUrl}', event)"
+                    onmouseenter="showMonsterTooltip('${combatant.name.replace(/'/g, "\\'")}', '${escapedUrl}', event)"
                     onmouseleave="hideMonsterTooltip()">${combatant.name || ''}</a>`;
             } else {
                 nameHTML = `<span style="font-weight: 500; color: ${inheritColor};">${combatant.name || ''}</span>`;
             }
-        } else if (combatant.dndBeyondUrl) {
+        } else if (dndBeyondUrl) {
             // NPCs/Monsters with URL: Make name a clickable link with tooltip
-            nameHTML = `<a href="${combatant.dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
+            const escapedUrl = dndBeyondUrl.replace(/'/g, "\\'");
+            nameHTML = `<a href="${dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
                 class="monster-name-hover" 
-                onmouseenter="showMonsterTooltip('${combatant.name.replace(/'/g, "\\'")}', '${combatant.dndBeyondUrl}', event)"
+                onmouseenter="showMonsterTooltip('${combatant.name.replace(/'/g, "\\'")}', '${escapedUrl}', event)"
                 onmouseleave="hideMonsterTooltip()">${combatant.name || ''}</a>`;
-        } else if (combatant.isMonster) {
-            // Read-only input for monsters without URLs
-            nameHTML = `<input type="text" value="${combatant.name || ''}" readonly style="background: #f0f0f0; cursor: not-allowed; color: ${inheritColor};" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'name', this.value)">`;
         } else {
-            // Editable input for custom NPCs
-            nameHTML = `<input type="text" value="${combatant.name || ''}" style="color: ${inheritColor};" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'name', this.value)">`;
+            // Monsters without URLs
+            nameHTML = `<span style="font-weight: 500; color: ${inheritColor};">${combatant.name || ''}</span>`;
         }
         
         row.innerHTML = `
-            <td style="text-align: center;">${(encounter.state === 'started' && combatant.isActive) ? '▶' : ''}</td>
+            <td style="text-align: center;">${(encounter.state === 'started' && encounter.activeCombatant === combatant.name) ? '▶' : ''}</td>
             <td>${nameHTML}</td>
-            <td style="text-align: center;">${isPlayer ? '<span style="color: #999;">-</span>' : (combatant.isMonster ? `<span style="color: #666; font-weight: 500;">${combatant.cr || ''}</span>` : (!encounter.state ? `<input type="text" value="${combatant.cr || ''}" style="width: 50px; text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'cr', this.value)">` : `<span style="color: #666; font-weight: 500;">${combatant.cr || ''}</span>`))}</td>
+            <td style="text-align: center;">${isPlayer ? '<span style="color: #999;">-</span>' : `<span style="color: #666; font-weight: 500;">${cr}</span>`}</td>
             <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.initiative || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'initiative', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.initiative || 0}</span>`}</td>
-            <td style="text-align: center;">${isPlayer ? `<span style="color: #666; font-weight: 500;">${combatant.ac || 10}</span>` : (!encounter.state ? `<input type="number" value="${combatant.ac || 10}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'ac', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.ac || 10}</span>`)}</td>
+            <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${ac}</span></td>
             <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.maxHp || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'maxHp', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.maxHp || 0}</span>`}</td>
             <td><input type="number" class="hp-input" value="${combatant.hp || 0}" style="text-align: center;"
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))"></td>
@@ -944,7 +972,6 @@ function addEncounter() {
         maxHp: player.maxHp || 0,
         ac: player.ac || 10,
         notes: '',
-        isActive: false,
         isPlayer: true,
         dndBeyondUrl: player.dndBeyondUrl || ''
     }));
@@ -1145,9 +1172,7 @@ function selectMonster(monsterName) {
             cr: monster.cr,
             dndBeyondUrl: monster.url,
             notes: '',
-            isActive: false,
-            isPlayer: false,
-            isMonster: true
+            isPlayer: false
         });
     }
     
@@ -1277,7 +1302,6 @@ function addCustomCombatant(encounterIndex) {
         cr: '',
         dndBeyondUrl: '',
         notes: '',
-        isActive: false,
         isPlayer: false
     });
     renderEncounters();
@@ -1322,14 +1346,13 @@ function refreshPlayers(encounterIndex) {
                 combatant.dndBeyondUrl = player.dndBeyondUrl || '';
             }
         }
-        // Clear active state
-        combatant.isActive = false;
     });
     
     // Reset encounter to never started state
     encounter.state = null;
     encounter.currentTurn = 0;
     encounter.currentRound = 0;
+    encounter.activeCombatant = null;
     
     renderEncounters();
     autoSave();
@@ -1339,15 +1362,11 @@ function refreshPlayers(encounterIndex) {
 function resetEncounter(encounterIndex) {
     const encounter = currentAdventure.encounters[encounterIndex];
     
-    // Clear active states
-    encounter.combatants.forEach(combatant => {
-        combatant.isActive = false;
-    });
-    
     // Reset to unstarted state
     encounter.state = null;
     encounter.currentTurn = 0;
     encounter.currentRound = 0;
+    encounter.activeCombatant = null;
     
     renderEncounters();
     autoSave();
@@ -1363,8 +1382,7 @@ function startEncounter(encounterIndex) {
     
     // Set first combatant as active
     if (encounter.combatants.length > 0) {
-        encounter.combatants.forEach(c => c.isActive = false);
-        encounter.combatants[0].isActive = true;
+        encounter.activeCombatant = encounter.combatants[0].name;
     }
     
     renderEncounters();
@@ -1378,8 +1396,8 @@ function endEncounter(encounterIndex) {
     encounter.currentTurn = 0;
     // Keep currentRound to show final count
     
-    // Clear all active states
-    encounter.combatants.forEach(c => c.isActive = false);
+    // Clear active state
+    encounter.activeCombatant = null;
     
     renderEncounters();
     autoSave();
@@ -1393,9 +1411,6 @@ function nextTurn(encounterIndex) {
     // Only advance turn if encounter is started
     if (encounter.state !== 'started' || combatants.length === 0) return;
     
-    // Clear current active
-    combatants.forEach(c => c.isActive = false);
-    
     // Find next
     let currentIndex = encounter.currentTurn || 0;
     currentIndex = (currentIndex + 1) % combatants.length;
@@ -1405,7 +1420,7 @@ function nextTurn(encounterIndex) {
         encounter.currentRound = (encounter.currentRound || 1) + 1;
     }
     
-    combatants[currentIndex].isActive = true;
+    encounter.activeCombatant = combatants[currentIndex].name;
     encounter.currentTurn = currentIndex;
     
     renderEncounters();
@@ -1462,19 +1477,41 @@ function formatModifier(score) {
     return mod >= 0 ? `+${mod}` : `${mod}`;
 }
 
-// Render tooltip content from monster details
-function renderTooltipContent(tooltip, monsterName, details) {
+// Render tooltip content from entity details
+function renderTooltipContent(tooltip, entityName, details, isCharacter = false) {
+    if (!details) {
+        tooltip.innerHTML = '<div class="monster-tooltip-loading">No details available</div>';
+        return;
+    }
+    
     let html = '';
     
     // Header
     html += '<div class="monster-tooltip-header">';
-    html += `<div class="monster-tooltip-title">${monsterName}</div>`;
+    html += `<div class="monster-tooltip-title">${entityName}</div>`;
     
     // Meta information
     let meta = [];
-    if (details.size) meta.push(details.size);
-    if (details.type) meta.push(details.type);
-    if (details.alignment) meta.push(details.alignment);
+    if (isCharacter) {
+        // For characters, show summary (e.g., "Level 1 Tiefling Rogue")
+        if (details.summary) {
+            meta.push(details.summary);
+        } else {
+            // Build from classes array
+            if (details.classes && details.classes.length > 0) {
+                const classStr = details.classes.map(c => `${c.name} ${c.level}`).join('/');
+                meta.push(classStr);
+            } else if (details.class) {
+                meta.push(details.class);
+            }
+            if (details.race) meta.push(details.race);
+        }
+    } else {
+        // For monsters, show size/type/alignment
+        if (details.size) meta.push(details.size);
+        if (details.type) meta.push(details.type);
+        if (details.alignment) meta.push(details.alignment);
+    }
     if (meta.length > 0) {
         html += `<div class="monster-tooltip-meta">${meta.join(', ')}</div>`;
     }
@@ -1486,44 +1523,71 @@ function renderTooltipContent(tooltip, monsterName, details) {
         const acDisplay = details.acType ? `${details.ac} (${details.acType})` : details.ac;
         html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">AC:</span><span class="monster-tooltip-stat-value">${acDisplay}</span></div>`;
     }
-    if (details.hp || details.maxHp) {
-        const hp = details.hp || details.maxHp;
-        const hpDisplay = details.hitDice ? `${hp} (${details.hitDice})` : hp;
+    // Handle HP - check for object first (character format), then numeric/string (monster format)
+    if (details.hp && typeof details.hp === 'object') {
+        // Character format: {current: X, max: Y}
+        const hpDisplay = details.hp.max ? `${details.hp.current || details.hp.max}/${details.hp.max}` : details.hp.current || details.hp.max;
+        html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">HP:</span><span class="monster-tooltip-stat-value">${hpDisplay}</span></div>`;
+    } else if (details.hp) {
+        // Monster format: numeric HP value
+        const hpDisplay = details.hitDice ? `${details.hp} (${details.hitDice})` : details.hp;
+        html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">HP:</span><span class="monster-tooltip-stat-value">${hpDisplay}</span></div>`;
+    } else if (details.maxHp) {
+        // Alternative format: maxHp field
+        const hpDisplay = details.hitDice ? `${details.maxHp} (${details.hitDice})` : details.maxHp;
         html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">HP:</span><span class="monster-tooltip-stat-value">${hpDisplay}</span></div>`;
     }
     if (details.speed) {
-        html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">Speed:</span><span class="monster-tooltip-stat-value">${details.speed}</span></div>`;
+        const speedDisplay = typeof details.speed === 'number' ? `${details.speed} ft.` : details.speed;
+        html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">Speed:</span><span class="monster-tooltip-stat-value">${speedDisplay}</span></div>`;
+    } else if (details.walkSpeed) {
+        html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">Speed:</span><span class="monster-tooltip-stat-value">${details.walkSpeed} ft.</span></div>`;
     }
-    if (details.cr) {
+    // Handle both initiativeBonus (monsters) and initiative (characters)
+    const init = details.initiativeBonus !== undefined ? details.initiativeBonus : 
+                 details.initiativeModifier !== undefined ? details.initiativeModifier : details.initiative;
+    if (init !== undefined) {
+        const initDisplay = init >= 0 ? `+${init}` : `${init}`;
+        html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">Initiative:</span><span class="monster-tooltip-stat-value">${initDisplay}</span></div>`;
+    }
+    if (!isCharacter && details.cr) {
         const xp = details.xp || CR_TO_XP[details.cr] || '';
         const crDisplay = xp ? `${details.cr} (${xp} XP)` : details.cr;
         html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">CR:</span><span class="monster-tooltip-stat-value">${crDisplay}</span></div>`;
     }
     html += '</div>';
     
-    // Ability Scores
-    if (details.abilities) {
+    // Ability Scores - handle both old format (nested object) and new format (flat values with separate modifiers)
+    const abilities = details.abilities;
+    const abilityMods = details.ability_modifiers;
+    if (abilities) {
         html += '<div class="monster-tooltip-abilities">';
         ['str', 'dex', 'con', 'int', 'wis', 'cha'].forEach(ability => {
-            if (details.abilities[ability]) {
-                const score = details.abilities[ability].score || 10;
-                const mod = details.abilities[ability].modifier !== undefined ? 
-                    (details.abilities[ability].modifier >= 0 ? `+${details.abilities[ability].modifier}` : `${details.abilities[ability].modifier}`) : 
-                    formatModifier(score);
-                html += `<div class="monster-tooltip-ability">
-                    <div class="monster-tooltip-ability-name">${ability.toUpperCase()}</div>
-                    <div class="monster-tooltip-ability-score">${score}</div>
-                    <div class="monster-tooltip-ability-mod">${mod}</div>
-                </div>`;
+            let score, mod;
+            if (typeof abilities[ability] === 'object' && abilities[ability] !== null) {
+                // Old format: {score: 10, modifier: 0}
+                score = abilities[ability].score || 10;
+                mod = abilities[ability].modifier !== undefined ? abilities[ability].modifier : formatModifier(score);
+            } else if (typeof abilities[ability] === 'number') {
+                // New format: abilities[ability] = 10, ability_modifiers[ability] = 0
+                score = abilities[ability];
+                mod = abilityMods && abilityMods[ability] !== undefined ? abilityMods[ability] : Math.floor((score - 10) / 2);
+            } else {
+                return; // Skip if no data
             }
+            
+            const modDisplay = mod >= 0 ? `+${mod}` : `${mod}`;
+            html += `<div class="monster-tooltip-ability">
+                <div class="monster-tooltip-ability-name">${ability.toUpperCase()}</div>
+                <div class="monster-tooltip-ability-score">${score}</div>
+                <div class="monster-tooltip-ability-mod">${modDisplay}</div>
+            </div>`;
         });
         html += '</div>';
     }
     
     // Saving Throws
     if (details.savingThrows) {
-        html += '<div class="monster-tooltip-section">';
-        html += '<div class="monster-tooltip-section-title">Saving Throws</div>';
         let saves = '';
         if (typeof details.savingThrows === 'string') {
             saves = details.savingThrows;
@@ -1533,6 +1597,8 @@ function renderTooltipContent(tooltip, monsterName, details) {
                 .join(', ');
         }
         if (saves) {
+            html += '<div class="monster-tooltip-section">';
+            html += '<div class="monster-tooltip-section-title">Saving Throws</div>';
             html += `<div class="monster-tooltip-section-content">${saves}</div>`;
             html += '</div>';
         }
@@ -1540,8 +1606,6 @@ function renderTooltipContent(tooltip, monsterName, details) {
     
     // Skills
     if (details.skills) {
-        html += '<div class="monster-tooltip-section">';
-        html += '<div class="monster-tooltip-section-title">Skills</div>';
         let skillsText = '';
         if (typeof details.skills === 'string') {
             // Parse "Deception+3,Stealth+5" format and add spaces
@@ -1552,29 +1616,48 @@ function renderTooltipContent(tooltip, monsterName, details) {
                 .join(', ');
         }
         if (skillsText) {
+            html += '<div class="monster-tooltip-section">';
+            html += '<div class="monster-tooltip-section-title">Skills</div>';
             html += `<div class="monster-tooltip-section-content">${skillsText}</div>`;
             html += '</div>';
         }
     }
     
-    // Resistances/Immunities
-    if (details.damageResistances) {
-        html += '<div class="monster-tooltip-section">';
-        html += '<div class="monster-tooltip-section-title">Resistances</div>';
-        html += `<div class="monster-tooltip-section-content">${details.damageResistances}</div>`;
-        html += '</div>';
+    // For characters, show passive senses
+    if (isCharacter) {
+        let passives = [];
+        if (details.passivePerception) passives.push(`Perception ${details.passivePerception}`);
+        if (details.passiveInsight) passives.push(`Insight ${details.passiveInsight}`);
+        if (details.passiveInvestigation) passives.push(`Investigation ${details.passiveInvestigation}`);
+        
+        if (passives.length > 0) {
+            html += '<div class="monster-tooltip-section">';
+            html += '<div class="monster-tooltip-section-title">Passive Senses</div>';
+            html += `<div class="monster-tooltip-section-content">${passives.join(', ')}</div>`;
+            html += '</div>';
+        }
     }
-    if (details.damageImmunities) {
-        html += '<div class="monster-tooltip-section">';
-        html += '<div class="monster-tooltip-section-title">Immunities</div>';
-        html += `<div class="monster-tooltip-section-content">${details.damageImmunities}</div>`;
-        html += '</div>';
-    }
-    if (details.conditionImmunities) {
-        html += '<div class="monster-tooltip-section">';
-        html += '<div class="monster-tooltip-section-title">Condition Immunities</div>';
-        html += `<div class="monster-tooltip-section-content">${details.conditionImmunities}</div>`;
-        html += '</div>';
+    
+    // Resistances/Immunities (for monsters)
+    if (!isCharacter) {
+        if (details.damageResistances) {
+            html += '<div class="monster-tooltip-section">';
+            html += '<div class="monster-tooltip-section-title">Resistances</div>';
+            html += `<div class="monster-tooltip-section-content">${details.damageResistances}</div>`;
+            html += '</div>';
+        }
+        if (details.damageImmunities) {
+            html += '<div class="monster-tooltip-section">';
+            html += '<div class="monster-tooltip-section-title">Immunities</div>';
+            html += `<div class="monster-tooltip-section-content">${details.damageImmunities}</div>`;
+            html += '</div>';
+        }
+        if (details.conditionImmunities) {
+            html += '<div class="monster-tooltip-section">';
+            html += '<div class="monster-tooltip-section-title">Condition Immunities</div>';
+            html += `<div class="monster-tooltip-section-content">${details.conditionImmunities}</div>`;
+            html += '</div>';
+        }
     }
     
     // Senses
@@ -1593,21 +1676,38 @@ function renderTooltipContent(tooltip, monsterName, details) {
         html += '</div>';
     }
     
-    // Traits
-    if (details.traits && details.traits.length > 0) {
+    // Proficiencies (for characters)
+    if (isCharacter && details.proficiencies) {
+        for (const [label, items] of Object.entries(details.proficiencies)) {
+            if (items) {
+                html += '<div class="monster-tooltip-section">';
+                html += `<div class="monster-tooltip-section-title">${label}</div>`;
+                html += `<div class="monster-tooltip-section-content">${items}</div>`;
+                html += '</div>';
+            }
+        }
+    }
+    
+    // Features/Traits
+    const featuresLabel = isCharacter ? 'Features & Traits' : 'Traits';
+    const featuresArray = details.features || details.traits;
+    
+    if (featuresArray && featuresArray.length > 0) {
         html += '<div class="monster-tooltip-section">';
-        html += '<div class="monster-tooltip-section-title">Traits</div>';
-        details.traits.forEach(trait => {
+        html += `<div class="monster-tooltip-section-title">${featuresLabel}</div>`;
+        featuresArray.forEach(feature => {
             html += `<div class="monster-tooltip-action">`;
-            html += `<div class="monster-tooltip-action-name">${trait.name}</div>`;
-            html += `<div class="monster-tooltip-action-desc">${trait.description}</div>`;
+            html += `<div class="monster-tooltip-action-name">${feature.name}</div>`;
+            if (feature.description) {
+                html += `<div class="monster-tooltip-action-desc">${feature.description}</div>`;
+            }
             html += `</div>`;
         });
         html += '</div>';
     }
     
-    // Actions
-    if (details.actions && details.actions.length > 0) {
+    // Actions (for monsters)
+    if (!isCharacter && details.actions && details.actions.length > 0) {
         html += '<div class="monster-tooltip-section">';
         html += '<div class="monster-tooltip-section-title">Actions</div>';
         details.actions.forEach(action => {
@@ -1619,8 +1719,8 @@ function renderTooltipContent(tooltip, monsterName, details) {
         html += '</div>';
     }
     
-    // Legendary Actions
-    if (details.legendaryActions && details.legendaryActions.length > 0) {
+    // Legendary Actions (for monsters)
+    if (!isCharacter && details.legendaryActions && details.legendaryActions.length > 0) {
         html += '<div class="monster-tooltip-section">';
         html += '<div class="monster-tooltip-section-title">Legendary Actions</div>';
         if (details.legendaryActionsDescription) {
@@ -1635,8 +1735,8 @@ function renderTooltipContent(tooltip, monsterName, details) {
         html += '</div>';
     }
     
-    // Reactions
-    if (details.reactions && details.reactions.length > 0) {
+    // Reactions (for monsters)
+    if (!isCharacter && details.reactions && details.reactions.length > 0) {
         html += '<div class="monster-tooltip-section">';
         html += '<div class="monster-tooltip-section-title">Reactions</div>';
         details.reactions.forEach(reaction => {
@@ -1651,7 +1751,13 @@ function renderTooltipContent(tooltip, monsterName, details) {
     tooltip.innerHTML = html;
 }
 
-function showMonsterTooltip(monsterName, monsterUrl, event) {
+// Determine if URL is a character or monster based on URL pattern
+function isCharacterUrl(url) {
+    return url && (url.includes('/profile/') || url.includes('/characters/'));
+}
+
+function showMonsterTooltip(entityName, entityUrl, event) {
+    console.log('showMonsterTooltip called:', entityName, entityUrl);
     clearTimeout(tooltipTimeout);
     
     const tooltip = createTooltipElement();
@@ -1695,8 +1801,8 @@ function showMonsterTooltip(monsterName, monsterUrl, event) {
         });
     };
     
-    // Store current monster being displayed
-    currentTooltipMonster = monsterName;
+    // Store current entity being displayed
+    currentTooltipMonster = entityName;
     
     // Add mouse enter/leave handlers to keep tooltip visible when hovering over it
     tooltip.addEventListener('mouseenter', () => {
@@ -1707,14 +1813,40 @@ function showMonsterTooltip(monsterName, monsterUrl, event) {
         hideMonsterTooltip();
     });
     
-    // First, try to find the monster in our current encounters (it's already loaded)
+    // Determine if this is a character or monster
+    const isCharacter = isCharacterUrl(entityUrl);
+    const entityType = isCharacter ? 'character' : 'monster';
+    console.log('Entity type:', entityType, 'URL:', entityUrl);
+    
+    // First, try to find the entity in our current encounters or players (it's already loaded)
     let cachedDetails = null;
-    if (currentAdventure && currentAdventure.encounters) {
+    
+    if (isCharacter && currentAdventure && currentAdventure.players) {
+        // Check players list for character details
+        for (const player of currentAdventure.players) {
+            if (player.name === entityName || (player.dndBeyondUrl === entityUrl)) {
+                cachedDetails = player;
+                // Build abilities object from player data if not present
+                if (!cachedDetails.abilities && cachedDetails.initiativeBonus !== undefined) {
+                    // Calculate ability scores from initiative bonus (assuming it comes from DEX)
+                    cachedDetails.abilities = {
+                        dex: {
+                            score: 10 + (cachedDetails.initiativeBonus * 2),
+                            modifier: cachedDetails.initiativeBonus
+                        }
+                    };
+                }
+                break;
+            }
+        }
+    }
+    
+    if (!cachedDetails && currentAdventure && currentAdventure.encounters) {
+        // Check encounters for cached data
         for (const encounter of currentAdventure.encounters) {
             if (encounter.combatants) {
                 for (const combatant of encounter.combatants) {
-                    if (combatant.name === monsterName && combatant.dndBeyondUrl === monsterUrl) {
-                        // Found it! Use the cached data
+                    if (combatant.name === entityName && combatant.dndBeyondUrl === entityUrl) {
                         cachedDetails = combatant;
                         break;
                     }
@@ -1724,43 +1856,87 @@ function showMonsterTooltip(monsterName, monsterUrl, event) {
         }
     }
     
-    // If we have cached details, use them immediately
-    if (cachedDetails && cachedDetails.abilities) {
+    // If we have cached details with FULL info (abilities present), use them immediately
+    // For characters, also use local player data even without abilities
+    if (cachedDetails && (cachedDetails.abilities || (isCharacter && cachedDetails.ac))) {
+        console.log('Using cached details:', cachedDetails);
         tooltip.style.display = 'block';
         positionTooltip(event);
-        renderTooltipContent(tooltip, monsterName, cachedDetails);
+        renderTooltipContent(tooltip, entityName, cachedDetails, isCharacter);
         return;
     }
     
+    console.log('No full cached details, fetching from server...');
+    
     // Otherwise, show loading and fetch from server
-    tooltip.innerHTML = '<div class="monster-tooltip-loading">Loading monster details...</div>';
+    const loadingText = isCharacter ? 'Loading character details...' : 'Loading monster details...';
+    tooltip.innerHTML = `<div class="monster-tooltip-loading">${loadingText}</div>`;
     tooltip.style.display = 'block';
     positionTooltip(event);
     
-    // Fetch monster details
-    fetch(`/api/dndbeyond/monster/${encodeURIComponent(monsterUrl)}`)
-        .then(response => response.json())
+    // Fetch details from appropriate endpoint
+    const apiEndpoint = isCharacter ? 
+        `/api/dndbeyond/character/${encodeURIComponent(entityUrl)}` :
+        `/api/dndbeyond/monster/${encodeURIComponent(entityUrl)}`;
+    
+    console.log('Fetching from:', apiEndpoint);
+    
+    fetch(apiEndpoint)
+        .then(response => {
+            console.log('Response received:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('Data received:', data);
+            console.log('Data structure - success:', data.success, 'details:', data.details ? 'exists' : 'missing', 'error:', data.error);
             // Only update if this is still the current tooltip
-            if (currentTooltipMonster !== monsterName) return;
+            if (currentTooltipMonster !== entityName) return;
             
             // Check if there was an error
             if (!data.success || data.error) {
-                tooltip.innerHTML = `<div class="monster-tooltip-loading">⚠️ ${data.error || 'Failed to load monster details'}</div>`;
+                if (isCharacter) {
+                    // For characters, fall back to local player data if available
+                    console.log('Character API failed, checking for local player data...');
+                    if (currentAdventure && currentAdventure.players) {
+                        for (const player of currentAdventure.players) {
+                            if (player.name === entityName || (player.dndBeyondUrl && player.dndBeyondUrl === entityUrl)) {
+                                console.log('Found local player data:', player);
+                                renderTooltipContent(tooltip, entityName, player, true);
+                                return;
+                            }
+                        }
+                    }
+                    // No local data available
+                    tooltip.innerHTML = `<div class="monster-tooltip-loading">
+                        <div style="margin-bottom: 8px;">⚠️ Character sheet unavailable</div>
+                        <div style="font-size: 12px; color: #666;">
+                            To fetch live data from D&D Beyond, you need to:<br>
+                            1. Log into D&D Beyond in your browser<br>
+                            2. Export cookies and save them using the app<br>
+                            <br>
+                            Or add character stats in the Players table above.
+                        </div>
+                    </div>`;
+                } else {
+                    tooltip.innerHTML = `<div class="monster-tooltip-loading">⚠️ ${data.error || 'Failed to load details'}</div>`;
+                }
                 return;
             }
             
             // Use the details from the response
-            const details = data.details || data;
-            renderTooltipContent(tooltip, monsterName, details);
+            const details = data.details || data.data || data;
+            console.log('Extracted details:', details);
+            console.log('Details has abilities?', details.abilities ? 'yes' : 'no');
+            console.log('Details has hp?', details.hp !== undefined ? 'yes' : 'no');
+            renderTooltipContent(tooltip, entityName, details, isCharacter);
             
             // Reposition after content is loaded in case size changed
             positionTooltip(event);
         })
         .catch(error => {
-            console.error('Error fetching monster details:', error);
-            if (currentTooltipMonster === monsterName) {
-                tooltip.innerHTML = '<div class="monster-tooltip-loading">Failed to load monster details</div>';
+            console.error(`Error fetching ${entityType} details:`, error);
+            if (currentTooltipMonster === entityName) {
+                tooltip.innerHTML = `<div class="monster-tooltip-loading">Failed to load ${entityType} details</div>`;
             }
         });
 }
