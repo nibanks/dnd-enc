@@ -246,12 +246,22 @@
       "maxHp": 48,
       "name": "Thorin Ironshield",
       "notes": "Great Weapon Master feat, uses magic greatsword +1",
-      "passiveInsight": 11,
-      "passiveInvestigation": 11,
-      "passivePerception": 13,
       "playerName": "Alice",
       "race": "Dwarf",
-      "speed": 25
+      "speed": 25,
+      "abilityScores": {
+        "str": 16,
+        "dex": 12,
+        "con": 16,
+        "int": 10,
+        "wis": 12,
+        "cha": 10
+      },
+      "skillProficiencies": {
+        "perception": true,
+        "insight": false,
+        "investigation": false
+      }
     },
     {
       "ac": 13,
@@ -262,12 +272,22 @@
       "maxHp": 28,
       "name": "Elara Moonwhisper",
       "notes": "Sculpt Spells feature, has Fireball and Counterspell prepared",
-      "passiveInsight": 12,
-      "passiveInvestigation": 17,
-      "passivePerception": 14,
       "playerName": "Bob",
       "race": "Half-Elf",
-      "speed": 30
+      "speed": 30,
+      "abilityScores": {
+        "str": 8,
+        "dex": 16,
+        "con": 14,
+        "int": 18,
+        "wis": 12,
+        "cha": 10
+      },
+      "skillProficiencies": {
+        "perception": false,
+        "insight": false,
+        "investigation": true
+      }
     },
     {
       "ac": 16,
@@ -278,12 +298,22 @@
       "maxHp": 35,
       "name": "Finn Quickfoot",
       "notes": "Sneak attack 3d6, has poisoner's kit and thieves' tools",
-      "passiveInsight": 15,
-      "passiveInvestigation": 13,
-      "passivePerception": 18,
       "playerName": "Charlie",
       "race": "Halfling",
-      "speed": 25
+      "speed": 25,
+      "abilityScores": {
+        "str": 10,
+        "dex": 18,
+        "con": 14,
+        "int": 13,
+        "wis": 14,
+        "cha": 12
+      },
+      "skillProficiencies": {
+        "perception": true,
+        "insight": true,
+        "investigation": false
+      }
     },
     {
       "ac": 18,
@@ -294,12 +324,22 @@
       "maxHp": 40,
       "name": "Brother Aldric",
       "notes": "Channel Divinity available, prepared healing spells",
-      "passiveInsight": 17,
-      "passiveInvestigation": 10,
-      "passivePerception": 15,
       "playerName": "Dana",
       "race": "Human",
-      "speed": 30
+      "speed": 30,
+      "abilityScores": {
+        "str": 14,
+        "dex": 10,
+        "con": 14,
+        "int": 10,
+        "wis": 18,
+        "cha": 12
+      },
+      "skillProficiencies": {
+        "perception": true,
+        "insight": true,
+        "investigation": false
+      }
     }
   ]
 }

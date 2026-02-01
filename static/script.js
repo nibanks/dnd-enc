@@ -819,20 +819,27 @@ function renderPlayers() {
             };
         }
         
+        // Initialize skill proficiencies if not present
+        if (!player.skillProficiencies) {
+            player.skillProficiencies = {
+                perception: false,
+                insight: false,
+                investigation: false
+            };
+        }
+        
         // Calculate ability modifiers
         const calcMod = (score) => Math.floor((score - 10) / 2);
         const wisMod = calcMod(player.abilityScores.wis || 10);
         const intMod = calcMod(player.abilityScores.int || 10);
         
-        // Calculate passive values (10 + modifier)
-        const passivePerception = 10 + wisMod;
-        const passiveInsight = 10 + wisMod;
-        const passiveInvestigation = 10 + intMod;
+        // Calculate proficiency bonus based on level
+        const profBonus = 2 + Math.floor(((player.level || 1) - 1) / 4);
         
-        // Store calculated values back to player object
-        player.passivePerception = passivePerception;
-        player.passiveInsight = passiveInsight;
-        player.passiveInvestigation = passiveInvestigation;
+        // Calculate passive values (10 + modifier + proficiency if proficient)
+        const passivePerception = 10 + wisMod + (player.skillProficiencies.perception ? profBonus : 0);
+        const passiveInsight = 10 + wisMod + (player.skillProficiencies.insight ? profBonus : 0);
+        const passiveInvestigation = 10 + intMod + (player.skillProficiencies.investigation ? profBonus : 0);
         
         // Track expanded state
         if (player.expanded === undefined) {
@@ -854,9 +861,9 @@ function renderPlayers() {
             <td><input type="number" value="${player.ac || 10}" onchange="updatePlayer(${index}, 'ac', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
             <td><input type="number" value="${player.speed || 30}" onchange="updatePlayer(${index}, 'speed', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
             <td><input type="number" value="${player.initiativeBonus || 0}" onchange="updatePlayer(${index}, 'initiativeBonus', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
-            <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${passivePerception}</span></td>
-            <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${passiveInsight}</span></td>
-            <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${passiveInvestigation}</span></td>
+            <td style="text-align: center;"><span style="color: #666; font-weight: 500;" title="10 + WIS(${wisMod >= 0 ? '+' : ''}${wisMod})${player.skillProficiencies.perception ? ' + Prof(+' + profBonus + ')' : ''}">${passivePerception}</span></td>
+            <td style="text-align: center;"><span style="color: #666; font-weight: 500;" title="10 + INT(${intMod >= 0 ? '+' : ''}${intMod})${player.skillProficiencies.investigation ? ' + Prof(+' + profBonus + ')' : ''}">${passiveInvestigation}</span></td>
+            <td style="text-align: center;"><span style="color: #666; font-weight: 500;" title="10 + WIS(${wisMod >= 0 ? '+' : ''}${wisMod})${player.skillProficiencies.insight ? ' + Prof(+' + profBonus + ')' : ''}">${passiveInsight}</span></td>
             <td style="width: 150px;"><input type="text" value="${player.notes || ''}" onchange="updatePlayer(${index}, 'notes', this.value)" style="width: 150px;"></td>
             <td><button class="btn-small" onclick="removePlayer(${index})" style="background: #e74c3c; padding: 4px 8px;" title="Delete this player">×</button></td>
         `;
@@ -869,74 +876,87 @@ function renderPlayers() {
         detailRow.innerHTML = `
             <td colspan="2"></td>
             <td colspan="14" style="padding: 10px;">
-                <div style="display: flex; gap: 15px; align-items: center;">
-                    <strong style="color: #666;">Ability Scores:</strong>
-                    <div style="display: flex; gap: 10px;">
-                        <div style="display: flex; flex-direction: column; align-items: center;">
-                            <label style="font-size: 11px; color: #666; font-weight: 500;">STR</label>
-                            <input type="number" value="${player.abilityScores.str || 10}" onchange="updatePlayerAbility(${index}, 'str', parseInt(this.value))" style="width: 45px; text-align: center;" title="Strength">
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <div>
+                        <strong style="color: #666;">Ability Scores:</strong>
+                        <div style="display: flex; gap: 10px; margin-top: 5px;">
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label style="font-size: 11px; color: #666; font-weight: 500;">STR</label>
+                                <input type="number" value="${player.abilityScores.str || 10}" onchange="updatePlayerAbility(${index}, 'str', parseInt(this.value))" style="width: 45px; text-align: center;" title="Strength">
+                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.str || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.str || 10)}</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label style="font-size: 11px; color: #666; font-weight: 500;">DEX</label>
+                                <input type="number" value="${player.abilityScores.dex || 10}" onchange="updatePlayerAbility(${index}, 'dex', parseInt(this.value))" style="width: 45px; text-align: center;" title="Dexterity">
+                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.dex || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.dex || 10)}</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label style="font-size: 11px; color: #666; font-weight: 500;">CON</label>
+                                <input type="number" value="${player.abilityScores.con || 10}" onchange="updatePlayerAbility(${index}, 'con', parseInt(this.value))" style="width: 45px; text-align: center;" title="Constitution">
+                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.con || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.con || 10)}</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label style="font-size: 11px; color: #666; font-weight: 500;">INT</label>
+                                <input type="number" value="${player.abilityScores.int || 10}" onchange="updatePlayerAbility(${index}, 'int', parseInt(this.value))" style="width: 45px; text-align: center;" title="Intelligence">
+                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.int || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.int || 10)}</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label style="font-size: 11px; color: #666; font-weight: 500;">WIS</label>
+                                <input type="number" value="${player.abilityScores.wis || 10}" onchange="updatePlayerAbility(${index}, 'wis', parseInt(this.value))" style="width: 45px; text-align: center;" title="Wisdom">
+                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.wis || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.wis || 10)}</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: center;">
+                                <label style="font-size: 11px; color: #666; font-weight: 500;">CHA</label>
+                                <input type="number" value="${player.abilityScores.cha || 10}" onchange="updatePlayerAbility(${index}, 'cha', parseInt(this.value))" style="width: 45px; text-align: center;" title="Charisma">
+                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.cha || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.cha || 10)}</span>
+                            </div>
                         </div>
-                        <div style="display: flex; flex-direction: column; align-items: center;">
-                            <label style="font-size: 11px; color: #666; font-weight: 500;">DEX</label>
-                            <input type="number" value="${player.abilityScores.dex || 10}" onchange="updatePlayerAbility(${index}, 'dex', parseInt(this.value))" style="width: 45px; text-align: center;" title="Dexterity">
-                        </div>
-                        <div style="display: flex; flex-direction: column; align-items: center;">
-                            <label style="font-size: 11px; color: #666; font-weight: 500;">CON</label>
-                            <input type="number" value="${player.abilityScores.con || 10}" onchange="updatePlayerAbility(${index}, 'con', parseInt(this.value))" style="width: 45px; text-align: center;" title="Constitution">
-                        </div>
-                        <div style="display: flex; flex-direction: column; align-items: center;">
-                            <label style="font-size: 11px; color: #666; font-weight: 500;">INT</label>
-                            <input type="number" value="${player.abilityScores.int || 10}" onchange="updatePlayerAbility(${index}, 'int', parseInt(this.value))" style="width: 45px; text-align: center;" title="Intelligence">
-                        </div>
-                        <div style="display: flex; flex-direction: column; align-items: center;">
-                            <label style="font-size: 11px; color: #666; font-weight: 500;">WIS</label>
-                            <input type="number" value="${player.abilityScores.wis || 10}" onchange="updatePlayerAbility(${index}, 'wis', parseInt(this.value))" style="width: 45px; text-align: center;" title="Wisdom">
-                        </div>
-                        <div style="display: flex; flex-direction: column; align-items: center;">
-                            <label style="font-size: 11px; color: #666; font-weight: 500;">CHA</label>
-                            <input type="number" value="${player.abilityScores.cha || 10}" onchange="updatePlayerAbility(${index}, 'cha', parseInt(this.value))" style="width: 45px; text-align: center;" title="Charisma">
+                    </div>
+                    <div style="border-left: 1px solid #ddd; padding-left: 20px;">
+                        <strong style="color: #666;">Skill Proficiencies:</strong>
+                        <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 5px;">
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="checkbox" ${player.skillProficiencies.perception ? 'checked' : ''} onchange="updatePlayerSkillProf(${index}, 'perception', this.checked)">
+                                <span style="font-size: 13px;">Perception (WIS)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="checkbox" ${player.skillProficiencies.investigation ? 'checked' : ''} onchange="updatePlayerSkillProf(${index}, 'investigation', this.checked)">
+                                <span style="font-size: 13px;">Investigation (INT)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="checkbox" ${player.skillProficiencies.insight ? 'checked' : ''} onchange="updatePlayerSkillProf(${index}, 'insight', this.checked)">
+                                <span style="font-size: 13px;">Insight (WIS)</span>
+                            </label>
                         </div>
                     </div>
                     <div style="margin-left: auto; color: #999; font-size: 12px;">
-                        Modifiers: STR ${calcMod(player.abilityScores.str || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.str || 10)}, 
-                        DEX ${calcMod(player.abilityScores.dex || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.dex || 10)}, 
-                        CON ${calcMod(player.abilityScores.con || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.con || 10)}, 
-                        INT ${calcMod(player.abilityScores.int || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.int || 10)}, 
-                        WIS ${calcMod(player.abilityScores.wis || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.wis || 10)}, 
-                        CHA ${calcMod(player.abilityScores.cha || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.cha || 10)}
+                        Proficiency Bonus: +${profBonus}
                     </div>
                 </div>
             </td>
+        </tr>
         `;
     });
 }
 
-// Add player
-function addPlayer() {
-    currentAdventure.players.push({
-        name: '',
-        playerName: '',
-        race: '',
-        class: '',
-        level: 1,
-        abilityScores: {
-            str: 10,
-            dex: 10,
-            con: 10,
-            int: 10,
-            wis: 10,
-            cha: 10
-        },
-        maxHp: 0,
-        ac: 10,
-        speed: 30,
-        initiativeBonus: 0,
-        passivePerception: 10,
-        passiveInsight: 10,
-        passiveInvestigation: 10,
-        notes: ''
-    });
+// Toggle player ability scores visibility
+function togglePlayerStats(index) {
+    currentAdventure.players[index].expanded = !currentAdventure.players[index].expanded;
     renderPlayers();
+    autoSave();
+}
+
+// Update player skill proficiency
+function updatePlayerSkillProf(index, skill, isProficient) {
+    if (!currentAdventure.players[index].skillProficiencies) {
+        currentAdventure.players[index].skillProficiencies = {
+            perception: false,
+            insight: false,
+            investigation: false
+        };
+    }
+    currentAdventure.players[index].skillProficiencies[skill] = isProficient;
+    renderPlayers(); // Re-render to update passive values
     autoSave();
 }
 
@@ -954,7 +974,7 @@ function updatePlayerAbility(index, ability, value) {
         };
     }
     currentAdventure.players[index].abilityScores[ability] = value;
-    renderPlayers(); // Re-render to update calculated passive values
+    renderPlayers(); // Re-render to show updated modifiers
     autoSave();
 }
 
@@ -973,6 +993,38 @@ function editPlayerUrl(index) {
         renderPlayers();
         autoSave();
     }
+}
+
+// Add new player
+function addPlayer() {
+    currentAdventure.players.push({
+        name: '',
+        playerName: '',
+        race: '',
+        class: '',
+        level: 1,
+        abilityScores: {
+            str: 10,
+            dex: 10,
+            con: 10,
+            int: 10,
+            wis: 10,
+            cha: 10
+        },
+        skillProficiencies: {
+            perception: false,
+            insight: false,
+            investigation: false
+        },
+        maxHp: 0,
+        ac: 10,
+        speed: 30,
+        initiativeBonus: 0,
+        notes: '',
+        expanded: false
+    });
+    renderPlayers();
+    autoSave();
 }
 
 // Remove player
@@ -1961,14 +2013,20 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
         if (details.summary) {
             meta.push(details.summary);
         } else {
-            // Build from classes array
+            // Build from classes array or flat fields
             if (details.classes && details.classes.length > 0) {
                 const classStr = details.classes.map(c => `${c.name} ${c.level}`).join('/');
                 meta.push(classStr);
+            } else if (details.level && details.class) {
+                meta.push(`Level ${details.level} ${details.class}`);
             } else if (details.class) {
                 meta.push(details.class);
             }
             if (details.race) meta.push(details.race);
+        }
+        // Add player name if available and different from character name
+        if (details.playerName && details.playerName !== entityName) {
+            meta.push(`(${details.playerName})`);
         }
     } else {
         // For monsters, show size/type/alignment
@@ -2022,7 +2080,7 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
     html += '</div>';
     
     // Ability Scores - handle both old format (nested object) and new format (flat values with separate modifiers)
-    const abilities = details.abilities;
+    const abilities = details.abilities || details.abilityScores;
     const abilityMods = details.ability_modifiers;
     if (abilities) {
         html += '<div class="monster-tooltip-abilities">';
@@ -2090,9 +2148,33 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
     // For characters, show passive senses
     if (isCharacter) {
         let passives = [];
-        if (details.passivePerception) passives.push(`Perception ${details.passivePerception}`);
-        if (details.passiveInsight) passives.push(`Insight ${details.passiveInsight}`);
-        if (details.passiveInvestigation) passives.push(`Investigation ${details.passiveInvestigation}`);
+        
+        // Calculate passives from ability scores and skill proficiencies if available
+        if (details.abilityScores) {
+            const calcMod = (score) => Math.floor((score - 10) / 2);
+            const level = details.level || 1;
+            const profBonus = 2 + Math.floor((level - 1) / 4);
+            
+            const wisScore = details.abilityScores.wis || 10;
+            const intScore = details.abilityScores.int || 10;
+            const wisMod = calcMod(wisScore);
+            const intMod = calcMod(intScore);
+            
+            const skillProfs = details.skillProficiencies || {};
+            
+            const passivePerception = 10 + wisMod + (skillProfs.perception ? profBonus : 0);
+            const passiveInvestigation = 10 + intMod + (skillProfs.investigation ? profBonus : 0);
+            const passiveInsight = 10 + wisMod + (skillProfs.insight ? profBonus : 0);
+            
+            passives.push(`Perception ${passivePerception}`);
+            passives.push(`Investigation ${passiveInvestigation}`);
+            passives.push(`Insight ${passiveInsight}`);
+        } else {
+            // Fallback to pre-calculated values if available
+            if (details.passivePerception) passives.push(`Perception ${details.passivePerception}`);
+            if (details.passiveInvestigation) passives.push(`Investigation ${details.passiveInvestigation}`);
+            if (details.passiveInsight) passives.push(`Insight ${details.passiveInsight}`);
+        }
         
         if (passives.length > 0) {
             html += '<div class="monster-tooltip-section">';
@@ -2290,16 +2372,6 @@ function showMonsterTooltip(entityName, entityUrl, event) {
         for (const player of currentAdventure.players) {
             if (player.name === entityName || (player.dndBeyondUrl === entityUrl)) {
                 cachedDetails = player;
-                // Build abilities object from player data if not present
-                if (!cachedDetails.abilities && cachedDetails.initiativeBonus !== undefined) {
-                    // Calculate ability scores from initiative bonus (assuming it comes from DEX)
-                    cachedDetails.abilities = {
-                        dex: {
-                            score: 10 + (cachedDetails.initiativeBonus * 2),
-                            modifier: cachedDetails.initiativeBonus
-                        }
-                    };
-                }
                 break;
             }
         }
