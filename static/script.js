@@ -5,6 +5,7 @@ let autoSaveTimeout = null;
 let DND_MONSTERS = {}; // Will be populated dynamically or use fallback
 let monstersLoaded = false;
 let hasCookies = false; // Track cookie authentication status
+let playersExpanded = true; // Track players section state
 
 // D&D 5e/2024 Classes
 const DND_CLASSES = [
@@ -14,10 +15,10 @@ const DND_CLASSES = [
 
 // D&D 5e/2024 Races
 const DND_RACES = [
-    'Dragonborn', 'Dwarf', 'Elf', 'Gnome', 'Half-Elf', 'Half-Orc', 'Halfling', 
-    'Human', 'Tiefling', 'Aasimar', 'Firbolg', 'Genasi', 'Goliath', 'Kenku', 
-    'Lizardfolk', 'Tabaxi', 'Tortle', 'Triton', 'Aarakocra', 'Bugbear', 
-    'Goblin', 'Hobgoblin', 'Kobold', 'Orc', 'Yuan-ti'
+    'Aarakocra', 'Aasimar', 'Bugbear', 'Dragonborn', 'Dwarf', 'Elf', 'Firbolg', 
+    'Genasi', 'Gnome', 'Goblin', 'Goliath', 'Half-Elf', 'Half-Orc', 'Halfling', 
+    'Hobgoblin', 'Human', 'Kenku', 'Kobold', 'Leonin', 'Lizardfolk', 'Orc', 
+    'Satyr', 'Tabaxi', 'Tiefling', 'Tortle', 'Triton', 'Warforged', 'Yuan-ti'
 ];
 
 // CR to XP mapping (D&D 5e)
@@ -375,6 +376,21 @@ function setupEventListeners() {
     document.getElementById('addEncounterBtn').addEventListener('click', addEncounter);
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
     document.getElementById('settingsBtnSelection').addEventListener('click', openSettingsModal);
+}
+
+// Toggle players section
+function togglePlayersSection() {
+    playersExpanded = !playersExpanded;
+    const container = document.getElementById('playersTableContainer');
+    const btn = document.getElementById('togglePlayersBtn');
+    
+    if (playersExpanded) {
+        container.style.display = 'block';
+        btn.textContent = '▼';
+    } else {
+        container.style.display = 'none';
+        btn.textContent = '▶';
+    }
 }
 
 // Settings Modal
@@ -791,8 +807,43 @@ function renderPlayers() {
         const classOptions = DND_CLASSES.map(c => `<option value="${c}" ${player.class === c ? 'selected' : ''}>${c}</option>`).join('');
         const raceOptions = DND_RACES.map(r => `<option value="${r}" ${player.race === r ? 'selected' : ''}>${r}</option>`).join('');
         
-        row = tbody.insertRow();
+        // Initialize abilities if not present
+        if (!player.abilityScores) {
+            player.abilityScores = {
+                str: 10,
+                dex: 10,
+                con: 10,
+                int: 10,
+                wis: 10,
+                cha: 10
+            };
+        }
+        
+        // Calculate ability modifiers
+        const calcMod = (score) => Math.floor((score - 10) / 2);
+        const wisMod = calcMod(player.abilityScores.wis || 10);
+        const intMod = calcMod(player.abilityScores.int || 10);
+        
+        // Calculate passive values (10 + modifier)
+        const passivePerception = 10 + wisMod;
+        const passiveInsight = 10 + wisMod;
+        const passiveInvestigation = 10 + intMod;
+        
+        // Store calculated values back to player object
+        player.passivePerception = passivePerception;
+        player.passiveInsight = passiveInsight;
+        player.passiveInvestigation = passiveInvestigation;
+        
+        // Track expanded state
+        if (player.expanded === undefined) {
+            player.expanded = false;
+        }
+        
+        // Main row
+        const row = tbody.insertRow();
+        row.id = `player-row-${index}`;
         row.innerHTML = `
+            <td><button class="btn-small" onclick="togglePlayerStats(${index})" style="padding: 4px 8px; font-size: 14px; background: #95a5a6;" title="Show/hide ability scores">${player.expanded ? '▼' : '▶'}</button></td>
             <td><button class="btn-small" onclick="editPlayerUrl(${index})" style="padding: 4px 8px; font-size: 16px; background: #3498db;" title="Edit D&D Beyond URL">🔗</button></td>
             <td><input type="text" value="${player.playerName || ''}" onchange="updatePlayer(${index}, 'playerName', this.value)" style="width: 90px;"></td>
             <td><input type="text" value="${player.name || ''}" onchange="updatePlayer(${index}, 'name', this.value)" style="width: 100px;"></td>
@@ -803,11 +854,59 @@ function renderPlayers() {
             <td><input type="number" value="${player.ac || 10}" onchange="updatePlayer(${index}, 'ac', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
             <td><input type="number" value="${player.speed || 30}" onchange="updatePlayer(${index}, 'speed', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
             <td><input type="number" value="${player.initiativeBonus || 0}" onchange="updatePlayer(${index}, 'initiativeBonus', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
-            <td><input type="number" value="${player.passivePerception || 10}" onchange="updatePlayer(${index}, 'passivePerception', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
-            <td><input type="number" value="${player.passiveInsight || 10}" onchange="updatePlayer(${index}, 'passiveInsight', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
-            <td><input type="number" value="${player.passiveInvestigation || 10}" onchange="updatePlayer(${index}, 'passiveInvestigation', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+            <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${passivePerception}</span></td>
+            <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${passiveInsight}</span></td>
+            <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${passiveInvestigation}</span></td>
             <td style="width: 150px;"><input type="text" value="${player.notes || ''}" onchange="updatePlayer(${index}, 'notes', this.value)" style="width: 150px;"></td>
             <td><button class="btn-small" onclick="removePlayer(${index})" style="background: #e74c3c; padding: 4px 8px;" title="Delete this player">×</button></td>
+        `;
+        
+        // Ability scores row (expandable)
+        const detailRow = tbody.insertRow();
+        detailRow.id = `player-detail-${index}`;
+        detailRow.style.display = player.expanded ? 'table-row' : 'none';
+        detailRow.style.backgroundColor = '#f8f9fa';
+        detailRow.innerHTML = `
+            <td colspan="2"></td>
+            <td colspan="14" style="padding: 10px;">
+                <div style="display: flex; gap: 15px; align-items: center;">
+                    <strong style="color: #666;">Ability Scores:</strong>
+                    <div style="display: flex; gap: 10px;">
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <label style="font-size: 11px; color: #666; font-weight: 500;">STR</label>
+                            <input type="number" value="${player.abilityScores.str || 10}" onchange="updatePlayerAbility(${index}, 'str', parseInt(this.value))" style="width: 45px; text-align: center;" title="Strength">
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <label style="font-size: 11px; color: #666; font-weight: 500;">DEX</label>
+                            <input type="number" value="${player.abilityScores.dex || 10}" onchange="updatePlayerAbility(${index}, 'dex', parseInt(this.value))" style="width: 45px; text-align: center;" title="Dexterity">
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <label style="font-size: 11px; color: #666; font-weight: 500;">CON</label>
+                            <input type="number" value="${player.abilityScores.con || 10}" onchange="updatePlayerAbility(${index}, 'con', parseInt(this.value))" style="width: 45px; text-align: center;" title="Constitution">
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <label style="font-size: 11px; color: #666; font-weight: 500;">INT</label>
+                            <input type="number" value="${player.abilityScores.int || 10}" onchange="updatePlayerAbility(${index}, 'int', parseInt(this.value))" style="width: 45px; text-align: center;" title="Intelligence">
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <label style="font-size: 11px; color: #666; font-weight: 500;">WIS</label>
+                            <input type="number" value="${player.abilityScores.wis || 10}" onchange="updatePlayerAbility(${index}, 'wis', parseInt(this.value))" style="width: 45px; text-align: center;" title="Wisdom">
+                        </div>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <label style="font-size: 11px; color: #666; font-weight: 500;">CHA</label>
+                            <input type="number" value="${player.abilityScores.cha || 10}" onchange="updatePlayerAbility(${index}, 'cha', parseInt(this.value))" style="width: 45px; text-align: center;" title="Charisma">
+                        </div>
+                    </div>
+                    <div style="margin-left: auto; color: #999; font-size: 12px;">
+                        Modifiers: STR ${calcMod(player.abilityScores.str || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.str || 10)}, 
+                        DEX ${calcMod(player.abilityScores.dex || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.dex || 10)}, 
+                        CON ${calcMod(player.abilityScores.con || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.con || 10)}, 
+                        INT ${calcMod(player.abilityScores.int || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.int || 10)}, 
+                        WIS ${calcMod(player.abilityScores.wis || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.wis || 10)}, 
+                        CHA ${calcMod(player.abilityScores.cha || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.cha || 10)}
+                    </div>
+                </div>
+            </td>
         `;
     });
 }
@@ -820,6 +919,14 @@ function addPlayer() {
         race: '',
         class: '',
         level: 1,
+        abilityScores: {
+            str: 10,
+            dex: 10,
+            con: 10,
+            int: 10,
+            wis: 10,
+            cha: 10
+        },
         maxHp: 0,
         ac: 10,
         speed: 30,
@@ -837,6 +944,24 @@ function addPlayer() {
 function updatePlayer(index, field, value) {
     currentAdventure.players[index][field] = value;
     autoSave();
+}
+
+// Update player ability score
+function updatePlayerAbility(index, ability, value) {
+    if (!currentAdventure.players[index].abilityScores) {
+        currentAdventure.players[index].abilityScores = {
+            str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10
+        };
+    }
+    currentAdventure.players[index].abilityScores[ability] = value;
+    renderPlayers(); // Re-render to update calculated passive values
+    autoSave();
+}
+
+// Toggle player stats expanded/collapsed
+function togglePlayerStats(index) {
+    currentAdventure.players[index].expanded = !currentAdventure.players[index].expanded;
+    renderPlayers();
 }
 
 // Edit player D&D Beyond URL
@@ -903,15 +1028,53 @@ function calculateEncounterXP(encounter) {
     const totalXP = encounter.combatants
         .filter(combatant => !isPlayerCombatant(combatant))
         .reduce((sum, combatant) => {
-            // Look up CR from monster list
-            const baseName = combatant.name.split(' ')[0]; // Get base name
-            const monster = DND_MONSTERS[baseName];
-            const cr = monster?.cr || combatant.cr || ''; // Fallback to combatant.cr if stored
+            // Try to get CR from combatant first, then look up in monster list
+            let cr = combatant.cr || '';
+            
+            // If no CR stored, try looking up from monster database
+            if (!cr) {
+                // Extract base monster name (remove numbering like "Cultist 1" -> "Cultist")
+                const baseName = combatant.name.replace(/\s+\d+$/, '');
+                const monster = DND_MONSTERS[baseName];
+                cr = monster?.cr || '';
+            }
+            
             const xp = CR_TO_XP[cr] || 0;
             return sum + xp;
         }, 0);
     
     return totalXP.toLocaleString();
+}
+
+function calculateEncounterCR(encounter) {
+    if (!encounter.combatants) return '0';
+    
+    const totalCR = encounter.combatants
+        .filter(combatant => !isPlayerCombatant(combatant))
+        .reduce((sum, combatant) => {
+            // Try to get CR from combatant first, then look up in monster list
+            let cr = combatant.cr || '';
+            
+            // If no CR stored, try looking up from monster database
+            if (!cr) {
+                // Extract base monster name (remove numbering like "Cultist 1" -> "Cultist")
+                const baseName = combatant.name.replace(/\s+\d+$/, '');
+                const monster = DND_MONSTERS[baseName];
+                cr = monster?.cr || '0';
+            }
+            
+            // Convert CR to numeric value
+            if (cr === '1/8') return sum + 0.125;
+            else if (cr === '1/4') return sum + 0.25;
+            else if (cr === '1/2') return sum + 0.5;
+            else return sum + (parseFloat(cr) || 0);
+        }, 0);
+    
+    // Format the total CR nicely
+    if (totalCR === 0) return '0';
+    if (totalCR < 1) return totalCR.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
+    if (totalCR % 1 === 0) return totalCR.toString(); // Whole number
+    return totalCR.toFixed(1); // One decimal place
 }
 
 // Create encounter card
@@ -954,15 +1117,18 @@ function createEncounterCard(encounter, encounterIndex) {
                     <button class="btn-small" onclick="toggleEncounterMinimize(${encounterIndex})" title="${encounter.minimized ? 'Expand' : 'Minimize'}" style="background: #95a5a6; padding: 4px 8px; font-size: 14px;">${minimizeIcon}</button>
                     <input type="text" class="encounter-title" value="${encounter.name || 'New Encounter'}" 
                            onchange="updateEncounterName(${encounterIndex}, this.value)" style="border: 1px solid #ddd; padding: 5px; flex: 1;">
-                    <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap;">XP: ${calculateEncounterXP(encounter)}</span>
+                    <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap;">CR: ${calculateEncounterCR(encounter)} | XP: ${calculateEncounterXP(encounter)}</span>
                 </div>
-                ${showControls ? `
                 <div class="encounter-controls">
-                    <button class="btn-small" onclick="addMonsterFromLibrary(${encounterIndex})" style="background: #27ae60;" title="Add a monster to this encounter">+</button>
-                    <button class="btn-small" onclick="refreshPlayers(${encounterIndex})" style="background: #3498db;" title="Refresh player stats from Players section">↻</button>
-                    <button class="btn-small" onclick="removeEncounter(${encounterIndex})" style="background: #e74c3c;" title="Delete this encounter">×</button>
+                    ${showControls ? `
+                        <button class="btn-small" onclick="addMonsterFromLibrary(${encounterIndex})" style="background: #27ae60;" title="Add a monster to this encounter">+</button>
+                        <button class="btn-small" onclick="refreshPlayers(${encounterIndex})" style="background: #3498db;" title="Refresh player stats from Players section">↻</button>
+                    ` : ''}
+                    <button class="btn-small" onclick="generateLoot(${encounterIndex})" style="background: #f39c12;" title="Generate treasure based on enemies">💰</button>
+                    ${showControls ? `
+                        <button class="btn-small" onclick="removeEncounter(${encounterIndex})" style="background: #e74c3c;" title="Delete this encounter">×</button>
+                    ` : ''}
                 </div>
-                ` : ''}
             </div>
             <div style="display: ${encounter.minimized ? 'none' : 'flex'}; align-items: center; gap: 15px;">
                 <div class="encounter-controls">
@@ -973,6 +1139,21 @@ function createEncounterCard(encounter, encounterIndex) {
         </div>
     `;
     card.appendChild(header);
+    
+    // Treasure section
+    if (encounter.treasure && !encounter.minimized) {
+        const treasureDiv = document.createElement('div');
+        treasureDiv.className = 'treasure-section';
+        treasureDiv.style.cssText = 'background: #fff8dc; border: 2px solid #f39c12; border-radius: 5px; padding: 10px; margin: 10px 0; font-family: monospace;';
+        treasureDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <strong style="color: #d68910;">💰 Treasure & Loot:</strong>
+                <button class="btn-small" onclick="clearLoot(${encounterIndex})" style="background: #e74c3c; padding: 2px 6px; font-size: 12px;" title="Clear treasure">×</button>
+            </div>
+            <div style="white-space: pre-wrap; color: #333;">${encounter.treasure}</div>
+        `;
+        card.appendChild(treasureDiv);
+    }
     
     // Combatants table
     const tableContainer = document.createElement('div');
@@ -1025,13 +1206,20 @@ function createEncounterCard(encounter, encounterIndex) {
                 dndBeyondUrl = player.dndBeyondUrl || '';
             }
         } else {
-            // Look up monster details from DND_MONSTERS
+            // Look up monster details from DND_MONSTERS (only if not already saved on combatant)
             const baseName = combatant.name.split(' ')[0]; // Get base name (e.g., "Cultist" from "Cultist 2")
             const monster = DND_MONSTERS[baseName];
             if (monster) {
-                ac = monster.ac || 10;
-                cr = monster.cr || '';
-                dndBeyondUrl = monster.url || '';
+                // Only use dictionary values if combatant doesn't have them saved
+                if (!combatant.ac) {
+                    ac = monster.ac || 10;
+                }
+                if (!combatant.cr) {
+                    cr = monster.cr || '';
+                }
+                if (!combatant.dndBeyondUrl) {
+                    dndBeyondUrl = monster.url || '';
+                }
             }
         }
         
@@ -1516,6 +1704,134 @@ function resetEncounter(encounterIndex) {
     encounter.currentRound = 0;
     encounter.activeCombatant = null;
     
+    renderEncounters();
+    autoSave();
+}
+
+// Generate treasure/loot based on encounter enemies
+function generateLoot(encounterIndex) {
+    const encounter = currentAdventure.encounters[encounterIndex];
+    
+    // Get all non-player combatants
+    const enemies = encounter.combatants.filter(c => !isPlayerCombatant(c));
+    
+    if (enemies.length === 0) {
+        alert('No enemies in this encounter to generate loot from!');
+        return;
+    }
+    
+    // Calculate total CR value
+    let totalCR = 0;
+    enemies.forEach(enemy => {
+        const cr = enemy.cr || '0';
+        if (cr === '1/8') totalCR += 0.125;
+        else if (cr === '1/4') totalCR += 0.25;
+        else if (cr === '1/2') totalCR += 0.5;
+        else totalCR += parseFloat(cr) || 0;
+    });
+    
+    let loot = [];
+    
+    // Individual treasure (coins)
+    if (totalCR < 1) {
+        const copper = Math.floor(Math.random() * 20) + 1;
+        const silver = Math.floor(Math.random() * 10);
+        loot.push(`Coins: ${copper} CP${silver > 0 ? ', ' + silver + ' SP' : ''}`);
+    } else if (totalCR < 5) {
+        const silver = Math.floor(Math.random() * 30) + 10;
+        const gold = Math.floor(Math.random() * 10);
+        loot.push(`Coins: ${silver} SP${gold > 0 ? ', ' + gold + ' GP' : ''}`);
+    } else if (totalCR < 11) {
+        const gold = Math.floor(Math.random() * 50) + 20;
+        const platinum = Math.floor(Math.random() * 5);
+        loot.push(`Coins: ${gold} GP${platinum > 0 ? ', ' + platinum + ' PP' : ''}`);
+    } else if (totalCR < 17) {
+        const gold = Math.floor(Math.random() * 100) + 50;
+        const platinum = Math.floor(Math.random() * 20) + 5;
+        loot.push(`Coins: ${gold} GP, ${platinum} PP`);
+    } else {
+        const gold = Math.floor(Math.random() * 200) + 100;
+        const platinum = Math.floor(Math.random() * 50) + 20;
+        loot.push(`Coins: ${gold} GP, ${platinum} PP`);
+    }
+    
+    // Add gems/art objects for higher CR
+    if (totalCR >= 3) {
+        const numGems = Math.floor(Math.random() * 3) + 1;
+        const gemValues = [10, 50, 100, 500, 1000];
+        const gemValue = gemValues[Math.min(Math.floor(totalCR / 4), 4)];
+        const gemTypes = ['agate', 'quartz', 'onyx', 'jade', 'pearl', 'topaz', 'ruby', 'sapphire', 'emerald', 'diamond'];
+        const gemType = gemTypes[Math.floor(Math.random() * gemTypes.length)];
+        loot.push(`Gems: ${numGems}× ${gemValue} GP ${gemType}`);
+    }
+    
+    // Add art objects for high CR
+    if (totalCR >= 5) {
+        const artItems = [
+            'silver ewer',
+            'carved bone statuette',
+            'gold bracelet',
+            'embroidered silk handkerchief',
+            'small gold idol',
+            'gold dragon comb with red garnet eye',
+            'painted wooden mask',
+            'silver chalice with moonstones'
+        ];
+        const artValue = totalCR >= 10 ? 750 : totalCR >= 7 ? 250 : 100;
+        const artItem = artItems[Math.floor(Math.random() * artItems.length)];
+        loot.push(`Art: ${artValue} GP ${artItem}`);
+    }
+    
+    // Magic items for very high CR
+    if (totalCR >= 8) {
+        const magicItems = [
+            'Potion of Healing',
+            'Potion of Greater Healing',
+            'Spell Scroll (random spell)',
+            '+1 Weapon',
+            'Bag of Holding',
+            'Cloak of Protection',
+            'Ring of Protection',
+            'Wand of Magic Missiles',
+            'Boots of Elvenkind',
+            'Gauntlets of Ogre Power'
+        ];
+        const numItems = totalCR >= 15 ? 2 : 1;
+        for (let i = 0; i < numItems; i++) {
+            const item = magicItems[Math.floor(Math.random() * magicItems.length)];
+            loot.push(`Magic Item: ${item}`);
+        }
+    }
+    
+    // Mundane equipment
+    const mundaneItems = [
+        'rope (50 ft)',
+        'torches (5)',
+        'rations (1 week)',
+        'waterskin',
+        'bedroll',
+        'tinderbox',
+        'backpack',
+        'common clothes',
+        'belt pouch',
+        'hempen rope'
+    ];
+    if (Math.random() > 0.5) {
+        const item = mundaneItems[Math.floor(Math.random() * mundaneItems.length)];
+        loot.push(`Equipment: ${item}`);
+    }
+    
+    // Set the treasure
+    encounter.treasure = loot.join('\n');
+    
+    renderEncounters();
+    autoSave();
+}
+
+// Clear treasure from encounter
+function clearLoot(encounterIndex) {
+    const encounter = currentAdventure.encounters[encounterIndex];
+    encounter.treasure = '';
     renderEncounters();
     autoSave();
 }

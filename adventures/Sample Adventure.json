@@ -65,12 +65,13 @@
       ],
       "currentRound": 6,
       "currentTurn": 0,
+      "minimized": false,
       "name": "Keep Defense",
       "state": "complete",
-      "minimized": true
+      "treasure": "Coins: 12 CP, 9 SP"
     },
     {
-      "activeCombatant": 1,
+      "activeCombatant": null,
       "chapter": "Chapter 1: The Beginning",
       "combatants": [
         {
@@ -122,11 +123,12 @@
           "notes": ""
         }
       ],
-      "currentRound": 2,
-      "currentTurn": 1,
+      "currentRound": 0,
+      "currentTurn": 0,
+      "minimized": false,
       "name": "Ambush on the Road",
-      "state": "started",
-      "minimized": false
+      "state": null,
+      "treasure": "Coins: 8 CP, 1 SP\nEquipment: belt pouch"
     },
     {
       "chapter": "Chapter 2: The Journey",
@@ -188,9 +190,9 @@
           "notes": ""
         }
       ],
+      "minimized": true,
       "name": "Cave Entrance Guards",
-      "state": "unstarted",
-      "minimized": true
+      "state": "unstarted"
     },
     {
       "chapter": "Chapter 3: The Finale",
@@ -228,9 +230,9 @@
           "notes": ""
         }
       ],
+      "minimized": true,
       "name": "Boss: Langdedrosa Cyanwrath",
-      "state": "unstarted",
-      "minimized": true
+      "state": "unstarted"
     }
   ],
   "name": "Sample Adventure",

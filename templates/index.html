@@ -39,13 +39,17 @@
             <!-- Players Section -->
             <section class="section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h2 style="margin: 0;">Players</h2>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button id="togglePlayersBtn" class="btn-small" onclick="togglePlayersSection()" style="background: #95a5a6; padding: 4px 8px; font-size: 14px;" title="Collapse/Expand players section">▼</button>
+                        <h2 style="margin: 0;">Players</h2>
+                    </div>
                     <button id="addPlayerBtn" class="btn-add" style="background: #27ae60;" title="Add a new player">+</button>
                 </div>
-                <div class="table-container">
+                <div id="playersTableContainer" class="table-container">
                     <table id="playersTable">
                         <thead>
                             <tr>
+                                <th style="width: 30px;"></th>
                                 <th style="width: 40px;"></th>
                                 <th>Player</th>
                                 <th>Character</th>
@@ -56,9 +60,9 @@
                                 <th style="text-align: center;">AC</th>
                                 <th style="text-align: center;">Speed</th>
                                 <th style="text-align: center;">Init</th>
-                                <th style="text-align: center;">Perc</th>
-                                <th style="text-align: center;">Insi</th>
-                                <th style="text-align: center;">Inve</th>
+                                <th style="text-align: center;" title="Passive Perception (auto-calculated)">Perc</th>
+                                <th style="text-align: center;" title="Passive Insight (auto-calculated)">Insi</th>
+                                <th style="text-align: center;" title="Passive Investigation (auto-calculated)">Inve</th>
                                 <th>Notes</th>
                                 <th style="width: 40px;"></th>
                             </tr>
