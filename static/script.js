@@ -6,6 +6,7 @@ let DND_MONSTERS = {}; // Will be populated dynamically or use fallback
 let monstersLoaded = false;
 let hasCookies = false; // Track cookie authentication status
 let playersExpanded = true; // Track players section state
+let playersEditMode = false; // Track players edit mode
 
 // D&D 5e/2024 Classes
 const DND_CLASSES = [
@@ -391,6 +392,151 @@ function togglePlayersSection() {
         container.style.display = 'none';
         btn.textContent = '▶';
     }
+}
+
+// Toggle statistics section
+let statsExpanded = false;
+let initiativeChart = null;
+
+function toggleStatsSection() {
+    statsExpanded = !statsExpanded;
+    const container = document.getElementById('statsContainer');
+    const btn = document.getElementById('toggleStatsBtn');
+    
+    if (statsExpanded) {
+        container.style.display = 'block';
+        btn.textContent = '▼';
+        renderStatistics();
+    } else {
+        container.style.display = 'none';
+        btn.textContent = '▶';
+    }
+}
+
+function renderStatistics() {
+    if (!currentAdventure || !currentAdventure.players || !currentAdventure.encounters) {
+        return;
+    }
+    
+    renderInitiativeChart();
+}
+
+function renderInitiativeChart() {
+    const ctx = document.getElementById('initiativeChart');
+    if (!ctx) return;
+    
+    // Collect initiative data for each player
+    const playerInitiatives = {};
+    
+    // Initialize for each player
+    currentAdventure.players.forEach(player => {
+        playerInitiatives[player.name] = [];
+    });
+    
+    // Collect all initiative rolls from encounters
+    currentAdventure.encounters.forEach(encounter => {
+        if (encounter.combatants) {
+            encounter.combatants.forEach(combatant => {
+                if (combatant.isPlayer && playerInitiatives[combatant.name] !== undefined) {
+                    playerInitiatives[combatant.name].push(combatant.initiative || 0);
+                }
+            });
+        }
+    });
+    
+    // Count frequency of each initiative value for each player
+    const datasets = [];
+    const colors = [
+        '#e74c3c', '#3498db', '#2ecc71', '#f39c12', 
+        '#9b59b6', '#1abc9c', '#e67e22', '#34495e'
+    ];
+    
+    let colorIndex = 0;
+    Object.entries(playerInitiatives).forEach(([playerName, initiatives]) => {
+        if (initiatives.length === 0) return;
+        
+        // Count frequency
+        const frequency = {};
+        initiatives.forEach(init => {
+            frequency[init] = (frequency[init] || 0) + 1;
+        });
+        
+        // Convert to array of {x, y} points sorted by initiative value
+        const data = Object.entries(frequency)
+            .map(([init, count]) => ({ x: parseInt(init), y: count }))
+            .sort((a, b) => a.x - b.x);
+        
+        const color = colors[colorIndex % colors.length];
+        datasets.push({
+            label: playerName,
+            data: data,
+            borderColor: color,
+            backgroundColor: color + '20',
+            borderWidth: 2,
+            tension: 0.4,
+            fill: false,
+            pointRadius: 4,
+            pointHoverRadius: 6
+        });
+        
+        colorIndex++;
+    });
+    
+    // Destroy existing chart if it exists
+    if (initiativeChart) {
+        initiativeChart.destroy();
+    }
+    
+    // Create new chart
+    initiativeChart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.5,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                title: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.parsed.y + ' time(s) at initiative ' + context.parsed.x;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Initiative Score'
+                    },
+                    ticks: {
+                        stepSize: 1
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Count'
+                    },
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
 }
 
 // Settings Modal
@@ -795,6 +941,59 @@ function renderChapterSelector() {
 }
 
 // Render players table
+function sortPlayers(field) {
+    if (!currentAdventure.players || currentAdventure.players.length === 0) return;
+    
+    currentAdventure.players.sort((a, b) => {
+        let aVal, bVal;
+        
+        // Handle special calculated fields
+        if (field === 'passivePerception') {
+            const calcMod = (score) => Math.floor((score - 10) / 2);
+            const aProfBonus = 2 + Math.floor(((a.level || 1) - 1) / 4);
+            const bProfBonus = 2 + Math.floor(((b.level || 1) - 1) / 4);
+            const aWisMod = calcMod(a.abilityScores?.wis || 10);
+            const bWisMod = calcMod(b.abilityScores?.wis || 10);
+            aVal = 10 + aWisMod + (a.skillProficiencies?.perception ? aProfBonus : 0);
+            bVal = 10 + bWisMod + (b.skillProficiencies?.perception ? bProfBonus : 0);
+        } else if (field === 'passiveInvestigation') {
+            const calcMod = (score) => Math.floor((score - 10) / 2);
+            const aProfBonus = 2 + Math.floor(((a.level || 1) - 1) / 4);
+            const bProfBonus = 2 + Math.floor(((b.level || 1) - 1) / 4);
+            const aIntMod = calcMod(a.abilityScores?.int || 10);
+            const bIntMod = calcMod(b.abilityScores?.int || 10);
+            aVal = 10 + aIntMod + (a.skillProficiencies?.investigation ? aProfBonus : 0);
+            bVal = 10 + bIntMod + (b.skillProficiencies?.investigation ? bProfBonus : 0);
+        } else if (field === 'passiveInsight') {
+            const calcMod = (score) => Math.floor((score - 10) / 2);
+            const aProfBonus = 2 + Math.floor(((a.level || 1) - 1) / 4);
+            const bProfBonus = 2 + Math.floor(((b.level || 1) - 1) / 4);
+            const aWisMod = calcMod(a.abilityScores?.wis || 10);
+            const bWisMod = calcMod(b.abilityScores?.wis || 10);
+            aVal = 10 + aWisMod + (a.skillProficiencies?.insight ? aProfBonus : 0);
+            bVal = 10 + bWisMod + (b.skillProficiencies?.insight ? bProfBonus : 0);
+        } else {
+            aVal = a[field];
+            bVal = b[field];
+        }
+        
+        // Handle undefined/null values
+        if (aVal === undefined || aVal === null) aVal = '';
+        if (bVal === undefined || bVal === null) bVal = '';
+        
+        // For numeric fields, sort largest to smallest
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+            return bVal - aVal;  // Descending order
+        }
+        
+        // For string fields, sort alphabetically (A-Z)
+        return String(aVal).localeCompare(String(bVal));
+    });
+    
+    renderPlayers();
+    autoSave();
+}
+
 function renderPlayers() {
     const tbody = document.getElementById('playersBody');
     tbody.innerHTML = '';
@@ -849,93 +1048,184 @@ function renderPlayers() {
         // Main row
         const row = tbody.insertRow();
         row.id = `player-row-${index}`;
-        row.innerHTML = `
-            <td><button class="btn-small" onclick="togglePlayerStats(${index})" style="padding: 4px 8px; font-size: 14px; background: #95a5a6;" title="Show/hide ability scores">${player.expanded ? '▼' : '▶'}</button></td>
-            <td><button class="btn-small" onclick="editPlayerUrl(${index})" style="padding: 4px 8px; font-size: 16px; background: #3498db;" title="Edit D&D Beyond URL">🔗</button></td>
-            <td><input type="text" value="${player.playerName || ''}" onchange="updatePlayer(${index}, 'playerName', this.value)" style="width: 90px;"></td>
-            <td><input type="text" value="${player.name || ''}" onchange="updatePlayer(${index}, 'name', this.value)" style="width: 100px;"></td>
-            <td><select onchange="updatePlayer(${index}, 'race', this.value)" style="width: 110px;"><option value="">Select Race</option>${raceOptions}</select></td>
-            <td><select onchange="updatePlayer(${index}, 'class', this.value)" style="width: 110px;"><option value="">Select Class</option>${classOptions}</select></td>
-            <td><input type="number" value="${player.level || 1}" onchange="updatePlayer(${index}, 'level', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
-            <td><input type="number" value="${player.maxHp || 0}" onchange="updatePlayer(${index}, 'maxHp', parseInt(this.value))" style="width: 45px; text-align: center;"></td>
-            <td><input type="number" value="${player.ac || 10}" onchange="updatePlayer(${index}, 'ac', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
-            <td><input type="number" value="${player.speed || 30}" onchange="updatePlayer(${index}, 'speed', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
-            <td><input type="number" value="${player.initiativeBonus || 0}" onchange="updatePlayer(${index}, 'initiativeBonus', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
-            <td style="text-align: center;"><span style="color: #666; font-weight: 500;" title="10 + WIS(${wisMod >= 0 ? '+' : ''}${wisMod})${player.skillProficiencies.perception ? ' + Prof(+' + profBonus + ')' : ''}">${passivePerception}</span></td>
-            <td style="text-align: center;"><span style="color: #666; font-weight: 500;" title="10 + INT(${intMod >= 0 ? '+' : ''}${intMod})${player.skillProficiencies.investigation ? ' + Prof(+' + profBonus + ')' : ''}">${passiveInvestigation}</span></td>
-            <td style="text-align: center;"><span style="color: #666; font-weight: 500;" title="10 + WIS(${wisMod >= 0 ? '+' : ''}${wisMod})${player.skillProficiencies.insight ? ' + Prof(+' + profBonus + ')' : ''}">${passiveInsight}</span></td>
-            <td style="width: 150px;"><input type="text" value="${player.notes || ''}" onchange="updatePlayer(${index}, 'notes', this.value)" style="width: 150px;"></td>
-            <td><button class="btn-small" onclick="removePlayer(${index})" style="background: #e74c3c; padding: 4px 8px;" title="Delete this player">×</button></td>
-        `;
+        
+        if (playersEditMode) {
+            // Edit mode: show input fields
+            row.innerHTML = `
+                <td><button class="btn-small" onclick="togglePlayerStats(${index})" style="background: #95a5a6;" title="Show/hide ability scores">${player.expanded ? '▼' : '▶'}</button></td>
+                <td><button class="btn-small" onclick="editPlayerUrl(${index})" style="background: #3498db;" title="Edit D&D Beyond URL">🔗</button></td>
+                <td><input type="text" value="${player.playerName || ''}" onchange="updatePlayer(${index}, 'playerName', this.value)" style="width: 90px;"></td>
+                <td><input type="text" value="${player.name || ''}" onchange="updatePlayer(${index}, 'name', this.value)" style="width: 100px;"></td>
+                <td><select onchange="updatePlayer(${index}, 'race', this.value)" style="width: 110px;"><option value="">Select Race</option>${raceOptions}</select></td>
+                <td><select onchange="updatePlayer(${index}, 'class', this.value)" style="width: 110px;"><option value="">Select Class</option>${classOptions}</select></td>
+                <td><input type="number" value="${player.level || 1}" onchange="updatePlayer(${index}, 'level', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+                <td><input type="number" value="${player.maxHp || 0}" onchange="updatePlayer(${index}, 'maxHp', parseInt(this.value))" style="width: 45px; text-align: center;"></td>
+                <td><input type="number" value="${player.ac || 10}" onchange="updatePlayer(${index}, 'ac', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+                <td><input type="number" value="${player.speed || 30}" onchange="updatePlayer(${index}, 'speed', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+                <td><input type="number" value="${player.initiativeBonus || 0}" onchange="updatePlayer(${index}, 'initiativeBonus', parseInt(this.value))" style="width: 38px; text-align: center;"></td>
+                <td style="text-align: center;"><span style="color: ${player.skillProficiencies.perception ? '#27ae60' : '#666'}; font-weight: 500;" title="10 + WIS(${wisMod >= 0 ? '+' : ''}${wisMod})${player.skillProficiencies.perception ? ' + Prof(+' + profBonus + ')' : ''}">${passivePerception}</span></td>
+                <td style="text-align: center;"><span style="color: ${player.skillProficiencies.investigation ? '#27ae60' : '#666'}; font-weight: 500;" title="10 + INT(${intMod >= 0 ? '+' : ''}${intMod})${player.skillProficiencies.investigation ? ' + Prof(+' + profBonus + ')' : ''}">${passiveInvestigation}</span></td>
+                <td style="text-align: center;"><span style="color: ${player.skillProficiencies.insight ? '#27ae60' : '#666'}; font-weight: 500;" title="10 + WIS(${wisMod >= 0 ? '+' : ''}${wisMod})${player.skillProficiencies.insight ? ' + Prof(+' + profBonus + ')' : ''}">${passiveInsight}</span></td>
+                <td style="width: 150px;"><input type="text" value="${player.notes || ''}" onchange="updatePlayer(${index}, 'notes', this.value)" style="width: 150px;"></td>
+                <td><button class="btn-small" onclick="removePlayer(${index})" style="background: #e74c3c;" title="Delete this player">×</button></td>
+            `;
+        } else {
+            // View mode: show read-only display
+            const hasUrl = player.dndBeyondUrl && player.dndBeyondUrl.trim() !== '';
+            row.innerHTML = `
+                <td><button class="btn-small" onclick="togglePlayerStats(${index})" style="background: #95a5a6;" title="Show/hide ability scores">${player.expanded ? '▼' : '▶'}</button></td>
+                <td>${hasUrl ? `<a href="${player.dndBeyondUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 4px 8px; font-size: 16px; background: #3498db; color: white; text-decoration: none; border-radius: 3px; cursor: pointer;" title="Open in D&D Beyond">🔗</a>` : '<span style="display: inline-block; padding: 4px 8px; font-size: 16px; color: #ccc;">🔗</span>'}</td>
+                <td style="padding: 8px;">${player.playerName || '—'}</td>
+                <td style="padding: 8px; font-weight: 500;">${player.name || '—'}</td>
+                <td style="padding: 8px;">${player.race || '—'}</td>
+                <td style="padding: 8px;">${player.class || '—'}</td>
+                <td style="text-align: center; padding: 8px;">${player.level || 1}</td>
+                <td style="text-align: center; padding: 8px;">${player.maxHp || 0}</td>
+                <td style="text-align: center; padding: 8px;">${player.ac || 10}</td>
+                <td style="text-align: center; padding: 8px;">${player.speed || 30}</td>
+                <td style="text-align: center; padding: 8px;">${player.initiativeBonus >= 0 ? '+' : ''}${player.initiativeBonus || 0}</td>
+                <td style="text-align: center;"><span style="color: ${player.skillProficiencies.perception ? '#27ae60' : '#666'}; font-weight: 500;" title="10 + WIS(${wisMod >= 0 ? '+' : ''}${wisMod})${player.skillProficiencies.perception ? ' + Prof(+' + profBonus + ')' : ''}">${passivePerception}</span></td>
+                <td style="text-align: center;"><span style="color: ${player.skillProficiencies.investigation ? '#27ae60' : '#666'}; font-weight: 500;" title="10 + INT(${intMod >= 0 ? '+' : ''}${intMod})${player.skillProficiencies.investigation ? ' + Prof(+' + profBonus + ')' : ''}">${passiveInvestigation}</span></td>
+                <td style="text-align: center;"><span style="color: ${player.skillProficiencies.insight ? '#27ae60' : '#666'}; font-weight: 500;" title="10 + WIS(${wisMod >= 0 ? '+' : ''}${wisMod})${player.skillProficiencies.insight ? ' + Prof(+' + profBonus + ')' : ''}">${passiveInsight}</span></td>
+                <td style="padding: 8px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${player.notes || ''}">${player.notes || '—'}</td>
+                <td></td>
+            `;
+        }
         
         // Ability scores row (expandable)
         const detailRow = tbody.insertRow();
         detailRow.id = `player-detail-${index}`;
         detailRow.style.display = player.expanded ? 'table-row' : 'none';
         detailRow.style.backgroundColor = '#f8f9fa';
-        detailRow.innerHTML = `
-            <td colspan="2"></td>
-            <td colspan="14" style="padding: 10px;">
-                <div style="display: flex; gap: 20px; align-items: center;">
-                    <div>
-                        <strong style="color: #666;">Ability Scores:</strong>
-                        <div style="display: flex; gap: 10px; margin-top: 5px;">
-                            <div style="display: flex; flex-direction: column; align-items: center;">
-                                <label style="font-size: 11px; color: #666; font-weight: 500;">STR</label>
-                                <input type="number" value="${player.abilityScores.str || 10}" onchange="updatePlayerAbility(${index}, 'str', parseInt(this.value))" style="width: 45px; text-align: center;" title="Strength">
-                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.str || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.str || 10)}</span>
-                            </div>
-                            <div style="display: flex; flex-direction: column; align-items: center;">
-                                <label style="font-size: 11px; color: #666; font-weight: 500;">DEX</label>
-                                <input type="number" value="${player.abilityScores.dex || 10}" onchange="updatePlayerAbility(${index}, 'dex', parseInt(this.value))" style="width: 45px; text-align: center;" title="Dexterity">
-                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.dex || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.dex || 10)}</span>
-                            </div>
-                            <div style="display: flex; flex-direction: column; align-items: center;">
-                                <label style="font-size: 11px; color: #666; font-weight: 500;">CON</label>
-                                <input type="number" value="${player.abilityScores.con || 10}" onchange="updatePlayerAbility(${index}, 'con', parseInt(this.value))" style="width: 45px; text-align: center;" title="Constitution">
-                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.con || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.con || 10)}</span>
-                            </div>
-                            <div style="display: flex; flex-direction: column; align-items: center;">
-                                <label style="font-size: 11px; color: #666; font-weight: 500;">INT</label>
-                                <input type="number" value="${player.abilityScores.int || 10}" onchange="updatePlayerAbility(${index}, 'int', parseInt(this.value))" style="width: 45px; text-align: center;" title="Intelligence">
-                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.int || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.int || 10)}</span>
-                            </div>
-                            <div style="display: flex; flex-direction: column; align-items: center;">
-                                <label style="font-size: 11px; color: #666; font-weight: 500;">WIS</label>
-                                <input type="number" value="${player.abilityScores.wis || 10}" onchange="updatePlayerAbility(${index}, 'wis', parseInt(this.value))" style="width: 45px; text-align: center;" title="Wisdom">
-                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.wis || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.wis || 10)}</span>
-                            </div>
-                            <div style="display: flex; flex-direction: column; align-items: center;">
-                                <label style="font-size: 11px; color: #666; font-weight: 500;">CHA</label>
-                                <input type="number" value="${player.abilityScores.cha || 10}" onchange="updatePlayerAbility(${index}, 'cha', parseInt(this.value))" style="width: 45px; text-align: center;" title="Charisma">
-                                <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.cha || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.cha || 10)}</span>
+        
+        if (playersEditMode) {
+            // Edit mode: show input fields and checkboxes
+            detailRow.innerHTML = `
+                <td colspan="2"></td>
+                <td colspan="14" style="padding: 10px;">
+                    <div style="display: flex; gap: 20px; align-items: center;">
+                        <div>
+                            <strong style="color: #666;">Ability Scores:</strong>
+                            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">STR</label>
+                                    <input type="number" value="${player.abilityScores.str || 10}" onchange="updatePlayerAbility(${index}, 'str', parseInt(this.value))" style="width: 45px; text-align: center;" title="Strength">
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.str || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.str || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">DEX</label>
+                                    <input type="number" value="${player.abilityScores.dex || 10}" onchange="updatePlayerAbility(${index}, 'dex', parseInt(this.value))" style="width: 45px; text-align: center;" title="Dexterity">
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.dex || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.dex || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">CON</label>
+                                    <input type="number" value="${player.abilityScores.con || 10}" onchange="updatePlayerAbility(${index}, 'con', parseInt(this.value))" style="width: 45px; text-align: center;" title="Constitution">
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.con || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.con || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">INT</label>
+                                    <input type="number" value="${player.abilityScores.int || 10}" onchange="updatePlayerAbility(${index}, 'int', parseInt(this.value))" style="width: 45px; text-align: center;" title="Intelligence">
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.int || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.int || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">WIS</label>
+                                    <input type="number" value="${player.abilityScores.wis || 10}" onchange="updatePlayerAbility(${index}, 'wis', parseInt(this.value))" style="width: 45px; text-align: center;" title="Wisdom">
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.wis || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.wis || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">CHA</label>
+                                    <input type="number" value="${player.abilityScores.cha || 10}" onchange="updatePlayerAbility(${index}, 'cha', parseInt(this.value))" style="width: 45px; text-align: center;" title="Charisma">
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.cha || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.cha || 10)}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <div style="border-left: 1px solid #ddd; padding-left: 20px;">
-                        <strong style="color: #666;">Skill Proficiencies:</strong>
-                        <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 5px;">
-                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="checkbox" ${player.skillProficiencies.perception ? 'checked' : ''} onchange="updatePlayerSkillProf(${index}, 'perception', this.checked)">
-                                <span style="font-size: 13px;">Perception (WIS)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="checkbox" ${player.skillProficiencies.investigation ? 'checked' : ''} onchange="updatePlayerSkillProf(${index}, 'investigation', this.checked)">
-                                <span style="font-size: 13px;">Investigation (INT)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="checkbox" ${player.skillProficiencies.insight ? 'checked' : ''} onchange="updatePlayerSkillProf(${index}, 'insight', this.checked)">
-                                <span style="font-size: 13px;">Insight (WIS)</span>
-                            </label>
+                        <div style="border-left: 1px solid #ddd; padding-left: 20px;">
+                            <strong style="color: #666;">Skill Proficiencies:</strong>
+                            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 5px;">
+                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                    <input type="checkbox" ${player.skillProficiencies.perception ? 'checked' : ''} onchange="updatePlayerSkillProf(${index}, 'perception', this.checked)">
+                                    <span style="font-size: 13px;">Perception (WIS)</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                    <input type="checkbox" ${player.skillProficiencies.investigation ? 'checked' : ''} onchange="updatePlayerSkillProf(${index}, 'investigation', this.checked)">
+                                    <span style="font-size: 13px;">Investigation (INT)</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                    <input type="checkbox" ${player.skillProficiencies.insight ? 'checked' : ''} onchange="updatePlayerSkillProf(${index}, 'insight', this.checked)">
+                                    <span style="font-size: 13px;">Insight (WIS)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div style="margin-left: auto; color: #999; font-size: 12px;">
+                            Proficiency Bonus: +${profBonus}
                         </div>
                     </div>
-                    <div style="margin-left: auto; color: #999; font-size: 12px;">
-                        Proficiency Bonus: +${profBonus}
+                </td>
+            </tr>
+            `;
+        } else {
+            // View mode: show read-only display with formatted modifiers
+            detailRow.innerHTML = `
+                <td colspan="2"></td>
+                <td colspan="14" style="padding: 10px;">
+                    <div style="display: flex; gap: 20px; align-items: center;">
+                        <div>
+                            <strong style="color: #666;">Ability Scores:</strong>
+                            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">STR</label>
+                                    <div style="width: 45px; text-align: center; padding: 4px; font-weight: 500;">${player.abilityScores.str || 10}</div>
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.str || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.str || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">DEX</label>
+                                    <div style="width: 45px; text-align: center; padding: 4px; font-weight: 500;">${player.abilityScores.dex || 10}</div>
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.dex || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.dex || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">CON</label>
+                                    <div style="width: 45px; text-align: center; padding: 4px; font-weight: 500;">${player.abilityScores.con || 10}</div>
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.con || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.con || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">INT</label>
+                                    <div style="width: 45px; text-align: center; padding: 4px; font-weight: 500;">${player.abilityScores.int || 10}</div>
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.int || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.int || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">WIS</label>
+                                    <div style="width: 45px; text-align: center; padding: 4px; font-weight: 500;">${player.abilityScores.wis || 10}</div>
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.wis || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.wis || 10)}</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; align-items: center;">
+                                    <label style="font-size: 11px; color: #666; font-weight: 500;">CHA</label>
+                                    <div style="width: 45px; text-align: center; padding: 4px; font-weight: 500;">${player.abilityScores.cha || 10}</div>
+                                    <span style="font-size: 10px; color: #999;">${calcMod(player.abilityScores.cha || 10) >= 0 ? '+' : ''}${calcMod(player.abilityScores.cha || 10)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="border-left: 1px solid #ddd; padding-left: 20px;">
+                            <strong style="color: #666;">Skill Proficiencies:</strong>
+                            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 5px;">
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <span style="font-size: 13px; color: ${player.skillProficiencies.perception ? '#27ae60' : '#999'};">${player.skillProficiencies.perception ? '✓' : '—'} Perception (WIS)</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <span style="font-size: 13px; color: ${player.skillProficiencies.investigation ? '#27ae60' : '#999'};">${player.skillProficiencies.investigation ? '✓' : '—'} Investigation (INT)</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <span style="font-size: 13px; color: ${player.skillProficiencies.insight ? '#27ae60' : '#999'};">${player.skillProficiencies.insight ? '✓' : '—'} Insight (WIS)</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-left: auto; color: #999; font-size: 12px;">
+                            Proficiency Bonus: +${profBonus}
+                        </div>
                     </div>
-                </div>
-            </td>
-        </tr>
-        `;
+                </td>
+            </tr>
+            `;
+        }
     });
 }
 
@@ -944,6 +1234,25 @@ function togglePlayerStats(index) {
     currentAdventure.players[index].expanded = !currentAdventure.players[index].expanded;
     renderPlayers();
     autoSave();
+}
+
+// Toggle players edit mode
+function togglePlayersEditMode() {
+    playersEditMode = !playersEditMode;
+    const btn = document.getElementById('toggleEditPlayersBtn');
+    const addBtn = document.getElementById('addPlayerBtn');
+    if (playersEditMode) {
+        btn.textContent = '💾';
+        btn.title = 'Save';
+        btn.style.background = '#27ae60';
+        addBtn.style.display = 'block';
+    } else {
+        btn.textContent = '✏️';
+        btn.title = 'Edit';
+        btn.style.background = '#f39c12';
+        addBtn.style.display = 'none';
+    }
+    renderPlayers();
 }
 
 // Update player skill proficiency
@@ -1166,7 +1475,7 @@ function createEncounterCard(encounter, encounterIndex) {
         <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 600px;">
-                    <button class="btn-small" onclick="toggleEncounterMinimize(${encounterIndex})" title="${encounter.minimized ? 'Expand' : 'Minimize'}" style="background: #95a5a6; padding: 4px 8px; font-size: 14px;">${minimizeIcon}</button>
+                    <button class="btn-small" onclick="toggleEncounterMinimize(${encounterIndex})" title="${encounter.minimized ? 'Expand' : 'Minimize'}" style="background: #95a5a6;">${minimizeIcon}</button>
                     <input type="text" class="encounter-title" value="${encounter.name || 'New Encounter'}" 
                            onchange="updateEncounterName(${encounterIndex}, this.value)" style="border: 1px solid #ddd; padding: 5px; flex: 1;">
                     <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap;">CR: ${calculateEncounterCR(encounter)} | XP: ${calculateEncounterXP(encounter)}</span>
@@ -1200,7 +1509,7 @@ function createEncounterCard(encounter, encounterIndex) {
         treasureDiv.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
                 <strong style="color: #d68910;">💰 Treasure & Loot:</strong>
-                <button class="btn-small" onclick="clearLoot(${encounterIndex})" style="background: #e74c3c; padding: 2px 6px; font-size: 12px;" title="Clear treasure">×</button>
+                <button class="btn-small" onclick="clearLoot(${encounterIndex})" style="background: #e74c3c;" title="Clear treasure">×</button>
             </div>
             <div style="white-space: pre-wrap; color: #333;">${encounter.treasure}</div>
         `;
@@ -1320,7 +1629,7 @@ function createEncounterCard(encounter, encounterIndex) {
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))"></td>
             <td><input type="text" value="${combatant.notes || ''}" 
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'notes', this.value)"></td>
-            <td><button class="btn-small" onclick="removeCombatant(${encounterIndex}, ${combatantIndex})" style="background: #e74c3c; padding: 4px 8px;" title="Delete this combatant">×</button></td>
+            <td><button class="btn-small" onclick="removeCombatant(${encounterIndex}, ${combatantIndex})" style="background: #e74c3c;" title="Delete this combatant">×</button></td>
         `;
     });
     

@@ -6,6 +6,7 @@
     <title>D&D Encounter Tracker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -40,10 +41,13 @@
             <section class="section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <button id="togglePlayersBtn" class="btn-small" onclick="togglePlayersSection()" style="background: #95a5a6; padding: 4px 8px; font-size: 14px;" title="Collapse/Expand players section">▼</button>
+                        <button id="togglePlayersBtn" onclick="togglePlayersSection()" style="background: #95a5a6;" title="Collapse/Expand players section">▼</button>
                         <h2 style="margin: 0;">Players</h2>
                     </div>
-                    <button id="addPlayerBtn" class="btn-add" style="background: #27ae60;" title="Add a new player">+</button>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button id="addPlayerBtn" class="btn-add" style="background: #27ae60; display: none;" title="Add a new player">+</button>
+                        <button id="toggleEditPlayersBtn" class="btn-add" onclick="togglePlayersEditMode()" style="background: #f39c12;" title="Edit">✏️</button>
+                    </div>
                 </div>
                 <div id="playersTableContainer" class="table-container">
                     <table id="playersTable">
@@ -51,18 +55,18 @@
                             <tr>
                                 <th style="width: 30px;"></th>
                                 <th style="width: 40px;"></th>
-                                <th>Player</th>
-                                <th>Character</th>
-                                <th>Race</th>
-                                <th>Class</th>
-                                <th style="text-align: center;">Level</th>
-                                <th style="text-align: center;">Max HP</th>
-                                <th style="text-align: center;">AC</th>
-                                <th style="text-align: center;">Speed</th>
-                                <th style="text-align: center;">Init</th>
-                                <th style="text-align: center;" title="Passive Perception (calculated)">Perc</th>
-                                <th style="text-align: center;" title="Passive Investigation (calculated)">Inve</th>
-                                <th style="text-align: center;" title="Passive Insight (calculated)">Insi</th>
+                                <th style="cursor: pointer;" onclick="sortPlayers('playerName')" title="Click to sort">Player</th>
+                                <th style="cursor: pointer;" onclick="sortPlayers('name')" title="Click to sort">Character</th>
+                                <th style="cursor: pointer;" onclick="sortPlayers('race')" title="Click to sort">Race</th>
+                                <th style="cursor: pointer;" onclick="sortPlayers('class')" title="Click to sort">Class</th>
+                                <th style="text-align: center; cursor: pointer;" onclick="sortPlayers('level')" title="Click to sort">Level</th>
+                                <th style="text-align: center; cursor: pointer;" onclick="sortPlayers('maxHp')" title="Click to sort">Max HP</th>
+                                <th style="text-align: center; cursor: pointer;" onclick="sortPlayers('ac')" title="Click to sort">AC</th>
+                                <th style="text-align: center; cursor: pointer;" onclick="sortPlayers('speed')" title="Click to sort">Speed</th>
+                                <th style="text-align: center; cursor: pointer;" onclick="sortPlayers('initiativeBonus')" title="Click to sort">Init</th>
+                                <th style="text-align: center; cursor: pointer;" onclick="sortPlayers('passivePerception')" title="Passive Perception (calculated) - Click to sort">Perc</th>
+                                <th style="text-align: center; cursor: pointer;" onclick="sortPlayers('passiveInvestigation')" title="Passive Investigation (calculated) - Click to sort">Inve</th>
+                                <th style="text-align: center; cursor: pointer;" onclick="sortPlayers('passiveInsight')" title="Passive Insight (calculated) - Click to sort">Insi</th>
                                 <th>Notes</th>
                                 <th style="width: 40px;"></th>
                             </tr>
@@ -78,8 +82,8 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h2 style="margin: 0;">Chapter</h2>
                     <div style="display: flex; gap: 10px;">
-                        <button onclick="addChapter()" style="padding: 8px 12px; background: #27ae60;" title="Add a new chapter">+</button>
-                        <button onclick="deleteChapter()" style="padding: 8px 12px; background: #e74c3c;" title="Delete current chapter">×</button>
+                        <button onclick="addChapter()" style="background: #27ae60;" title="Add a new chapter">+</button>
+                        <button onclick="deleteChapter()" style="background: #e74c3c;" title="Delete current chapter">×</button>
                     </div>
                 </div>
                 <div style="margin-bottom: 15px;">
@@ -102,6 +106,24 @@
                     <button id="addEncounterBtn" class="btn-add" style="background: #27ae60;" title="Add a new encounter">+</button>
                 </div>
                 <div id="encountersContainer"></div>
+            </section>
+
+            <!-- Statistics Section -->
+            <section class="section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <button id="toggleStatsBtn" class="btn-small" onclick="toggleStatsSection()" style="background: #95a5a6; padding: 4px 8px; font-size: 14px;" title="Collapse/Expand statistics section">▶</button>
+                        <h2 style="margin: 0;">Statistics</h2>
+                    </div>
+                </div>
+                <div id="statsContainer" style="display: none;">
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="margin-bottom: 10px;">Initiative Distribution by Player</h3>
+                        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <canvas id="initiativeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </section>
         </div>
     </div>
@@ -133,7 +155,7 @@
                     ⚠️ D&D Beyond authentication is REQUIRED for this app to function. Without cookies, you cannot create adventures or add monsters.
                 </p>
                 <h3>How to get your D&D Beyond cookies:</h3>
-                <ol style="line-height: 1.8; margin-bottom: 20px;">
+                <ol style="line-height: 1.8; margin-bottom: 20px; padding-left: 20px;">
                     <li>Open <a href="https://www.dndbeyond.com" target="_blank">dndbeyond.com</a> in your browser</li>
                     <li><strong>Log in</strong> to your D&D Beyond account (must be logged in!)</li>
                     <li>Press <strong>F12</strong> to open Developer Tools</li>
