@@ -6,9 +6,59 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: 
+        radial-gradient(ellipse at 20% 30%, rgba(220, 20, 60, 0.4) 0%, transparent 40%),
+        radial-gradient(ellipse at 80% 70%, rgba(255, 140, 0, 0.4) 0%, transparent 40%),
+        repeating-linear-gradient(45deg, 
+            rgba(139, 0, 0, 0.15) 0px, 
+            rgba(139, 0, 0, 0.15) 3px, 
+            transparent 3px, 
+            transparent 15px),
+        repeating-linear-gradient(-45deg, 
+            rgba(184, 134, 11, 0.12) 0px, 
+            rgba(184, 134, 11, 0.12) 3px, 
+            transparent 3px, 
+            transparent 15px),
+        linear-gradient(135deg, #1a0505 0%, #0a0a1a 25%, #1a1000 50%, #0a0a1a 75%, #1a0505 100%);
+    background-size: 100% 100%, 100% 100%, 30px 30px, 30px 30px, 100% 100%;
+    background-attachment: fixed;
     min-height: 100vh;
     padding: 20px;
+    position: relative;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 15% 20%, rgba(255, 215, 0, 0.15) 0%, transparent 25%),
+        radial-gradient(circle at 85% 80%, rgba(220, 20, 60, 0.15) 0%, transparent 25%),
+        radial-gradient(circle at 50% 10%, rgba(255, 69, 0, 0.1) 0%, transparent 30%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    font-size: 400px;
+    opacity: 0.15;
+    top: 50%;
+    left: 50%;
+    width: 500px;
+    height: 500px;
+    transform: translate(-50%, -50%) rotate(-15deg);
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'%3E%3Cpath d='M250 50 L280 100 L320 80 L300 130 L350 150 L310 180 L340 220 L300 230 L310 280 L270 270 L260 320 L240 280 L200 300 L210 250 L170 240 L200 200 L160 170 L200 160 L180 120 L220 130 L230 90 Z M250 150 Q260 140 270 150 T290 180 Q290 200 280 210 T250 230 Q230 230 220 220 T200 190 Q200 170 210 160 T240 150 Q245 150 250 150 Z M180 250 L160 280 L140 260 L150 230 Z M320 250 L340 280 L360 260 L350 230 Z M240 350 L250 400 L260 350 L280 370 L270 340 L250 360 L230 340 L220 370 Z M100 200 L90 160 L70 180 L80 140 L60 150 L75 120 L50 130 L70 100 L45 105 L65 80 L90 90 L100 60 L120 85 L130 60 L140 90 Z M400 200 L410 160 L430 180 L420 140 L440 150 L425 120 L450 130 L430 100 L455 105 L435 80 L410 90 L400 60 L380 85 L370 60 L360 90 Z' fill='%23ff4500' stroke='%23b22222' stroke-width='2' opacity='0.4'/%3E%3Cpath d='M245 140 L248 145 L255 147 L250 152 L251 159 L245 155 L239 159 L240 152 L235 147 L242 145 Z M270 300 L273 305 L280 307 L275 312 L276 319 L270 315 L264 319 L265 312 L260 307 L267 305 Z M220 300 L223 305 L230 307 L225 312 L226 319 L220 315 L214 319 L215 312 L210 307 L217 305 Z' fill='%23ffd700' opacity='0.6'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 30px rgba(220, 20, 60, 0.8)) drop-shadow(0 0 60px rgba(255, 69, 0, 0.5));
 }
 
 .container {

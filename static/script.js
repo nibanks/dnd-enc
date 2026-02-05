@@ -7,6 +7,8 @@ let monstersLoaded = false;
 let hasCookies = false; // Track cookie authentication status
 let playersExpanded = true; // Track players section state
 let playersEditMode = false; // Track players edit mode
+let initiativeChart = null; // Chart instance for initiative distribution
+let crChart = null; // Chart instance for CR over time
 
 // D&D 5e/2024 Classes
 const DND_CLASSES = [
@@ -396,7 +398,6 @@ function togglePlayersSection() {
 
 // Toggle statistics section
 let statsExpanded = false;
-let initiativeChart = null;
 
 function toggleStatsSection() {
     statsExpanded = !statsExpanded;
@@ -419,6 +420,7 @@ function renderStatistics() {
     }
     
     renderInitiativeChart();
+    renderCRChart();
 }
 
 function renderInitiativeChart() {
@@ -433,22 +435,46 @@ function renderInitiativeChart() {
         playerInitiatives[player.name] = [];
     });
     
-    // Collect all initiative rolls from encounters
+    // Collect all initiative rolls from encounters that have been started
     currentAdventure.encounters.forEach(encounter => {
-        if (encounter.combatants) {
-            encounter.combatants.forEach(combatant => {
-                if (combatant.isPlayer && playerInitiatives[combatant.name] !== undefined) {
-                    playerInitiatives[combatant.name].push(combatant.initiative || 0);
-                }
-            });
+        // Only include encounters that have been started or completed
+        if (encounter.state === 'started' || encounter.state === 'complete') {
+            if (encounter.combatants) {
+                encounter.combatants.forEach(combatant => {
+                    if (combatant.isPlayer && playerInitiatives[combatant.name] !== undefined) {
+                        playerInitiatives[combatant.name].push(combatant.initiative || 0);
+                    }
+                });
+            }
         }
     });
+    
+    // Find min and max initiative across all players
+    let minInit = Infinity;
+    let maxInit = -Infinity;
+    Object.values(playerInitiatives).forEach(initiatives => {
+        if (initiatives.length > 0) {
+            minInit = Math.min(minInit, ...initiatives);
+            maxInit = Math.max(maxInit, ...initiatives);
+        }
+    });
+    
+    // If no data, return early
+    if (minInit === Infinity || maxInit === -Infinity) {
+        return;
+    }
     
     // Count frequency of each initiative value for each player
     const datasets = [];
     const colors = [
-        '#e74c3c', '#3498db', '#2ecc71', '#f39c12', 
-        '#9b59b6', '#1abc9c', '#e67e22', '#34495e'
+        '#e74c3c',  // Red
+        '#3498db',  // Blue
+        '#2ecc71',  // Green
+        '#f39c12',  // Orange
+        '#9b59b6',  // Purple
+        '#e91e63',  // Pink
+        '#00bcd4',  // Cyan
+        '#ff5722'   // Deep Orange
     ];
     
     let colorIndex = 0;
@@ -461,10 +487,14 @@ function renderInitiativeChart() {
             frequency[init] = (frequency[init] || 0) + 1;
         });
         
-        // Convert to array of {x, y} points sorted by initiative value
-        const data = Object.entries(frequency)
-            .map(([init, count]) => ({ x: parseInt(init), y: count }))
-            .sort((a, b) => a.x - b.x);
+        // Create data points for all initiative values from min to max
+        const data = [];
+        for (let i = minInit; i <= maxInit; i++) {
+            data.push({
+                x: i,
+                y: frequency[i] || 0
+            });
+        }
         
         const color = colors[colorIndex % colors.length];
         datasets.push({
@@ -489,7 +519,7 @@ function renderInitiativeChart() {
     
     // Create new chart
     initiativeChart = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: { datasets },
         options: {
             responsive: true,
@@ -520,7 +550,8 @@ function renderInitiativeChart() {
                     },
                     ticks: {
                         stepSize: 1
-                    }
+                    },
+                    stacked: true
                 },
                 y: {
                     type: 'linear',
@@ -532,7 +563,144 @@ function renderInitiativeChart() {
                         stepSize: 1,
                         precision: 0
                     },
-                    beginAtZero: true
+                    beginAtZero: true,
+                    stacked: true
+                }
+            }
+        }
+    });
+}
+
+function renderCRChart() {
+    const canvas = document.getElementById('crChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    // Calculate total CR for each encounter
+    const encounterData = [];
+    
+    currentAdventure.encounters.forEach((encounter, index) => {
+        if (!encounter.combatants) return;
+        
+        let totalCR = 0;
+        let encounterName = encounter.name || `Encounter ${index + 1}`;
+        
+        // Sum up CR values from all monsters (non-players)
+        encounter.combatants.forEach(combatant => {
+            if (combatant.isPlayer) return;
+            
+            // Try to get CR from combatant first, then look up in monster list
+            let cr = combatant.cr || '';
+            
+            // If no CR stored, try looking up from monster database
+            if (!cr) {
+                // Extract base monster name (remove numbering like "Cultist 1" -> "Cultist")
+                const baseName = combatant.name.replace(/\s+\d+$/, '');
+                const monster = DND_MONSTERS[baseName];
+                cr = monster?.cr || '0';
+            }
+            
+            // Convert CR to numeric value
+            let crValue = 0;
+            if (typeof cr === 'string') {
+                // Handle fractional CRs like "1/8", "1/4", "1/2"
+                if (cr.includes('/')) {
+                    const parts = cr.split('/');
+                    crValue = parseInt(parts[0]) / parseInt(parts[1]);
+                } else {
+                    crValue = parseFloat(cr) || 0;
+                }
+            } else {
+                crValue = cr || 0;
+            }
+            totalCR += crValue;
+        });
+        
+        encounterData.push({
+            x: index + 1,
+            y: totalCR,
+            label: encounterName,
+            state: encounter.state
+        });
+    });
+    
+    // Destroy existing chart if it exists
+    if (crChart) {
+        crChart.destroy();
+    }
+    
+    // Create new chart
+    crChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: 'Total Encounter CR',
+                data: encounterData,
+                borderColor: '#e74c3c',
+                backgroundColor: '#e74c3c20',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointBackgroundColor: encounterData.map(d => d.state === 'complete' ? '#e74c3c' : '#3498db'),
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                segment: {
+                    borderColor: ctx => {
+                        const curr = ctx.p1DataIndex;
+                        return encounterData[curr]?.state === 'complete' ? '#e74c3c' : '#3498db';
+                    }
+                }
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.5,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                title: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return encounterData[context[0].dataIndex].label;
+                        },
+                        label: function(context) {
+                            return 'Total CR: ' + context.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Encounter Number'
+                    },
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Challenge Rating'
+                    },
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(1);
+                        }
+                    }
                 }
             }
         }
@@ -1474,47 +1642,35 @@ function createEncounterCard(encounter, encounterIndex) {
     header.innerHTML = `
         <div style="display: flex; flex-direction: column; gap: 10px; flex: 1;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 600px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
                     <button class="btn-small" onclick="toggleEncounterMinimize(${encounterIndex})" title="${encounter.minimized ? 'Expand' : 'Minimize'}" style="background: #95a5a6;">${minimizeIcon}</button>
-                    <input type="text" class="encounter-title" value="${encounter.name || 'New Encounter'}" 
-                           onchange="updateEncounterName(${encounterIndex}, this.value)" style="border: 1px solid #ddd; padding: 5px; flex: 1;">
-                    <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap;">CR: ${calculateEncounterCR(encounter)} | XP: ${calculateEncounterXP(encounter)}</span>
+                    ${showControls ? `
+                        <input type="text" class="encounter-title" value="${encounter.name || 'New Encounter'}" 
+                               onchange="updateEncounterName(${encounterIndex}, this.value)" style="border: 1px solid #ddd; padding: 5px; width: 280px; max-width: 280px;">
+                    ` : `
+                        <span class="encounter-title" style="font-size: 20px; font-weight: 600; width: 280px; max-width: 280px;">${encounter.name || 'New Encounter'}</span>
+                    `}
+                    <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap; margin-left: 10px;">CR: ${calculateEncounterCR(encounter)} | XP: ${calculateEncounterXP(encounter)}</span>
                 </div>
                 <div class="encounter-controls">
                     ${showControls ? `
                         <button class="btn-small" onclick="addMonsterFromLibrary(${encounterIndex})" style="background: #27ae60;" title="Add a monster to this encounter">+</button>
                         <button class="btn-small" onclick="refreshPlayers(${encounterIndex})" style="background: #3498db;" title="Refresh player stats from Players section">↻</button>
                     ` : ''}
-                    <button class="btn-small" onclick="generateLoot(${encounterIndex})" style="background: #f39c12;" title="Generate treasure based on enemies">💰</button>
                     ${showControls ? `
                         <button class="btn-small" onclick="removeEncounter(${encounterIndex})" style="background: #e74c3c;" title="Delete this encounter">×</button>
                     ` : ''}
                 </div>
             </div>
             <div style="display: ${encounter.minimized ? 'none' : 'flex'}; align-items: center; gap: 15px;">
+                <span style="color: #666; font-weight: 500;">Round ${encounter.currentRound || 1}</span>
                 <div class="encounter-controls">
                     ${encounterButtons}
                 </div>
-                ${encounter.state === 'started' || encounter.state === 'complete' ? `<span style="color: #666; font-weight: 500;">Round ${encounter.currentRound || 1}</span>` : ''}
             </div>
         </div>
     `;
     card.appendChild(header);
-    
-    // Treasure section
-    if (encounter.treasure && !encounter.minimized) {
-        const treasureDiv = document.createElement('div');
-        treasureDiv.className = 'treasure-section';
-        treasureDiv.style.cssText = 'background: #fff8dc; border: 2px solid #f39c12; border-radius: 5px; padding: 10px; margin: 10px 0; font-family: monospace;';
-        treasureDiv.innerHTML = `
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <strong style="color: #d68910;">💰 Treasure & Loot:</strong>
-                <button class="btn-small" onclick="clearLoot(${encounterIndex})" style="background: #e74c3c;" title="Clear treasure">×</button>
-            </div>
-            <div style="white-space: pre-wrap; color: #333;">${encounter.treasure}</div>
-        `;
-        card.appendChild(treasureDiv);
-    }
     
     // Combatants table
     const tableContainer = document.createElement('div');
@@ -1596,15 +1752,21 @@ function createEncounterCard(encounter, encounterIndex) {
         const inheritColor = isUnconscious ? '#e74c3c' : 'inherit';
         
         if (isPlayer) {
-            // Players: always show as link if they have URL, otherwise just text (not input box)
+            // Players: always show tooltip with player data, link to URL if available
+            const escapedName = combatant.name.replace(/'/g, "\\'");
+            const escapedUrl = dndBeyondUrl ? dndBeyondUrl.replace(/'/g, "\\'") : '';
+            const playerUrl = escapedUrl || `player:${escapedName}`; // Use special identifier for local player data
+            
             if (dndBeyondUrl) {
-                const escapedUrl = dndBeyondUrl.replace(/'/g, "\\'");
                 nameHTML = `<a href="${dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
                     class="monster-name-hover" 
-                    onmouseenter="showMonsterTooltip('${combatant.name.replace(/'/g, "\\'")}', '${escapedUrl}', event)"
+                    onmouseenter="showMonsterTooltip('${escapedName}', '${playerUrl}', event)"
                     onmouseleave="hideMonsterTooltip()">${combatant.name || ''}</a>`;
             } else {
-                nameHTML = `<span style="font-weight: 500; color: ${inheritColor};">${combatant.name || ''}</span>`;
+                nameHTML = `<span style="font-weight: 500; color: ${inheritColor}; cursor: help;" 
+                    class="monster-name-hover"
+                    onmouseenter="showMonsterTooltip('${escapedName}', '${playerUrl}', event)"
+                    onmouseleave="hideMonsterTooltip()">${combatant.name || ''}</span>`;
             }
         } else if (dndBeyondUrl) {
             // NPCs/Monsters with URL: Make name a clickable link with tooltip
@@ -1629,9 +1791,33 @@ function createEncounterCard(encounter, encounterIndex) {
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))"></td>
             <td><input type="text" value="${combatant.notes || ''}" 
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'notes', this.value)"></td>
-            <td><button class="btn-small" onclick="removeCombatant(${encounterIndex}, ${combatantIndex})" style="background: #e74c3c;" title="Delete this combatant">×</button></td>
+            <td>${showControls ? `<button class="btn-small" onclick="removeCombatant(${encounterIndex}, ${combatantIndex})" style="background: #e74c3c;" title="Delete this combatant">×</button>` : ''}</td>
         `;
     });
+    
+    // Treasure section (always shown at the end)
+    if (!encounter.minimized) {
+        const treasureDiv = document.createElement('div');
+        treasureDiv.className = 'treasure-section';
+        treasureDiv.style.cssText = 'background: #fff8dc; border: 2px solid #f39c12; border-radius: 5px; padding: 10px; margin: 10px 0; font-family: monospace;';
+        
+        // Initialize treasure if it doesn't exist
+        if (!encounter.treasure) {
+            encounter.treasure = 'No treasure generated yet. Click regenerate to generate treasure.';
+        }
+        
+        treasureDiv.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <strong style="color: #d68910;">💰 Treasure & Loot:</strong>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn-small" onclick="generateLoot(${encounterIndex})" style="background: #3498db;" title="Regenerate treasure">↻</button>
+                    <button class="btn-small" id="treasure-edit-btn-${encounterIndex}" onclick="toggleTreasureEdit(${encounterIndex})" style="background: #f39c12;" title="Edit treasure">✎</button>
+                </div>
+            </div>
+            <div id="treasure-content-${encounterIndex}" style="white-space: pre-wrap; color: #333;">${encounter.treasure}</div>
+        `;
+        card.appendChild(treasureDiv);
+    }
     
     return card;
 }
@@ -2197,6 +2383,49 @@ function clearLoot(encounterIndex) {
     autoSave();
 }
 
+// Toggle treasure editing mode
+function toggleTreasureEdit(encounterIndex) {
+    const encounter = currentAdventure.encounters[encounterIndex];
+    const contentDiv = document.getElementById(`treasure-content-${encounterIndex}`);
+    const editBtn = document.getElementById(`treasure-edit-btn-${encounterIndex}`);
+    
+    if (!contentDiv || !editBtn) return;
+    
+    // Check if currently in edit mode
+    const isEditing = editBtn.getAttribute('data-editing') === 'true';
+    
+    if (isEditing) {
+        // Save mode - get textarea value and save
+        const textarea = contentDiv.querySelector('textarea');
+        if (textarea) {
+            encounter.treasure = textarea.value;
+            contentDiv.innerHTML = `<div style="white-space: pre-wrap; color: #333;">${encounter.treasure}</div>`;
+            editBtn.textContent = '✎';
+            editBtn.title = 'Edit treasure';
+            editBtn.style.background = '#f39c12';
+            editBtn.setAttribute('data-editing', 'false');
+            autoSave();
+        }
+    } else {
+        // Edit mode - show textarea
+        const currentTreasure = encounter.treasure || '';
+        contentDiv.innerHTML = `
+            <textarea style="width: 100%; min-height: 100px; font-family: monospace; padding: 5px; border: 1px solid #ddd; border-radius: 3px;" 
+                      id="treasure-textarea-${encounterIndex}">${currentTreasure}</textarea>
+        `;
+        editBtn.textContent = '✔';
+        editBtn.title = 'Save treasure';
+        editBtn.style.background = '#2ecc71';
+        editBtn.setAttribute('data-editing', 'true');
+        
+        // Focus the textarea
+        setTimeout(() => {
+            const textarea = document.getElementById(`treasure-textarea-${encounterIndex}`);
+            if (textarea) textarea.focus();
+        }, 0);
+    }
+}
+
 // Start encounter - sort by initiative and mark as started
 function startEncounter(encounterIndex) {
     const encounter = currentAdventure.encounters[encounterIndex];
@@ -2300,6 +2529,44 @@ function createTooltipElement() {
 function formatModifier(score) {
     const mod = Math.floor((score - 10) / 2);
     return mod >= 0 ? `+${mod}` : `${mod}`;
+}
+
+// Format action description text with proper spacing and bold keywords
+function formatActionDescription(text) {
+    if (!text) return '';
+    
+    // Add space after periods before capital letters (e.g., "ft.Hit:" -> "ft. Hit:")
+    text = text.replace(/\.([A-Z])/g, '. $1');
+    
+    // Add space after colons before numbers/text (e.g., "Roll:+3" -> "Roll: +3")
+    text = text.replace(/:([+\-0-9])/g, ': $1');
+    
+    // Add space before "to hit" (e.g., "+4to hit" -> "+4 to hit")
+    text = text.replace(/(\d+)(to\s+hit)/gi, '$1 $2');
+    
+    // Add spaces around parenthesized dice rolls (e.g., "4(1d4 + 2)piercing" -> "4 (1d4 + 2) piercing")
+    text = text.replace(/(\d+)\((\d+d\d+(?:\s*[+\-]\s*\d+)?)\)([A-Za-z])/g, '$1 ($2) $3');
+    
+    // Bold attack roll patterns (e.g., "Melee Attack Roll", "Ranged Attack Roll", "Melee Weapon Attack")
+    text = text.replace(/(Melee|Ranged)\s+(Weapon\s+)?(Attack|Spell\s+Attack)(\s+Roll)?/gi, '<strong>$&</strong>');
+    
+    // Bold damage types
+    const damageTypes = [
+        'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Force', 'Lightning', 'Necrotic', 
+        'Piercing', 'Poison', 'Psychic', 'Radiant', 'Slashing', 'Thunder'
+    ];
+    damageTypes.forEach(type => {
+        const regex = new RegExp(`\\b(${type})\\b`, 'gi');
+        text = text.replace(regex, '<strong>$1</strong>');
+    });
+    
+    // Bold dice rolls (e.g., "1d4 + 1", "2d6", "1d8 + 3")
+    text = text.replace(/\b(\d+d\d+(?:\s*[+\-]\s*\d+)?)\b/gi, '<strong>$1</strong>');
+    
+    // Bold "Hit:" and "Miss:"
+    text = text.replace(/\b(Hit|Miss):/gi, '<strong>$1:</strong>');
+    
+    return text;
 }
 
 // Render tooltip content from entity details
@@ -2554,7 +2821,7 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
             html += `<div class="monster-tooltip-action">`;
             html += `<div class="monster-tooltip-action-name">${feature.name}</div>`;
             if (feature.description) {
-                html += `<div class="monster-tooltip-action-desc">${feature.description}</div>`;
+                html += `<div class="monster-tooltip-action-desc">${formatActionDescription(feature.description)}</div>`;
             }
             html += `</div>`;
         });
@@ -2568,7 +2835,7 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
         details.actions.forEach(action => {
             html += `<div class="monster-tooltip-action">`;
             html += `<div class="monster-tooltip-action-name">${action.name}</div>`;
-            html += `<div class="monster-tooltip-action-desc">${action.description}</div>`;
+            html += `<div class="monster-tooltip-action-desc">${formatActionDescription(action.description)}</div>`;
             html += `</div>`;
         });
         html += '</div>';
@@ -2579,12 +2846,12 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
         html += '<div class="monster-tooltip-section">';
         html += '<div class="monster-tooltip-section-title">Legendary Actions</div>';
         if (details.legendaryActionsDescription) {
-            html += `<div class="monster-tooltip-section-content" style="margin-bottom: 8px;">${details.legendaryActionsDescription}</div>`;
+            html += `<div class="monster-tooltip-section-content" style="margin-bottom: 8px;">${formatActionDescription(details.legendaryActionsDescription)}</div>`;
         }
         details.legendaryActions.forEach(action => {
             html += `<div class="monster-tooltip-action">`;
             html += `<div class="monster-tooltip-action-name">${action.name}</div>`;
-            html += `<div class="monster-tooltip-action-desc">${action.description}</div>`;
+            html += `<div class="monster-tooltip-action-desc">${formatActionDescription(action.description)}</div>`;
             html += `</div>`;
         });
         html += '</div>';
@@ -2597,7 +2864,7 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
         details.reactions.forEach(reaction => {
             html += `<div class="monster-tooltip-action">`;
             html += `<div class="monster-tooltip-action-name">${reaction.name}</div>`;
-            html += `<div class="monster-tooltip-action-desc">${reaction.description}</div>`;
+            html += `<div class="monster-tooltip-action-desc">${formatActionDescription(reaction.description)}</div>`;
             html += `</div>`;
         });
         html += '</div>';
@@ -2668,10 +2935,13 @@ function showMonsterTooltip(entityName, entityUrl, event) {
         hideMonsterTooltip();
     });
     
+    // Check if this is a local player (using player: prefix)
+    const isLocalPlayer = entityUrl.startsWith('player:');
+    
     // Determine if this is a character or monster
-    const isCharacter = isCharacterUrl(entityUrl);
+    const isCharacter = isLocalPlayer || isCharacterUrl(entityUrl);
     const entityType = isCharacter ? 'character' : 'monster';
-    console.log('Entity type:', entityType, 'URL:', entityUrl);
+    console.log('Entity type:', entityType, 'URL:', entityUrl, 'isLocalPlayer:', isLocalPlayer);
     
     // First, try to find the entity in our current encounters or players (it's already loaded)
     let cachedDetails = null;
@@ -2679,7 +2949,7 @@ function showMonsterTooltip(entityName, entityUrl, event) {
     if (isCharacter && currentAdventure && currentAdventure.players) {
         // Check players list for character details
         for (const player of currentAdventure.players) {
-            if (player.name === entityName || (player.dndBeyondUrl === entityUrl)) {
+            if (player.name === entityName || (player.dndBeyondUrl === entityUrl) || isLocalPlayer) {
                 cachedDetails = player;
                 break;
             }
@@ -2703,11 +2973,25 @@ function showMonsterTooltip(entityName, entityUrl, event) {
     
     // If we have cached details with FULL info (abilities present), use them immediately
     // For characters, also use local player data even without abilities
-    if (cachedDetails && (cachedDetails.abilities || (isCharacter && cachedDetails.ac))) {
+    // For local players (player: prefix), always use local data
+    if (cachedDetails && (cachedDetails.abilities || (isCharacter && cachedDetails.ac) || isLocalPlayer)) {
         console.log('Using cached details:', cachedDetails);
         tooltip.style.display = 'block';
         positionTooltip(event);
         renderTooltipContent(tooltip, entityName, cachedDetails, isCharacter);
+        return;
+    }
+    
+    // If this is a local player but no data found, show error
+    if (isLocalPlayer) {
+        tooltip.innerHTML = `<div class="monster-tooltip-loading">
+            <div style="margin-bottom: 8px;">⚠️ Player data not found</div>
+            <div style="font-size: 12px; color: #666;">
+                Add this character to the Players section above.
+            </div>
+        </div>`;
+        tooltip.style.display = 'block';
+        positionTooltip(event);
         return;
     }
     

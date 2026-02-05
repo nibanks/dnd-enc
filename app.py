@@ -389,7 +389,16 @@ def get_character_details_old(character_url):
         
         # Ensure URL is properly formatted
         if not character_url.startswith('http'):
-            character_url = f"https://www.dndbeyond.com/{character_url}"
+            # If it looks like profile/username/characters/id or characters/id
+            if '/' in character_url:
+                if character_url.startswith('profile/') or character_url.startswith('characters/'):
+                    character_url = f"https://www.dndbeyond.com/{character_url}"
+                else:
+                    # Assume it's username/characters/id format
+                    character_url = f"https://www.dndbeyond.com/profile/{character_url}"
+            else:
+                # Just a character ID
+                character_url = f"https://www.dndbeyond.com/characters/{character_url}"
         
         print(f"Fetching character details from: {character_url}")
         
@@ -626,7 +635,11 @@ def get_monster_details(monster_url):
         
         # Ensure URL is properly formatted
         if not monster_url.startswith('http'):
-            monster_url = f"https://www.dndbeyond.com/{monster_url}"
+            # If it's a short form, add the full monsters prefix
+            if not monster_url.startswith('monsters/'):
+                monster_url = f"https://www.dndbeyond.com/monsters/{monster_url}"
+            else:
+                monster_url = f"https://www.dndbeyond.com/{monster_url}"
         
         print(f"Fetching monster details from: {monster_url}")
         
@@ -1137,7 +1150,85 @@ def get_adventure(name):
     
     with open(filepath, 'r') as f:
         data = json.load(f)
+    
+    # Restore full URLs after loading
+    data = restore_adventure_from_storage(data)
+    
     return jsonify(data)
+
+def clean_adventure_for_storage(data):
+    """Remove CR fields and shorten URLs before saving"""
+    import copy
+    data = copy.deepcopy(data)
+    
+    # Strip common URL prefix
+    url_prefix = "https://www.dndbeyond.com/monsters/"
+    
+    # Clean encounters
+    if 'encounters' in data:
+        for encounter in data['encounters']:
+            if 'combatants' in encounter:
+                for combatant in encounter['combatants']:
+                    # Remove CR field (always look up from monster database)
+                    if 'cr' in combatant:
+                        del combatant['cr']
+                    
+                    # Shorten dndBeyondUrl
+                    if 'dndBeyondUrl' in combatant and combatant['dndBeyondUrl'].startswith(url_prefix):
+                        combatant['dndBeyondUrl'] = combatant['dndBeyondUrl'][len(url_prefix):]
+    
+    # Clean players
+    if 'players' in data:
+        for player in data['players']:
+            # Shorten player dndBeyondUrl (different prefix for characters)
+            if 'dndBeyondUrl' in player:
+                # Strip common character URL prefixes
+                char_prefixes = [
+                    "https://www.dndbeyond.com/profile/",
+                    "https://www.dndbeyond.com/characters/"
+                ]
+                for prefix in char_prefixes:
+                    if player['dndBeyondUrl'].startswith(prefix):
+                        player['dndBeyondUrl'] = player['dndBeyondUrl'][len(prefix):]
+                        break
+    
+    return data
+
+def restore_adventure_from_storage(data):
+    """Restore full URLs after loading"""
+    import copy
+    data = copy.deepcopy(data)
+    
+    monster_prefix = "https://www.dndbeyond.com/monsters/"
+    
+    # Restore encounter URLs
+    if 'encounters' in data:
+        for encounter in data['encounters']:
+            if 'combatants' in encounter:
+                for combatant in encounter['combatants']:
+                    # Restore monster URL if it's shortened
+                    if 'dndBeyondUrl' in combatant and combatant['dndBeyondUrl']:
+                        url = combatant['dndBeyondUrl']
+                        # Only add prefix if it doesn't already have it
+                        if not url.startswith('http'):
+                            combatant['dndBeyondUrl'] = monster_prefix + url
+    
+    # Restore player URLs
+    if 'players' in data:
+        for player in data['players']:
+            if 'dndBeyondUrl' in player and player['dndBeyondUrl']:
+                url = player['dndBeyondUrl']
+                # Only add prefix if it doesn't already have it
+                if not url.startswith('http'):
+                    # Determine if it's a profile or character URL based on format
+                    if '/' in url and not url.startswith('characters/'):
+                        # Looks like profile/username/characters/id
+                        player['dndBeyondUrl'] = "https://www.dndbeyond.com/profile/" + url
+                    else:
+                        # Direct character ID
+                        player['dndBeyondUrl'] = "https://www.dndbeyond.com/characters/" + url
+    
+    return data
 
 @app.route('/api/adventure/<name>', methods=['POST'])
 def save_adventure(name):
@@ -1145,8 +1236,11 @@ def save_adventure(name):
     filepath = DATA_DIR / f"{name}.json"
     data = request.json
     
+    # Clean data before saving
+    cleaned_data = clean_adventure_for_storage(data)
+    
     with open(filepath, 'w') as f:
-        json.dump(data, f, indent=2)
+        json.dump(cleaned_data, f, indent=2)
     
     return jsonify({"success": True})
 
