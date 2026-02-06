@@ -1521,6 +1521,61 @@ function isPlayerCombatant(combatant) {
 }
 
 // Render encounters
+// Drag and drop state
+let draggedEncounterIndex = null;
+let dropTargetIndex = null;
+
+function handleDragStart(e) {
+    draggedEncounterIndex = parseInt(e.currentTarget.dataset.encounterIndex);
+    e.currentTarget.style.opacity = '0.4';
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    
+    const targetIndex = parseInt(e.currentTarget.dataset.encounterIndex);
+    
+    if (draggedEncounterIndex !== null && draggedEncounterIndex !== targetIndex) {
+        dropTargetIndex = targetIndex;
+    }
+    
+    return false;
+}
+
+function handleDragEnd(e) {
+    if (draggedEncounterIndex !== null && dropTargetIndex !== null && draggedEncounterIndex !== dropTargetIndex) {
+        // Reorder the encounters array
+        const draggedEncounter = currentAdventure.encounters[draggedEncounterIndex];
+        currentAdventure.encounters.splice(draggedEncounterIndex, 1);
+        
+        // Calculate new insertion index
+        const newIndex = draggedEncounterIndex < dropTargetIndex ? dropTargetIndex - 1 : dropTargetIndex;
+        currentAdventure.encounters.splice(newIndex, 0, draggedEncounter);
+        
+        // Re-render immediately
+        renderEncounters();
+    } else if (e.currentTarget) {
+        e.currentTarget.style.opacity = '1';
+    }
+    
+    draggedEncounterIndex = null;
+    dropTargetIndex = null;
+}
+
 function renderEncounters() {
     const container = document.getElementById('encountersContainer');
     container.innerHTML = '';
@@ -1610,6 +1665,14 @@ function calculateEncounterCR(encounter) {
 function createEncounterCard(encounter, encounterIndex) {
     const card = document.createElement('div');
     card.className = 'encounter-card';
+    card.draggable = true;
+    card.dataset.encounterIndex = encounterIndex;
+    
+    // Drag and drop event handlers
+    card.addEventListener('dragstart', handleDragStart);
+    card.addEventListener('dragover', handleDragOver);
+    card.addEventListener('drop', handleDrop);
+    card.addEventListener('dragend', handleDragEnd);
     
     const header = document.createElement('div');
     header.className = 'encounter-header';

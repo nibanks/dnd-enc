@@ -231,6 +231,21 @@ input[type="number"]:focus {
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
+    cursor: move;
+    transition: all 0.2s ease;
+}
+
+.encounter-card:hover {
+    border-color: #3498db;
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+}
+
+.encounter-card[draggable="true"] {
+    cursor: grab;
+}
+
+.encounter-card:active {
+    cursor: grabbing;
 }
 
 .encounter-header {
