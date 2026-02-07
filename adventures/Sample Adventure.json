@@ -11,123 +11,97 @@
   ],
   "encounters": [
     {
-      "activeCombatant": null,
       "chapter": "Chapter 1: The Beginning",
       "combatants": [
         {
           "hp": 28,
-          "initiative": 22,
-          "isPlayer": true,
           "maxHp": 35,
           "name": "Finn Quickfoot",
-          "notes": "Used Second Wind"
+          "notes": "Used Second Wind",
+          "init": 22
         },
         {
           "hp": 28,
-          "initiative": 19,
-          "isPlayer": true,
           "maxHp": 28,
           "name": "Elara Moonwhisper",
-          "notes": ""
+          "init": 19
         },
         {
-          "hp": 0,
-          "initiative": 15,
-          "isPlayer": false,
           "maxHp": 9,
           "name": "Cultist 1",
-          "notes": "Defeated"
+          "notes": "Defeated",
+          "init": 15
         },
         {
           "hp": 40,
-          "initiative": 14,
-          "isPlayer": true,
           "maxHp": 40,
           "name": "Brother Aldric",
-          "notes": ""
+          "init": 14
         },
         {
-          "hp": 0,
-          "initiative": 12,
-          "isPlayer": false,
           "maxHp": 9,
           "name": "Cultist 2",
-          "notes": "Defeated"
+          "notes": "Defeated",
+          "init": 12
         },
         {
           "hp": 35,
-          "initiative": 11,
-          "isPlayer": true,
           "maxHp": 48,
           "name": "Thorin Ironshield",
-          "notes": "Took 13 damage"
+          "notes": "Took 13 damage",
+          "init": 11
         }
       ],
       "currentRound": 6,
-      "currentTurn": 0,
-      "minimized": false,
       "name": "Keep Defense",
       "state": "complete",
       "treasure": "Coins: 12 CP, 9 SP"
     },
     {
-      "activeCombatant": null,
       "chapter": "Chapter 1: The Beginning",
       "combatants": [
         {
           "hp": 35,
-          "initiative": 21,
-          "isPlayer": true,
           "maxHp": 35,
           "name": "Finn Quickfoot",
-          "notes": "Hidden (advantage on next attack)"
+          "notes": "Hidden (advantage on next attack)",
+          "init": 21
         },
         {
           "hp": 39,
-          "initiative": 16,
-          "isPlayer": false,
           "maxHp": 39,
           "name": "Dragonclaw 1",
-          "notes": ""
+          "init": 16
         },
         {
           "hp": 28,
-          "initiative": 15,
-          "isPlayer": true,
           "maxHp": 28,
           "name": "Elara Moonwhisper",
-          "notes": "Concentrating on Haste"
+          "notes": "Concentrating on Haste",
+          "init": 15
         },
         {
           "hp": 40,
-          "initiative": 13,
-          "isPlayer": true,
           "maxHp": 40,
           "name": "Brother Aldric",
-          "notes": "Bless active on party"
+          "notes": "Bless active on party",
+          "init": 13
         },
         {
           "hp": 20,
-          "initiative": 12,
-          "isPlayer": false,
           "maxHp": 39,
           "name": "Dragonclaw 2",
-          "notes": "Injured"
+          "notes": "Injured",
+          "init": 12
         },
         {
           "hp": 48,
-          "initiative": 9,
-          "isPlayer": true,
           "maxHp": 48,
           "name": "Thorin Ironshield",
-          "notes": ""
+          "init": 9
         }
       ],
-      "currentRound": 0,
-      "currentTurn": 0,
-      "minimized": false,
       "name": "Ambush on the Road",
-      "state": null,
       "treasure": "Coins: 8 CP, 1 SP\nEquipment: belt pouch"
     },
     {
@@ -135,59 +109,38 @@
       "combatants": [
         {
           "hp": 48,
-          "initiative": 0,
-          "isPlayer": true,
           "maxHp": 48,
-          "name": "Thorin Ironshield",
-          "notes": ""
+          "name": "Thorin Ironshield"
         },
         {
           "hp": 28,
-          "initiative": 0,
-          "isPlayer": true,
           "maxHp": 28,
-          "name": "Elara Moonwhisper",
-          "notes": ""
+          "name": "Elara Moonwhisper"
         },
         {
           "hp": 35,
-          "initiative": 0,
-          "isPlayer": true,
           "maxHp": 35,
-          "name": "Finn Quickfoot",
-          "notes": ""
+          "name": "Finn Quickfoot"
         },
         {
           "hp": 40,
-          "initiative": 0,
-          "isPlayer": true,
           "maxHp": 40,
-          "name": "Brother Aldric",
-          "notes": ""
+          "name": "Brother Aldric"
         },
         {
           "hp": 39,
-          "initiative": 0,
-          "isPlayer": false,
           "maxHp": 39,
-          "name": "Guard Drake",
-          "notes": ""
+          "name": "Guard Drake"
         },
         {
           "hp": 9,
-          "initiative": 0,
-          "isPlayer": false,
           "maxHp": 9,
-          "name": "Cultist",
-          "notes": ""
+          "name": "Cultist"
         },
         {
           "hp": 9,
-          "initiative": 0,
-          "isPlayer": false,
           "maxHp": 9,
-          "name": "Cultist",
-          "notes": ""
+          "name": "Cultist"
         }
       ],
       "minimized": true,
@@ -199,35 +152,23 @@
       "combatants": [
         {
           "hp": 48,
-          "initiative": 0,
-          "isPlayer": true,
           "maxHp": 48,
-          "name": "Thorin Ironshield",
-          "notes": ""
+          "name": "Thorin Ironshield"
         },
         {
           "hp": 28,
-          "initiative": 0,
-          "isPlayer": true,
           "maxHp": 28,
-          "name": "Elara Moonwhisper",
-          "notes": ""
+          "name": "Elara Moonwhisper"
         },
         {
           "hp": 35,
-          "initiative": 0,
-          "isPlayer": true,
           "maxHp": 35,
-          "name": "Finn Quickfoot",
-          "notes": ""
+          "name": "Finn Quickfoot"
         },
         {
           "hp": 40,
-          "initiative": 0,
-          "isPlayer": true,
           "maxHp": 40,
-          "name": "Brother Aldric",
-          "notes": ""
+          "name": "Brother Aldric"
         }
       ],
       "minimized": true,
@@ -240,7 +181,6 @@
     {
       "ac": 18,
       "class": "Fighter",
-      "dndBeyondUrl": "",
       "initiativeBonus": 1,
       "level": 5,
       "maxHp": 48,
@@ -258,15 +198,12 @@
         "cha": 10
       },
       "skillProficiencies": {
-        "perception": true,
-        "insight": false,
-        "investigation": false
+        "perception": true
       }
     },
     {
       "ac": 13,
       "class": "Wizard",
-      "dndBeyondUrl": "",
       "initiativeBonus": 3,
       "level": 5,
       "maxHp": 28,
@@ -284,15 +221,12 @@
         "cha": 10
       },
       "skillProficiencies": {
-        "perception": false,
-        "insight": false,
         "investigation": true
       }
     },
     {
       "ac": 16,
       "class": "Rogue",
-      "dndBeyondUrl": "",
       "initiativeBonus": 4,
       "level": 5,
       "maxHp": 35,
@@ -311,15 +245,12 @@
       },
       "skillProficiencies": {
         "perception": true,
-        "insight": true,
-        "investigation": false
+        "insight": true
       }
     },
     {
       "ac": 18,
       "class": "Cleric",
-      "dndBeyondUrl": "",
-      "initiativeBonus": 0,
       "level": 5,
       "maxHp": 40,
       "name": "Brother Aldric",
@@ -337,8 +268,7 @@
       },
       "skillProficiencies": {
         "perception": true,
-        "insight": true,
-        "investigation": false
+        "insight": true
       }
     }
   ]

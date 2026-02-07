@@ -1157,12 +1157,34 @@ def get_adventure(name):
     return jsonify(data)
 
 def clean_adventure_for_storage(data):
-    """Remove CR fields and shorten URLs before saving"""
+    """Remove CR fields, shorten URLs, and strip empty values before saving"""
     import copy
+    import re
     data = copy.deepcopy(data)
     
+    # Helper to recursively remove empty strings, empty lists, empty dicts, None values, and zeros
+    def strip_empty(obj):
+        if isinstance(obj, dict):
+            return {k: strip_empty(v) for k, v in obj.items() 
+                   if v not in (None, "", [], {}, 0, 0.0)}
+        elif isinstance(obj, list):
+            return [strip_empty(item) for item in obj]
+        else:
+            return obj
+    
+    # Helper to extract character ID from URL
+    def extract_character_id(url):
+        """Extract just the character ID number from a D&D Beyond character URL"""
+        if not url:
+            return url
+        # Match pattern like username/characters/NUMBER or just NUMBER
+        match = re.search(r'(\d{8,})$', url)  # At least 8 digits at the end
+        if match:
+            return match.group(1)
+        return url
+    
     # Strip common URL prefix
-    url_prefix = "https://www.dndbeyond.com/monsters/"
+    monster_prefix = "https://www.dndbeyond.com/monsters/"
     
     # Clean encounters
     if 'encounters' in data:
@@ -1173,60 +1195,167 @@ def clean_adventure_for_storage(data):
                     if 'cr' in combatant:
                         del combatant['cr']
                     
-                    # Shorten dndBeyondUrl
-                    if 'dndBeyondUrl' in combatant and combatant['dndBeyondUrl'].startswith(url_prefix):
-                        combatant['dndBeyondUrl'] = combatant['dndBeyondUrl'][len(url_prefix):]
+                    # Shorten field names for storage
+                    if 'initiative' in combatant:
+                        combatant['init'] = combatant['initiative']
+                        del combatant['initiative']
+                    
+                    if 'dndBeyondUrl' in combatant:
+                        combatant['id'] = combatant['dndBeyondUrl']
+                        del combatant['dndBeyondUrl']
+                    
+                    # Check if this is a player (has id that looks like a character ID)
+                    if 'id' in combatant and combatant['id']:
+                        url = combatant['id']
+                        
+                        # If it's a character URL (contains only digits or profile path), it's a player
+                        is_character = bool(re.search(r'/characters/|^\d{8,}$', url))
+                        
+                        if is_character:
+                            # Extract just the character ID
+                            combatant['id'] = extract_character_id(url)
+                            # Remove name for players (will look up from players list)
+                            if 'name' in combatant:
+                                del combatant['name']
+                        else:
+                            # It's a monster - shorten URL
+                            if url.startswith(monster_prefix):
+                                combatant['id'] = url[len(monster_prefix):]
+                    else:
+                        # No URL means it's a monster - no special handling needed
+                        pass
     
-    # Clean players
+    # Clean players - extract only character IDs
     if 'players' in data:
         for player in data['players']:
-            # Shorten player dndBeyondUrl (different prefix for characters)
             if 'dndBeyondUrl' in player:
-                # Strip common character URL prefixes
-                char_prefixes = [
-                    "https://www.dndbeyond.com/profile/",
-                    "https://www.dndbeyond.com/characters/"
-                ]
-                for prefix in char_prefixes:
-                    if player['dndBeyondUrl'].startswith(prefix):
-                        player['dndBeyondUrl'] = player['dndBeyondUrl'][len(prefix):]
-                        break
+                player['dndBeyondUrl'] = extract_character_id(player['dndBeyondUrl'])
     
-    return data
+    # Strip all empty values
+    return strip_empty(data)
 
 def restore_adventure_from_storage(data):
-    """Restore full URLs after loading"""
+    """Restore full URLs and provide defaults for missing fields after loading"""
     import copy
     data = copy.deepcopy(data)
     
     monster_prefix = "https://www.dndbeyond.com/monsters/"
+    character_prefix = "https://www.dndbeyond.com/characters/"
     
-    # Restore encounter URLs
-    if 'encounters' in data:
-        for encounter in data['encounters']:
-            if 'combatants' in encounter:
-                for combatant in encounter['combatants']:
-                    # Restore monster URL if it's shortened
-                    if 'dndBeyondUrl' in combatant and combatant['dndBeyondUrl']:
-                        url = combatant['dndBeyondUrl']
-                        # Only add prefix if it doesn't already have it
-                        if not url.startswith('http'):
-                            combatant['dndBeyondUrl'] = monster_prefix + url
+    # Helper to ensure default values for missing fields
+    def ensure_defaults(obj, defaults):
+        """Merge defaults into object for any missing keys"""
+        for key, default_value in defaults.items():
+            if key not in obj or obj[key] is None:
+                obj[key] = default_value
+        return obj
     
-    # Restore player URLs
+    # Build a lookup map of character ID -> player info
+    player_lookup = {}
     if 'players' in data:
         for player in data['players']:
-            if 'dndBeyondUrl' in player and player['dndBeyondUrl']:
-                url = player['dndBeyondUrl']
+            # Provide player-level defaults
+            ensure_defaults(player, {
+                'name': '',
+                'playerName': '',
+                'race': '',
+                'class': '',
+                'level': 1,
+                'maxHp': 0,
+                'ac': 10,
+                'speed': 30,
+                'initiativeBonus': 0,
+                'passivePerception': 10,
+                'passiveInvestigation': 10,
+                'passiveInsight': 10,
+                'notes': '',
+                'dndBeyondUrl': ''
+            })
+            
+            # Restore full character URL
+            if player['dndBeyondUrl']:
+                char_id = player['dndBeyondUrl']
                 # Only add prefix if it doesn't already have it
-                if not url.startswith('http'):
-                    # Determine if it's a profile or character URL based on format
-                    if '/' in url and not url.startswith('characters/'):
-                        # Looks like profile/username/characters/id
-                        player['dndBeyondUrl'] = "https://www.dndbeyond.com/profile/" + url
-                    else:
-                        # Direct character ID
-                        player['dndBeyondUrl'] = "https://www.dndbeyond.com/characters/" + url
+                if not char_id.startswith('http'):
+                    player['dndBeyondUrl'] = character_prefix + char_id
+                    # Store in lookup by just the ID
+                    player_lookup[char_id] = player
+                else:
+                    # Extract ID from full URL for lookup
+                    char_id = char_id.split('/')[-1]
+                    player_lookup[char_id] = player
+    
+    # Restore encounter URLs and defaults
+    if 'encounters' in data:
+        for encounter in data['encounters']:
+            # Provide encounter-level defaults
+            ensure_defaults(encounter, {
+                'name': '',
+                'chapter': '',
+                'state': 'unstarted',
+                'combatants': [],
+                'currentRound': 1,
+                'currentTurn': 0,
+                'activeCombatant': None,
+                'minimized': False,
+                'treasure': '',
+                'notes': ''
+            })
+            
+            if 'combatants' in encounter:
+                for combatant in encounter['combatants']:
+                    # Restore full field names
+                    if 'init' in combatant:
+                        combatant['initiative'] = combatant['init']
+                        del combatant['init']
+                    
+                    if 'id' in combatant:
+                        combatant['dndBeyondUrl'] = combatant['id']
+                        del combatant['id']
+                    
+                    # Provide combatant-level defaults
+                    ensure_defaults(combatant, {
+                        'initiative': 0,
+                        'hp': 0,
+                        'maxHp': 0,
+                        'dmg': 0,
+                        'heal': 0,
+                        'notes': '',
+                        'dndBeyondUrl': ''
+                    })
+                    
+                    if combatant['dndBeyondUrl']:
+                        url = combatant['dndBeyondUrl']
+                        
+                        # Check if this looks like a character ID (8+ digits)
+                        if url.isdigit() and len(url) >= 8:
+                            # It's a player - restore URL and look up name from players list
+                            combatant['dndBeyondUrl'] = character_prefix + url
+                            
+                            # Look up player name (don't set 'name' - its absence indicates player)
+                            # The frontend will look up the name from the players list
+                            if 'name' in combatant:
+                                del combatant['name']
+                        else:
+                            # It's a monster - restore monster URL and ensure name exists
+                            if not url.startswith('http'):
+                                combatant['dndBeyondUrl'] = monster_prefix + url
+                            
+                            # Ensure name exists for monsters (presence of 'name' indicates monster)
+                            if 'name' not in combatant:
+                                combatant['name'] = ''
+                    elif 'name' not in combatant:
+                        # No URL and no name - set empty name to indicate monster
+                        combatant['name'] = ''
+    
+    # Provide top-level defaults
+    ensure_defaults(data, {
+        'name': '',
+        'players': [],
+        'encounters': [],
+        'chapters': [],
+        'chapterNotes': {}
+    })
     
     return data
 

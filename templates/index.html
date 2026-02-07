@@ -197,23 +197,55 @@
                 <button class="close-btn" onclick="closeDamageModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">From:</label>
-                    <select id="damageFromSelect" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                    </select>
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">To:</label>
-                    <select id="damageToSelect" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                    </select>
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Damage Amount:</label>
-                    <input type="number" id="damageAmount" min="0" value="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+                    <div style="flex: 0.55;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">From:</label>
+                        <select id="damageFromSelect" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        </select>
+                    </div>
+                    <div style="flex: 0.55;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">To:</label>
+                        <select id="damageToSelect" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        </select>
+                    </div>
+                    <div style="flex: 0 0 50px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">DMG:</label>
+                        <input type="number" id="damageAmount" class="dmg-input" min="0" value="0" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;">
+                    </div>
                 </div>
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button onclick="closeDamageModal()" class="btn-small" style="background: #95a5a6;">Cancel</button>
                     <button onclick="confirmDamage()" class="btn-small" style="background: #e74c3c;">Apply Damage</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Heal Modal -->
+    <div id="healModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>Apply Healing</h2>
+                <button class="close-btn" onclick="closeHealModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
+                    <div style="flex: 0.55;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">From:</label>
+                        <select id="healFromSelect" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        </select>
+                    </div>
+                    <div style="flex: 0.55;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">To:</label>
+                        <select id="healToSelect" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        </select>
+                    </div>
+                    <div style="flex: 0 0 50px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">Heal:</label>
+                        <input type="number" id="healAmount" class="heal-input" min="0" value="0" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="confirmHeal()" class="btn-small" style="background: #2ecc71;">Apply Healing</button>
                 </div>
             </div>
         </div>

@@ -389,6 +389,32 @@ function setupEventListeners() {
             openDamageModal();
             return false;
         }
+        
+        // Keyboard shortcut for heal tracking (Ctrl+H)
+        if (e.ctrlKey && (e.key === 'h' || e.key === 'H')) {
+            e.preventDefault();
+            e.stopPropagation();
+            openHealModal();
+            return false;
+        }
+        
+        // ESC key closes any open modal
+        if (e.key === 'Escape') {
+            const monsterModal = document.getElementById('monsterModal');
+            const settingsModal = document.getElementById('settingsModal');
+            const damageModal = document.getElementById('damageModal');
+            const healModal = document.getElementById('healModal');
+            
+            if (monsterModal && monsterModal.style.display === 'flex') {
+                closeMonsterModal();
+            } else if (settingsModal && settingsModal.style.display === 'flex') {
+                closeSettingsModal();
+            } else if (damageModal && damageModal.style.display === 'flex') {
+                closeDamageModal();
+            } else if (healModal && healModal.style.display === 'flex') {
+                closeHealModal();
+            }
+        }
     }, true);
 }
 
@@ -858,20 +884,22 @@ function openDamageModal() {
     toSelect.innerHTML = '';
     
     activeEncounter.combatants.forEach((combatant, index) => {
+        const combatantName = getCombatantName(combatant);
+        
         const optionFrom = document.createElement('option');
         optionFrom.value = index;
-        optionFrom.textContent = combatant.name;
+        optionFrom.textContent = combatantName;
         fromSelect.appendChild(optionFrom);
         
         const optionTo = document.createElement('option');
         optionTo.value = index;
-        optionTo.textContent = combatant.name;
+        optionTo.textContent = combatantName;
         toSelect.appendChild(optionTo);
     });
     
     // Set default "from" to active combatant
     const activeCombatantIndex = activeEncounter.combatants.findIndex(
-        c => c.name === activeEncounter.activeCombatant
+        c => getCombatantName(c) === activeEncounter.activeCombatant
     );
     if (activeCombatantIndex >= 0) {
         fromSelect.value = activeCombatantIndex;
@@ -916,6 +944,96 @@ function confirmDamage() {
     // Re-render and close
     renderEncounters();
     closeDamageModal();
+}
+
+// Heal Modal
+function openHealModal() {
+    // Find an active encounter (started or just any encounter with combatants)
+    let activeEncounter = currentAdventure.encounters?.find(e => e.state === 'started');
+    
+    // If no started encounter, try to find any encounter with combatants
+    if (!activeEncounter) {
+        activeEncounter = currentAdventure.encounters?.find(e => e.combatants && e.combatants.length > 0);
+    }
+    
+    if (!activeEncounter || !activeEncounter.combatants || activeEncounter.combatants.length === 0) {
+        return; // Only works if there are combatants
+    }
+    
+    const modal = document.getElementById('healModal');
+    if (!modal) {
+        return;
+    }
+    
+    const fromSelect = document.getElementById('healFromSelect');
+    const toSelect = document.getElementById('healToSelect');
+    const amountInput = document.getElementById('healAmount');
+    
+    // Clear and populate dropdowns
+    fromSelect.innerHTML = '';
+    toSelect.innerHTML = '';
+    
+    activeEncounter.combatants.forEach((combatant, index) => {
+        const combatantName = getCombatantName(combatant);
+        
+        const optionFrom = document.createElement('option');
+        optionFrom.value = index;
+        optionFrom.textContent = combatantName;
+        fromSelect.appendChild(optionFrom);
+        
+        const optionTo = document.createElement('option');
+        optionTo.value = index;
+        optionTo.textContent = combatantName;
+        toSelect.appendChild(optionTo);
+    });
+    
+    // Set default "from" to active combatant
+    const activeCombatantIndex = activeEncounter.combatants.findIndex(
+        c => getCombatantName(c) === activeEncounter.activeCombatant
+    );
+    if (activeCombatantIndex >= 0) {
+        fromSelect.value = activeCombatantIndex;
+    }
+    
+    amountInput.value = 0;
+    modal.style.display = 'flex';
+    setTimeout(() => amountInput.focus(), 100);
+}
+
+function closeHealModal() {
+    const modal = document.getElementById('healModal');
+    modal.style.display = 'none';
+}
+
+function confirmHeal() {
+    const activeEncounter = currentAdventure.encounters?.find(e => e.state === 'started');
+    if (!activeEncounter) {
+        closeHealModal();
+        return;
+    }
+    
+    const fromIndex = parseInt(document.getElementById('healFromSelect').value);
+    const toIndex = parseInt(document.getElementById('healToSelect').value);
+    const amount = parseInt(document.getElementById('healAmount').value) || 0;
+    
+    if (amount <= 0) {
+        closeHealModal();
+        return;
+    }
+    
+    // Update the from combatant's Heal
+    if (activeEncounter.combatants[fromIndex]) {
+        activeEncounter.combatants[fromIndex].heal = (activeEncounter.combatants[fromIndex].heal || 0) + amount;
+    }
+    
+    // Update the to combatant's HP (increase it)
+    if (activeEncounter.combatants[toIndex]) {
+        activeEncounter.combatants[toIndex].hp = (activeEncounter.combatants[toIndex].hp || 0) + amount;
+    }
+    
+    // Re-render and close
+    renderEncounters();
+    closeHealModal();
 }
 
 // Check cookie status
@@ -1715,9 +1833,25 @@ function removePlayer(index) {
 
 // Check if combatant is a player
 function isPlayerCombatant(combatant) {
-    if (combatant.isPlayer !== undefined) return combatant.isPlayer;
-    // Check if name matches any player
-    return currentAdventure.players.some(p => p.name === combatant.name);
+    // If combatant has no name field, it's a player (name looked up from dndBeyondUrl)
+    // If combatant has a name field, it's a monster/NPC
+    return !combatant.hasOwnProperty('name');
+}
+
+// Get combatant display name (look up from players if needed)
+function getCombatantName(combatant) {
+    if (isPlayerCombatant(combatant)) {
+        // Look up player name from URL
+        if (combatant.dndBeyondUrl) {
+            const charId = combatant.dndBeyondUrl.split('/').pop();
+            const player = currentAdventure.players?.find(p => p.dndBeyondUrl && p.dndBeyondUrl.includes(charId));
+            if (player) {
+                return player.name;
+            }
+        }
+        return 'Unknown Player';
+    }
+    return combatant.name || '';
 }
 
 // Render encounters
@@ -1972,7 +2106,11 @@ function createEncounterCard(encounter, encounterIndex) {
     encounter.combatants.forEach((combatant, combatantIndex) => {
         const row = tbody.insertRow();
         const isPlayer = isPlayerCombatant(combatant);
-        const isActive = encounter.state === 'started' && encounter.activeCombatant === combatant.name;
+        
+        // Get combatant name
+        const combatantName = getCombatantName(combatant);
+        
+        const isActive = encounter.state === 'started' && encounter.activeCombatant === combatantName;
         row.className = isActive ? 'combatant-row active' : 'combatant-row';
         
         // Look up details from player list or monster list
@@ -1982,7 +2120,8 @@ function createEncounterCard(encounter, encounterIndex) {
         
         if (isPlayer) {
             // Look up player details from players array
-            const player = currentAdventure.players?.find(p => p.name === combatant.name);
+            const charId = combatant.dndBeyondUrl.split('/').pop();
+            const player = currentAdventure.players?.find(p => p.dndBeyondUrl && p.dndBeyondUrl.includes(charId));
             if (player) {
                 ac = player.ac || 10;
                 dndBeyondUrl = player.dndBeyondUrl || '';
@@ -2018,7 +2157,7 @@ function createEncounterCard(encounter, encounterIndex) {
         
         if (isPlayer) {
             // Players: always show tooltip with player data, link to URL if available
-            const escapedName = combatant.name.replace(/'/g, "\\'");
+            const escapedName = combatantName.replace(/'/g, "\\'");
             const escapedUrl = dndBeyondUrl ? dndBeyondUrl.replace(/'/g, "\\'") : '';
             const playerUrl = escapedUrl || `player:${escapedName}`; // Use special identifier for local player data
             
@@ -2026,27 +2165,27 @@ function createEncounterCard(encounter, encounterIndex) {
                 nameHTML = `<a href="${dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
                     class="monster-name-hover" 
                     onmouseenter="showMonsterTooltip('${escapedName}', '${playerUrl}', event)"
-                    onmouseleave="hideMonsterTooltip()">${combatant.name || ''}</a>`;
+                    onmouseleave="hideMonsterTooltip()">${combatantName || ''}</a>`;
             } else {
                 nameHTML = `<span style="font-weight: 500; color: ${inheritColor}; cursor: help;" 
                     class="monster-name-hover"
                     onmouseenter="showMonsterTooltip('${escapedName}', '${playerUrl}', event)"
-                    onmouseleave="hideMonsterTooltip()">${combatant.name || ''}</span>`;
+                    onmouseleave="hideMonsterTooltip()">${combatantName || ''}</span>`;
             }
         } else if (dndBeyondUrl) {
             // NPCs/Monsters with URL: Make name a clickable link with tooltip
             const escapedUrl = dndBeyondUrl.replace(/'/g, "\\'");
             nameHTML = `<a href="${dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
                 class="monster-name-hover" 
-                onmouseenter="showMonsterTooltip('${combatant.name.replace(/'/g, "\\'")}', '${escapedUrl}', event)"
-                onmouseleave="hideMonsterTooltip()">${combatant.name || ''}</a>`;
+                onmouseenter="showMonsterTooltip('${combatantName.replace(/'/g, "\\'")}', '${escapedUrl}', event)"
+                onmouseleave="hideMonsterTooltip()">${combatantName || ''}</a>`;
         } else {
             // Monsters without URLs
-            nameHTML = `<span style="font-weight: 500; color: ${inheritColor};">${combatant.name || ''}</span>`;
+            nameHTML = `<span style="font-weight: 500; color: ${inheritColor};">${combatantName || ''}</span>`;
         }
         
         row.innerHTML = `
-            <td style="text-align: center;">${(encounter.state === 'started' && encounter.activeCombatant === combatant.name) ? '▶' : ''}</td>
+            <td style="text-align: center;">${(encounter.state === 'started' && encounter.activeCombatant === combatantName) ? '▶' : ''}</td>
             <td>${nameHTML}</td>
             <td style="text-align: center;">${isPlayer ? '<span style="color: #999;">-</span>' : `<span style="color: #666; font-weight: 500;">${cr}</span>`}</td>
             <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.initiative || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'initiative', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.initiative || 0}</span>`}</td>
@@ -2095,13 +2234,11 @@ function createEncounterCard(encounter, encounterIndex) {
 function addEncounter() {
     // Auto-populate with players
     const combatants = currentAdventure.players.map(player => ({
-        name: player.name,
         initiative: 0,
         hp: player.maxHp || 0,
         maxHp: player.maxHp || 0,
         ac: player.ac || 10,
         notes: '',
-        isPlayer: true,
         dndBeyondUrl: player.dndBeyondUrl || ''
     }));
     
@@ -2318,8 +2455,7 @@ function selectMonster(monsterName) {
             ac: 10,  // Will be fetched from D&D Beyond
             cr: monster.cr,
             dndBeyondUrl: monster.url,
-            notes: '',
-            isPlayer: false
+            notes: ''
         });
     }
     
@@ -2448,8 +2584,7 @@ function addCustomCombatant(encounterIndex) {
         ac: 10,
         cr: '',
         dndBeyondUrl: '',
-        notes: '',
-        isPlayer: false
+        notes: ''
     });
     renderEncounters();
     autoSave();
@@ -2489,13 +2624,11 @@ function refreshPlayers(encounterIndex) {
     // Add all players from the Players section
     currentAdventure.players.forEach(player => {
         encounter.combatants.push({
-            name: player.name,
             initiative: 0,
             hp: player.maxHp || 0,
             maxHp: player.maxHp || 0,
             ac: player.ac || 10,
             notes: '',
-            isPlayer: true,
             dndBeyondUrl: player.dndBeyondUrl || ''
         });
     });
@@ -2705,7 +2838,7 @@ function startEncounter(encounterIndex) {
     
     // Set first combatant as active
     if (encounter.combatants.length > 0) {
-        encounter.activeCombatant = encounter.combatants[0].name;
+        encounter.activeCombatant = getCombatantName(encounter.combatants[0]);
     }
     
     renderEncounters();
@@ -2743,7 +2876,7 @@ function nextTurn(encounterIndex) {
         encounter.currentRound = (encounter.currentRound || 1) + 1;
     }
     
-    encounter.activeCombatant = combatants[currentIndex].name;
+    encounter.activeCombatant = getCombatantName(combatants[currentIndex]);
     encounter.currentTurn = currentIndex;
     
     renderEncounters();
