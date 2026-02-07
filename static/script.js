@@ -352,6 +352,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
     
+    // Save scroll position before page unload
+    window.addEventListener('beforeunload', () => {
+        sessionStorage.setItem('scrollPosition', window.scrollY.toString());
+    });
+    
     // Auto-load adventure from URL parameter
     const url = new URL(window.location);
     const adventureName = url.searchParams.get('adventure');
@@ -479,8 +484,11 @@ function renderInitiativeChart() {
         if (encounter.state === 'started' || encounter.state === 'complete') {
             if (encounter.combatants) {
                 encounter.combatants.forEach(combatant => {
-                    if (combatant.isPlayer && playerInitiatives[combatant.name] !== undefined) {
-                        playerInitiatives[combatant.name].push(combatant.initiative || 0);
+                    if (isPlayerCombatant(combatant)) {
+                        const playerName = getCombatantName(combatant);
+                        if (playerInitiatives[playerName] !== undefined) {
+                            playerInitiatives[playerName].push(combatant.initiative || 0);
+                        }
                     }
                 });
             }
@@ -625,7 +633,7 @@ function renderCRChart() {
         
         // Sum up CR values from all monsters (non-players)
         encounter.combatants.forEach(combatant => {
-            if (combatant.isPlayer) return;
+            if (isPlayerCombatant(combatant)) return;
             
             // Try to get CR from combatant first, then look up in monster list
             let cr = combatant.cr || '';
@@ -761,7 +769,7 @@ function renderDamageChart() {
         
         // Sum up damage dealt to all NPCs (maxHp - finalHp)
         encounter.combatants.forEach(combatant => {
-            if (combatant.isPlayer) return;
+            if (isPlayerCombatant(combatant)) return;
             
             const maxHp = combatant.maxHp || 0;
             const currentHp = combatant.hp || 0;
@@ -1278,6 +1286,15 @@ async function handleAdventureChange(e) {
     
     renderAdventure();
     document.getElementById('adventureContent').style.display = 'block';
+    
+    // Restore scroll position after content is rendered
+    setTimeout(() => {
+        const savedScrollY = sessionStorage.getItem('scrollPosition');
+        if (savedScrollY !== null) {
+            window.scrollTo(0, parseInt(savedScrollY, 10));
+            sessionStorage.removeItem('scrollPosition');
+        }
+    }, 100);
 }
 
 // Create new adventure
