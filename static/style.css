@@ -193,14 +193,14 @@ input[type="number"] {
     box-sizing: border-box;
 }
 
-/* Remove spinner arrows from number inputs except HP */
-input[type="number"]:not(.hp-input)::-webkit-inner-spin-button,
-input[type="number"]:not(.hp-input)::-webkit-outer-spin-button {
+/* Remove spinner arrows from number inputs except HP, DMG, and Heal */
+input[type="number"]:not(.hp-input):not(.dmg-input):not(.heal-input)::-webkit-inner-spin-button,
+input[type="number"]:not(.hp-input):not(.dmg-input):not(.heal-input)::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
 
-input[type="number"]:not(.hp-input) {
+input[type="number"]:not(.hp-input):not(.dmg-input):not(.heal-input) {
     -moz-appearance: textfield;
 }
 

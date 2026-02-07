@@ -9,6 +9,7 @@ let playersExpanded = true; // Track players section state
 let playersEditMode = false; // Track players edit mode
 let initiativeChart = null; // Chart instance for initiative distribution
 let crChart = null; // Chart instance for CR over time
+let damageChart = null; // Chart instance for damage dealt per encounter
 
 // D&D 5e/2024 Classes
 const DND_CLASSES = [
@@ -379,6 +380,16 @@ function setupEventListeners() {
     document.getElementById('addEncounterBtn').addEventListener('click', addEncounter);
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
     document.getElementById('settingsBtnSelection').addEventListener('click', openSettingsModal);
+    
+    // Keyboard shortcut for damage tracking (Ctrl+D)
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && (e.key === 'd' || e.key === 'D')) {
+            e.preventDefault();
+            e.stopPropagation();
+            openDamageModal();
+            return false;
+        }
+    }, true);
 }
 
 // Toggle players section
@@ -421,6 +432,7 @@ function renderStatistics() {
     
     renderInitiativeChart();
     renderCRChart();
+    renderDamageChart();
 }
 
 function renderInitiativeChart() {
@@ -707,6 +719,106 @@ function renderCRChart() {
     });
 }
 
+function renderDamageChart() {
+    const canvas = document.getElementById('damageChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    // Calculate total damage for each encounter
+    const encounterData = [];
+    
+    currentAdventure.encounters.forEach((encounter, index) => {
+        if (!encounter.combatants) return;
+        
+        let totalDamage = 0;
+        let encounterName = encounter.name || `Encounter ${index + 1}`;
+        
+        // Sum up damage dealt to all NPCs (maxHp - finalHp)
+        encounter.combatants.forEach(combatant => {
+            if (combatant.isPlayer) return;
+            
+            const maxHp = combatant.maxHp || 0;
+            const currentHp = combatant.hp || 0;
+            const damageTaken = Math.max(0, maxHp - currentHp);
+            totalDamage += damageTaken;
+        });
+        
+        encounterData.push({
+            x: index + 1,
+            y: totalDamage,
+            label: encounterName,
+            state: encounter.state
+        });
+    });
+    
+    // Destroy existing chart if it exists
+    if (damageChart) {
+        damageChart.destroy();
+    }
+    
+    // Create new chart
+    damageChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            datasets: [{
+                label: 'Total Damage Dealt',
+                data: encounterData,
+                backgroundColor: encounterData.map(d => d.state === 'complete' ? '#2ecc71' : '#95a5a6'),
+                borderColor: encounterData.map(d => d.state === 'complete' ? '#27ae60' : '#7f8c8d'),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.5,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                title: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return encounterData[context[0].dataIndex].label;
+                        },
+                        label: function(context) {
+                            return 'Damage Dealt: ' + context.parsed.y + ' HP';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Encounter Number'
+                    },
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Total Damage (HP)'
+                    },
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+}
+
 // Settings Modal
 function openSettingsModal() {
     const modal = document.getElementById('settingsModal');
@@ -716,6 +828,94 @@ function openSettingsModal() {
 function closeSettingsModal() {
     const modal = document.getElementById('settingsModal');
     modal.style.display = 'none';
+}
+
+// Damage Modal
+function openDamageModal() {
+    // Find an active encounter (started or just any encounter with combatants)
+    let activeEncounter = currentAdventure.encounters?.find(e => e.state === 'started');
+    
+    // If no started encounter, try to find any encounter with combatants
+    if (!activeEncounter) {
+        activeEncounter = currentAdventure.encounters?.find(e => e.combatants && e.combatants.length > 0);
+    }
+    
+    if (!activeEncounter || !activeEncounter.combatants || activeEncounter.combatants.length === 0) {
+        return; // Only works if there are combatants
+    }
+    
+    const modal = document.getElementById('damageModal');
+    if (!modal) {
+        return;
+    }
+    
+    const fromSelect = document.getElementById('damageFromSelect');
+    const toSelect = document.getElementById('damageToSelect');
+    const amountInput = document.getElementById('damageAmount');
+    
+    // Clear and populate dropdowns
+    fromSelect.innerHTML = '';
+    toSelect.innerHTML = '';
+    
+    activeEncounter.combatants.forEach((combatant, index) => {
+        const optionFrom = document.createElement('option');
+        optionFrom.value = index;
+        optionFrom.textContent = combatant.name;
+        fromSelect.appendChild(optionFrom);
+        
+        const optionTo = document.createElement('option');
+        optionTo.value = index;
+        optionTo.textContent = combatant.name;
+        toSelect.appendChild(optionTo);
+    });
+    
+    // Set default "from" to active combatant
+    const activeCombatantIndex = activeEncounter.combatants.findIndex(
+        c => c.name === activeEncounter.activeCombatant
+    );
+    if (activeCombatantIndex >= 0) {
+        fromSelect.value = activeCombatantIndex;
+    }
+    
+    amountInput.value = 0;
+    modal.style.display = 'flex';
+    setTimeout(() => amountInput.focus(), 100);
+}
+
+function closeDamageModal() {
+    const modal = document.getElementById('damageModal');
+    modal.style.display = 'none';
+}
+
+function confirmDamage() {
+    const activeEncounter = currentAdventure.encounters?.find(e => e.state === 'started');
+    if (!activeEncounter) {
+        closeDamageModal();
+        return;
+    }
+    
+    const fromIndex = parseInt(document.getElementById('damageFromSelect').value);
+    const toIndex = parseInt(document.getElementById('damageToSelect').value);
+    const amount = parseInt(document.getElementById('damageAmount').value) || 0;
+    
+    if (amount <= 0) {
+        closeDamageModal();
+        return;
+    }
+    
+    // Update the from combatant's DMG
+    if (activeEncounter.combatants[fromIndex]) {
+        activeEncounter.combatants[fromIndex].dmg = (activeEncounter.combatants[fromIndex].dmg || 0) + amount;
+    }
+    
+    // Update the to combatant's HP
+    if (activeEncounter.combatants[toIndex]) {
+        activeEncounter.combatants[toIndex].hp = (activeEncounter.combatants[toIndex].hp || 0) - amount;
+    }
+    
+    // Re-render and close
+    renderEncounters();
+    closeDamageModal();
 }
 
 // Check cookie status
@@ -1751,8 +1951,10 @@ function createEncounterCard(encounter, encounterIndex) {
                 <th style="width: 60px; text-align: center;">CR</th>
                 <th style="width: 50px; text-align: center;">Init</th>
                 <th style="width: 60px; text-align: center;">AC</th>
-                <th style="width: 80px; text-align: center;">Max HP</th>
-                <th style="width: 80px; text-align: center;">HP</th>
+                <th style="width: 68px; text-align: center;">MaxHP</th>
+                <th style="width: 68px; text-align: center;">HP</th>
+                <th style="width: 68px; text-align: center;">DMG</th>
+                <th style="width: 68px; text-align: center;">Heal</th>
                 <th>Notes</th>
                 <th style="width: 40px;"></th>
             </tr>
@@ -1849,9 +2051,13 @@ function createEncounterCard(encounter, encounterIndex) {
             <td style="text-align: center;">${isPlayer ? '<span style="color: #999;">-</span>' : `<span style="color: #666; font-weight: 500;">${cr}</span>`}</td>
             <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.initiative || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'initiative', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.initiative || 0}</span>`}</td>
             <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${ac}</span></td>
-            <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.maxHp || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'maxHp', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.maxHp || 0}</span>`}</td>
-            <td><input type="number" class="hp-input" value="${combatant.hp || 0}" style="text-align: center;"
-                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))"></td>
+            <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.maxHp || 0}" style="text-align: center; width: 100%;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'maxHp', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.maxHp || 0}</span>`}</td>
+            <td style="text-align: center;">${encounter.state === 'complete' ? `<span style="color: ${(combatant.hp || 0) <= 0 ? '#e74c3c' : '#666'}; font-weight: 500;">${combatant.hp || 0}</span>` : `<input type="number" class="hp-input" value="${combatant.hp || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
+                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))">`}</td>
+            <td style="text-align: center;">${encounter.state === 'complete' ? `<span style="color: #666; font-weight: 500;">${combatant.dmg || 0}</span>` : `<input type="number" class="dmg-input" value="${combatant.dmg || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
+                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'dmg', parseInt(this.value))">`}</td>
+            <td style="text-align: center;">${encounter.state === 'complete' ? `<span style="color: #666; font-weight: 500;">${combatant.heal || 0}</span>` : `<input type="number" class="heal-input" value="${combatant.heal || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
+                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'heal', parseInt(this.value))">`}</td>
             <td><input type="text" value="${combatant.notes || ''}" 
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'notes', this.value)"></td>
             <td>${showControls ? `<button class="btn-small" onclick="removeCombatant(${encounterIndex}, ${combatantIndex})" style="background: #e74c3c;" title="Delete this combatant">×</button>` : ''}</td>
