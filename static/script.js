@@ -64,6 +64,37 @@ const CR_TO_XP = {
     '30': 155000
 };
 
+// Common D&D conditions
+const DND_CONDITIONS = [
+    'Blinded', 'Charmed', 'Deafened', 'Frightened', 'Grappled', 
+    'Incapacitated', 'Invisible', 'Paralyzed', 'Petrified', 'Poisoned', 
+    'Prone', 'Restrained', 'Stunned', 'Unconscious', 'Concentrating',
+    'Blessed', 'Hasted', 'Raging', 'Hidden'
+];
+
+// Condition icons mapping
+const CONDITION_ICONS = {
+    'Blinded': '🙈',
+    'Charmed': '💖',
+    'Deafened': '🔇',
+    'Frightened': '😱',
+    'Grappled': '🤼',
+    'Incapacitated': '😵',
+    'Invisible': '👻',
+    'Paralyzed': '🧊',
+    'Petrified': '🗿',
+    'Poisoned': '☠️',
+    'Prone': '⬇️',
+    'Restrained': '⛓️',
+    'Stunned': '💫',
+    'Unconscious': '⚰️',
+    'Concentrating': '⚡',
+    'Blessed': '✨',
+    'Hasted': '⏩',
+    'Raging': '💢',
+    'Hidden': '🫥'
+};
+
 // Expanded monster database (D&D 2024)
 const FALLBACK_MONSTERS = {
     // CR 0
@@ -410,6 +441,7 @@ function setupEventListeners() {
             const settingsModal = document.getElementById('settingsModal');
             const damageModal = document.getElementById('damageModal');
             const healModal = document.getElementById('healModal');
+            const conditionsModal = document.getElementById('conditionsModal');
             
             if (monsterModal && monsterModal.style.display === 'flex') {
                 closeMonsterModal();
@@ -419,6 +451,11 @@ function setupEventListeners() {
                 closeDamageModal();
             } else if (healModal && healModal.style.display === 'flex') {
                 closeHealModal();
+            } else if (conditionsModal) {
+                // Save conditions on ESC
+                const encounterIndex = parseInt(conditionsModal.getAttribute('data-encounter'));
+                const combatantIndex = parseInt(conditionsModal.getAttribute('data-combatant'));
+                saveConditions(encounterIndex, combatantIndex);
             }
         }
     }, true);
@@ -1030,7 +1067,7 @@ function confirmDamage() {
     
     const fromIndex = parseInt(document.getElementById('damageFromSelect').value);
     const toIndex = parseInt(document.getElementById('damageToSelect').value);
-    const amount = parseInt(document.getElementById('damageAmount').value) || 0;
+    let amount = parseInt(document.getElementById('damageAmount').value) || 0;
     
     if (amount <= 0) {
         closeDamageModal();
@@ -1042,13 +1079,58 @@ function confirmDamage() {
         activeEncounter.combatants[fromIndex].dmg = (activeEncounter.combatants[fromIndex].dmg || 0) + amount;
     }
     
-    // Update the to combatant's HP
+    // Update the to combatant's HP (handle temp HP first)
     if (activeEncounter.combatants[toIndex]) {
-        activeEncounter.combatants[toIndex].hp = (activeEncounter.combatants[toIndex].hp || 0) - amount;
+        const target = activeEncounter.combatants[toIndex];
+        const tempHp = target.tempHp || 0;
+        
+        // Apply damage to temp HP first
+        if (tempHp > 0) {
+            if (amount <= tempHp) {
+                target.tempHp = tempHp - amount;
+                amount = 0;
+            } else {
+                target.tempHp = 0;
+                amount -= tempHp;
+            }
+        }
+        
+        // Apply remaining damage to regular HP
+        if (amount > 0) {
+            target.hp = (target.hp || 0) - amount;
+            
+            // Don't let player HP go below 0
+            const isPlayer = isPlayerCombatant(target);
+            if (isPlayer && target.hp < 0) {
+                target.hp = 0;
+            }
+        }
+        
+        // Check concentration (DC = 10 or half damage, whichever is higher)
+        if (target.concentrating && amount > 0) {
+            const dc = Math.max(10, Math.floor(amount / 2));
+            const targetName = getCombatantName(target);
+            setTimeout(() => {
+                if (confirm(`${targetName} is concentrating! Make a DC ${dc} Constitution save or lose concentration.`)) {
+                    // Passed save - do nothing
+                } else {
+                    // Failed save - lose concentration
+                    target.concentrating = false;
+                    renderEncounters();
+                    autoSave();
+                }
+            }, 100);
+        }
+        
+        // Clear death saves if healing from 0 HP
+        if (target.deathSaves && target.hp > 0) {
+            target.deathSaves = { successes: 0, failures: 0 };
+        }
     }
     
     // Re-render and close
     renderEncounters();
+    autoSave();
     closeDamageModal();
 }
 
@@ -1134,7 +1216,19 @@ function confirmHeal() {
     
     // Update the to combatant's HP (increase it)
     if (activeEncounter.combatants[toIndex]) {
-        activeEncounter.combatants[toIndex].hp = (activeEncounter.combatants[toIndex].hp || 0) + amount;
+        const target = activeEncounter.combatants[toIndex];
+        target.hp = (target.hp || 0) + amount;
+        
+        // Don't let HP go above maxHP
+        const maxHp = target.maxHp || 0;
+        if (target.hp > maxHp) {
+            target.hp = maxHp;
+        }
+        
+        // Clear death saves if healing from 0 HP
+        if (target.deathSaves && target.hp > 0) {
+            target.deathSaves = { successes: 0, failures: 0 };
+        }
     }
     
     // Re-render and close
@@ -2165,8 +2259,8 @@ function createEncounterCard(encounter, encounterIndex) {
                     <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap; margin-left: 10px;">CR: ${calculateEncounterCR(encounter)} | XP: ${calculateEncounterXP(encounter)}</span>
                 </div>
                 <div class="encounter-controls">
-                    ${encounter.state === 'complete' && !encounter.minimized ? `
-                        <button class="btn-add" onclick="toggleEncounterEdit(${encounterIndex})" style="background: ${encounterEditMode[encounterIndex] ? '#2ecc71' : '#f39c12'};" title="${encounterEditMode[encounterIndex] ? 'Save changes' : 'Edit HP, DMG, Heal columns'}">${encounterEditMode[encounterIndex] ? '💾' : '✏️'}</button>
+                    ${!encounter.minimized ? `
+                        <button class="btn-small" onclick="toggleEncounterEdit(${encounterIndex})" style="background: ${encounterEditMode[encounterIndex] ? '#27ae60' : '#9b59b6'}; font-size: 16px;" title="${encounterEditMode[encounterIndex] ? 'Save changes' : 'Edit number fields'}">${encounterEditMode[encounterIndex] ? '💾' : '✎'}</button>
                     ` : ''}
                     ${showControls ? `
                         <button class="btn-small" onclick="addMonsterFromLibrary(${encounterIndex})" style="background: #27ae60;" title="Add a monster to this encounter">+</button>
@@ -2201,12 +2295,14 @@ function createEncounterCard(encounter, encounterIndex) {
                 <th style="width: 30px;">Turn</th>
                 <th style="width: 120px;">Name</th>
                 <th style="width: 60px; text-align: center;">CR</th>
-                <th style="width: 50px; text-align: center;">Init</th>
+                <th style="width: 60px; text-align: center;">Init</th>
                 <th style="width: 60px; text-align: center;">AC</th>
-                <th style="width: 68px; text-align: center;">MaxHP</th>
-                <th style="width: 68px; text-align: center;">HP</th>
-                <th style="width: 68px; text-align: center;">DMG</th>
-                <th style="width: 68px; text-align: center;">Heal</th>
+                <th style="width: 60px; text-align: center;">MaxHP</th>
+                <th style="width: 60px; text-align: center;">HP</th>
+                <th style="width: 60px; text-align: center;">Temp</th>
+                <th style="width: 60px; text-align: center;">DMG</th>
+                <th style="width: 60px; text-align: center;">Heal</th>
+                <th style="width: 100px; text-align: center;">Status</th>
                 <th>Notes</th>
                 <th style="width: 40px;"></th>
             </tr>
@@ -2302,19 +2398,79 @@ function createEncounterCard(encounter, encounterIndex) {
             nameHTML = `<span style="font-weight: 500; color: ${inheritColor};">${combatantName || ''}</span>`;
         }
         
+        // Build temp HP cell
+        const tempHpValue = combatant.tempHp || 0;
+        const tempHpCell = encounterEditMode[encounterIndex]
+            ? `<input type="number" value="${tempHpValue}" style="width: 100%; text-align: center;" min="0"
+                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'tempHp', Math.max(0, parseInt(this.value) || 0))">` 
+            : `<span style="color: ${tempHpValue > 0 ? '#3498db' : '#999'}; font-weight: 500;">${tempHpValue}</span>`;
+        
+        // Build conditions cell
+        const conditions = combatant.conditions || [];
+        const concentrating = combatant.concentrating || false;
+        let conditionsCell = '';
+        
+        if (encounter.state === 'complete' && !encounterEditMode[encounterIndex]) {
+            // View mode: show condition badges only
+            if (conditions.length === 0 && !concentrating) {
+                conditionsCell = '<span style="color: #999;">-</span>';
+            } else {
+                const badges = conditions.map(c => {
+                    const icon = CONDITION_ICONS[c] || '';
+                    return `<span class="condition-badge" title="${c}">${icon}</span>`;
+                }).join(' ');
+                const concBadge = concentrating ? `<span class="condition-badge" title="Concentrating">${CONDITION_ICONS['Concentrating']}</span>` : '';
+                conditionsCell = badges + concBadge;
+            }
+        } else {
+            // Edit/active mode: show clickable icons or button
+            if (conditions.length === 0 && !concentrating) {
+                conditionsCell = `<button class="btn-small" onclick="openConditionsDialog(${encounterIndex}, ${combatantIndex})" 
+                    style="background: #9b59b6; padding: 2px 6px; font-size: 11px;" title="Manage conditions">
+                    -
+                </button>`;
+            } else {
+                const badges = conditions.map(c => {
+                    const icon = CONDITION_ICONS[c] || '';
+                    return `<span class="condition-badge" style="cursor: pointer;" title="${c}" onclick="openConditionsDialog(${encounterIndex}, ${combatantIndex})">${icon}</span>`;
+                }).join(' ');
+                const concBadge = concentrating ? `<span class="condition-badge" style="cursor: pointer;" title="Concentrating" onclick="openConditionsDialog(${encounterIndex}, ${combatantIndex})">${CONDITION_ICONS['Concentrating']}</span>` : '';
+                conditionsCell = badges + concBadge;
+            }
+        }
+        
+        // Build death saves cell for players at 0 HP
+        let deathSavesCell = '';
+        if (isPlayer && (combatant.hp || 0) <= 0 && encounter.state !== 'complete') {
+            const saves = combatant.deathSaves || { successes: 0, failures: 0 };
+            deathSavesCell = `
+                <div style="display: flex; gap: 4px; align-items: center; margin-top: 4px; font-size: 11px;">
+                    <div title="Success" style="display: flex; gap: 2px;">
+                        ${[1,2,3].map(i => `<span class="death-save-box ${saves.successes >= i ? 'checked' : ''}" 
+                            onclick="toggleDeathSave(${encounterIndex}, ${combatantIndex}, 'successes', ${i})">✓</span>`).join('')}
+                    </div>
+                    <div title="Failure" style="display: flex; gap: 2px;">
+                        ${[1,2,3].map(i => `<span class="death-save-box failure ${saves.failures >= i ? 'checked' : ''}" 
+                            onclick="toggleDeathSave(${encounterIndex}, ${combatantIndex}, 'failures', ${i})">✗</span>`).join('')}
+                    </div>
+                </div>`;
+        }
+        
         row.innerHTML = `
             <td style="text-align: center;">${(encounter.state === 'started' && encounter.activeCombatant === combatantName) ? '▶' : ''}</td>
-            <td>${nameHTML}</td>
+            <td>${nameHTML}${deathSavesCell}</td>
             <td style="text-align: center;">${isPlayer ? '<span style="color: #999;">-</span>' : `<span style="color: #666; font-weight: 500;">${cr}</span>`}</td>
             <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.initiative || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'initiative', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.initiative || 0}</span>`}</td>
             <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${ac}</span></td>
             <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.maxHp || 0}" style="text-align: center; width: 100%;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'maxHp', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.maxHp || 0}</span>`}</td>
-            <td style="text-align: center;">${encounter.state === 'complete' && !encounterEditMode[encounterIndex] ? `<span style="color: ${(combatant.hp || 0) <= 0 ? '#e74c3c' : '#666'}; font-weight: 500;">${combatant.hp || 0}</span>` : `<input type="number" class="hp-input" value="${combatant.hp || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
-                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))">`}</td>
-            <td style="text-align: center;">${encounter.state === 'complete' && !encounterEditMode[encounterIndex] ? `<span style="color: #666; font-weight: 500;">${combatant.dmg || 0}</span>` : `<input type="number" class="dmg-input" value="${combatant.dmg || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
-                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'dmg', parseInt(this.value))">`}</td>
-            <td style="text-align: center;">${encounter.state === 'complete' && !encounterEditMode[encounterIndex] ? `<span style="color: #666; font-weight: 500;">${combatant.heal || 0}</span>` : `<input type="number" class="heal-input" value="${combatant.heal || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
-                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'heal', parseInt(this.value))">`}</td>
+            <td style="text-align: center;">${encounterEditMode[encounterIndex] ? `<input type="number" class="hp-input" value="${combatant.hp || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
+                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))">` : `<span style="color: ${(combatant.hp || 0) <= 0 ? '#e74c3c' : '#666'}; font-weight: 500;">${combatant.hp || 0}</span>`}</td>
+            <td style="text-align: center;">${tempHpCell}</td>
+            <td style="text-align: center;">${encounterEditMode[encounterIndex] ? `<input type="number" class="dmg-input" value="${combatant.dmg || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
+                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'dmg', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.dmg || 0}</span>`}</td>
+            <td style="text-align: center;">${encounterEditMode[encounterIndex] ? `<input type="number" class="heal-input" value="${combatant.heal || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
+                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'heal', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.heal || 0}</span>`}</td>
+            <td style="text-align: center;">${conditionsCell}</td>
             <td><input type="text" value="${combatant.notes || ''}" 
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'notes', this.value)"></td>
             <td>${showControls ? `<button class="btn-small" onclick="removeCombatant(${encounterIndex}, ${combatantIndex})" style="background: #e74c3c;" title="Delete this combatant">×</button>` : ''}</td>
@@ -2337,10 +2493,9 @@ function createEncounterCard(encounter, encounterIndex) {
                 <strong style="color: #d68910;">💰 Treasure & Loot:</strong>
                 <div style="display: flex; gap: 5px;">
                     <button class="btn-small" onclick="generateLoot(${encounterIndex})" style="background: #3498db;" title="Regenerate treasure">↻</button>
-                    <button class="btn-small" id="treasure-edit-btn-${encounterIndex}" onclick="toggleTreasureEdit(${encounterIndex})" style="background: #f39c12;" title="Edit treasure">✎</button>
                 </div>
             </div>
-            <div id="treasure-content-${encounterIndex}" style="white-space: pre-wrap; color: #333;">${encounter.treasure}</div>
+            <div id="treasure-content-${encounterIndex}" style="white-space: pre-wrap; color: #333;">${encounterEditMode[encounterIndex] ? `<textarea style="width: 100%; min-height: 100px; font-family: monospace; padding: 5px; border: 1px solid #ddd; border-radius: 3px;" onchange="updateTreasure(${encounterIndex}, this.value)">${encounter.treasure}</textarea>` : encounter.treasure}</div>
         `;
         card.appendChild(treasureDiv);
     }
@@ -2710,7 +2865,25 @@ function addCustomCombatant(encounterIndex) {
 
 // Update combatant
 function updateCombatant(encounterIndex, combatantIndex, field, value) {
-    currentAdventure.encounters[encounterIndex].combatants[combatantIndex][field] = value;
+    const combatant = currentAdventure.encounters[encounterIndex].combatants[combatantIndex];
+    
+    // Apply HP constraints
+    if (field === 'hp') {
+        const maxHp = combatant.maxHp || 0;
+        const isPlayer = isPlayerCombatant(combatant);
+        
+        // Don't let HP go above maxHP
+        if (value > maxHp) {
+            value = maxHp;
+        }
+        
+        // Don't let player HP go below 0
+        if (isPlayer && value < 0) {
+            value = 0;
+        }
+    }
+    
+    combatant[field] = value;
     renderEncounters();
     autoSave();
 }
@@ -2760,6 +2933,129 @@ function refreshPlayers(encounterIndex) {
     renderEncounters();
     autoSave();
 }
+
+// Toggle death save success/failure
+function toggleDeathSave(encounterIndex, combatantIndex, type, value) {
+    const combatant = currentAdventure.encounters[encounterIndex].combatants[combatantIndex];
+    
+    // Initialize death saves if not present
+    if (!combatant.deathSaves) {
+        combatant.deathSaves = { successes: 0, failures: 0 };
+    }
+    
+    // Toggle the value
+    if (combatant.deathSaves[type] === value) {
+        combatant.deathSaves[type] = value - 1;
+    } else {
+        combatant.deathSaves[type] = value;
+    }
+    
+    // Check for stabilization or death
+    if (combatant.deathSaves.successes >= 3) {
+        combatant.hp = 1;
+        combatant.deathSaves = { successes: 0, failures: 0 };
+        alert(`${getCombatantName(combatant)} has stabilized!`);
+    } else if (combatant.deathSaves.failures >= 3) {
+        alert(`${getCombatantName(combatant)} has died!`);
+    }
+    
+    renderEncounters();
+    autoSave();
+}
+
+// Open conditions dialog
+function openConditionsDialog(encounterIndex, combatantIndex) {
+    const combatant = currentAdventure.encounters[encounterIndex].combatants[combatantIndex];
+    const conditions = combatant.conditions || [];
+    const concentrating = combatant.concentrating || false;
+    
+    // Build checkbox list
+    let html = '<div style="max-height: 600px; overflow-y: auto; padding: 10px;">';
+    html += '<h3 style="margin-top: 0; margin-bottom: 15px;">Manage Conditions</h3>';
+    
+    // All conditions checkboxes (including Concentrating)
+    html += '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">';
+    DND_CONDITIONS.forEach(condition => {
+        let checked = false;
+        if (condition === 'Concentrating') {
+            checked = concentrating;
+        } else {
+            checked = conditions.includes(condition);
+        }
+        const icon = CONDITION_ICONS[condition] || '';
+        const inputId = condition === 'Concentrating' ? 'id="cond-concentrating"' : 'class="condition-checkbox"';
+        html += `<label style="display: flex; align-items: center; cursor: pointer; padding: 5px;">
+            <input type="checkbox" ${inputId} value="${condition}" ${checked ? 'checked' : ''} 
+                style="width: 16px; height: 16px; margin-right: 6px;">
+            ${icon} ${condition}
+        </label>`;
+    });
+    html += '</div>';
+    html += '</div>';
+    
+    // Show modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'conditionsModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            ${html}
+            <div style="display: flex; gap: 10px; margin-top: 20px; padding: 0 10px 10px 10px;">
+                <button class="btn" onclick="clearConditions(${encounterIndex}, ${combatantIndex})" style="flex: 1; background: #95a5a6;">Clear</button>
+                <button class="btn" onclick="saveConditions(${encounterIndex}, ${combatantIndex})" style="flex: 1;">Save</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.style.display = 'flex';
+    
+    // Store modal reference for save function
+    modal.setAttribute('data-encounter', encounterIndex);
+    modal.setAttribute('data-combatant', combatantIndex);
+}
+
+// Close conditions modal
+function closeConditionsModal() {
+    const modal = document.getElementById('conditionsModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Save conditions from dialog
+function saveConditions(encounterIndex, combatantIndex) {
+    const combatant = currentAdventure.encounters[encounterIndex].combatants[combatantIndex];
+    
+    // Get selected conditions
+    const checkboxes = document.querySelectorAll('.condition-checkbox:checked');
+    const selectedConditions = Array.from(checkboxes).map(cb => cb.value);
+    
+    // Get concentration state
+    const concentratingCheckbox = document.getElementById('cond-concentrating');
+    const concentrating = concentratingCheckbox ? concentratingCheckbox.checked : false;
+    
+    // Update combatant
+    combatant.conditions = selectedConditions;
+    combatant.concentrating = concentrating;
+    
+    closeConditionsModal();
+    renderEncounters();
+    autoSave();
+}
+
+// Clear all conditions
+function clearConditions(encounterIndex, combatantIndex) {
+    const combatant = currentAdventure.encounters[encounterIndex].combatants[combatantIndex];
+    
+    // Clear all conditions
+    combatant.conditions = [];
+    combatant.concentrating = false;
+    
+    closeConditionsModal();
+    renderEncounters();
+    autoSave();
+}
+
 
 // Reset encounter to unstarted state
 function resetEncounter(encounterIndex) {
@@ -2918,46 +3214,10 @@ function clearLoot(encounterIndex) {
 }
 
 // Toggle treasure editing mode
-function toggleTreasureEdit(encounterIndex) {
-    const encounter = currentAdventure.encounters[encounterIndex];
-    const contentDiv = document.getElementById(`treasure-content-${encounterIndex}`);
-    const editBtn = document.getElementById(`treasure-edit-btn-${encounterIndex}`);
-    
-    if (!contentDiv || !editBtn) return;
-    
-    // Check if currently in edit mode
-    const isEditing = editBtn.getAttribute('data-editing') === 'true';
-    
-    if (isEditing) {
-        // Save mode - get textarea value and save
-        const textarea = contentDiv.querySelector('textarea');
-        if (textarea) {
-            encounter.treasure = textarea.value;
-            contentDiv.innerHTML = `<div style="white-space: pre-wrap; color: #333;">${encounter.treasure}</div>`;
-            editBtn.textContent = '✎';
-            editBtn.title = 'Edit treasure';
-            editBtn.style.background = '#f39c12';
-            editBtn.setAttribute('data-editing', 'false');
-            autoSave();
-        }
-    } else {
-        // Edit mode - show textarea
-        const currentTreasure = encounter.treasure || '';
-        contentDiv.innerHTML = `
-            <textarea style="width: 100%; min-height: 100px; font-family: monospace; padding: 5px; border: 1px solid #ddd; border-radius: 3px;" 
-                      id="treasure-textarea-${encounterIndex}">${currentTreasure}</textarea>
-        `;
-        editBtn.textContent = '✔';
-        editBtn.title = 'Save treasure';
-        editBtn.style.background = '#2ecc71';
-        editBtn.setAttribute('data-editing', 'true');
-        
-        // Focus the textarea
-        setTimeout(() => {
-            const textarea = document.getElementById(`treasure-textarea-${encounterIndex}`);
-            if (textarea) textarea.focus();
-        }, 0);
-    }
+// Update treasure text
+function updateTreasure(encounterIndex, value) {
+    currentAdventure.encounters[encounterIndex].treasure = value;
+    autoSave();
 }
 
 // Start encounter - sort by initiative and mark as started

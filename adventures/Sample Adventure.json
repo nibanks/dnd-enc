@@ -15,6 +15,9 @@
       "combatants": [
         {
           "ac": 16,
+          "conditions": [
+            "Hidden"
+          ],
           "dmg": 22,
           "hp": 22,
           "maxHp": 35,
@@ -32,6 +35,9 @@
           "id": "2"
         },
         {
+          "conditions": [
+            "Prone"
+          ],
           "dmg": 12,
           "maxHp": 39,
           "name": "Guard Drake",
@@ -40,14 +46,19 @@
         },
         {
           "ac": 18,
+          "concentrating": true,
           "heal": 21,
           "hp": 32,
           "maxHp": 40,
           "notes": "Cast Healing Word on Thorin",
+          "tempHp": 5,
           "init": 14,
           "id": "4"
         },
         {
+          "conditions": [
+            "Unconscious"
+          ],
           "dmg": 5,
           "maxHp": 9,
           "name": "Cultist 1",
@@ -67,6 +78,7 @@
           "hp": 26,
           "maxHp": 48,
           "notes": "Great Weapon Master attack",
+          "tempHp": 8,
           "init": 11,
           "id": "1"
         },
@@ -88,6 +100,9 @@
       "combatants": [
         {
           "ac": 16,
+          "conditions": [
+            "Blessed"
+          ],
           "dmg": 38,
           "hp": 18,
           "maxHp": 35,
@@ -96,6 +111,9 @@
           "id": "3"
         },
         {
+          "conditions": [
+            "Frightened"
+          ],
           "dmg": 14,
           "hp": 17,
           "maxHp": 39,
@@ -114,15 +132,20 @@
         },
         {
           "ac": 18,
+          "concentrating": true,
           "dmg": 25,
           "heal": 19,
           "hp": 23,
           "maxHp": 40,
           "notes": "Cast Cure Wounds on Elara and Spiritual Weapon",
+          "tempHp": 3,
           "init": 13,
           "id": "4"
         },
         {
+          "conditions": [
+            "Prone"
+          ],
           "dmg": 11,
           "maxHp": 39,
           "name": "Veteran 2",
@@ -135,10 +158,14 @@
           "hp": 28,
           "maxHp": 48,
           "notes": "Action Surge, 4 attacks",
+          "tempHp": 5,
           "init": 9,
           "id": "1"
         },
         {
+          "conditions": [
+            "Unconscious"
+          ],
           "dmg": 18,
           "maxHp": 93,
           "name": "Ogre",
@@ -147,7 +174,6 @@
         }
       ],
       "currentRound": 5,
-      "minimized": true,
       "name": "Ambush on the Road",
       "state": "complete",
       "treasure": "Coins: 25 GP, 18 SP\nEquipment: 2 longswords, chain mail, sack with 3 days rations"
@@ -157,6 +183,14 @@
       "combatants": [
         {
           "ac": 18,
+          "conditions": [
+            "Blinded",
+            "Grappled",
+            "Invisible"
+          ],
+          "deathSaves": {
+            "failures": 1
+          },
           "hp": 48,
           "maxHp": 48,
           "init": 14,
@@ -215,7 +249,6 @@
         }
       ],
       "currentRound": 1,
-      "minimized": true,
       "name": "Cave Entrance Guards",
       "state": "unstarted",
       "treasure": "No treasure generated yet. Click regenerate to generate treasure."
