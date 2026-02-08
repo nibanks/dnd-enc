@@ -20,7 +20,7 @@
           "maxHp": 35,
           "notes": "Sneak attack critical!",
           "init": 22,
-          "id": "https://www.dndbeyond.com/characters/3"
+          "id": "3"
         },
         {
           "ac": 13,
@@ -29,7 +29,7 @@
           "maxHp": 28,
           "notes": "Cast Fireball",
           "init": 19,
-          "id": "https://www.dndbeyond.com/characters/2"
+          "id": "2"
         },
         {
           "dmg": 12,
@@ -45,7 +45,7 @@
           "maxHp": 40,
           "notes": "Cast Healing Word on Thorin",
           "init": 14,
-          "id": "https://www.dndbeyond.com/characters/4"
+          "id": "4"
         },
         {
           "dmg": 5,
@@ -68,7 +68,7 @@
           "maxHp": 48,
           "notes": "Great Weapon Master attack",
           "init": 11,
-          "id": "https://www.dndbeyond.com/characters/1"
+          "id": "1"
         },
         {
           "dmg": 4,
@@ -93,7 +93,7 @@
           "maxHp": 35,
           "notes": "Multiple sneak attacks",
           "init": 21,
-          "id": "https://www.dndbeyond.com/characters/3"
+          "id": "3"
         },
         {
           "dmg": 14,
@@ -110,7 +110,7 @@
           "maxHp": 28,
           "notes": "Cast Scorching Ray and Fireball",
           "init": 15,
-          "id": "https://www.dndbeyond.com/characters/2"
+          "id": "2"
         },
         {
           "ac": 18,
@@ -120,7 +120,7 @@
           "maxHp": 40,
           "notes": "Cast Cure Wounds on Elara and Spiritual Weapon",
           "init": 13,
-          "id": "https://www.dndbeyond.com/characters/4"
+          "id": "4"
         },
         {
           "dmg": 11,
@@ -136,7 +136,7 @@
           "maxHp": 48,
           "notes": "Action Surge, 4 attacks",
           "init": 9,
-          "id": "https://www.dndbeyond.com/characters/1"
+          "id": "1"
         },
         {
           "dmg": 18,
@@ -147,6 +147,7 @@
         }
       ],
       "currentRound": 5,
+      "minimized": true,
       "name": "Ambush on the Road",
       "state": "complete",
       "treasure": "Coins: 25 GP, 18 SP\nEquipment: 2 longswords, chain mail, sack with 3 days rations"
@@ -159,28 +160,28 @@
           "hp": 48,
           "maxHp": 48,
           "init": 14,
-          "id": "https://www.dndbeyond.com/characters/1"
+          "id": "1"
         },
         {
           "ac": 13,
           "hp": 28,
           "maxHp": 28,
           "init": 18,
-          "id": "https://www.dndbeyond.com/characters/2"
+          "id": "2"
         },
         {
           "ac": 16,
           "hp": 35,
           "maxHp": 35,
           "init": 22,
-          "id": "https://www.dndbeyond.com/characters/3"
+          "id": "3"
         },
         {
           "ac": 18,
           "hp": 40,
           "maxHp": 40,
           "init": 12,
-          "id": "https://www.dndbeyond.com/characters/4"
+          "id": "4"
         },
         {
           "hp": 39,
@@ -227,28 +228,28 @@
           "hp": 48,
           "maxHp": 48,
           "init": 10,
-          "id": "https://www.dndbeyond.com/characters/1"
+          "id": "1"
         },
         {
           "ac": 13,
           "hp": 28,
           "maxHp": 28,
           "init": 16,
-          "id": "https://www.dndbeyond.com/characters/2"
+          "id": "2"
         },
         {
           "ac": 16,
           "hp": 35,
           "maxHp": 35,
           "init": 21,
-          "id": "https://www.dndbeyond.com/characters/3"
+          "id": "3"
         },
         {
           "ac": 18,
           "hp": 40,
           "maxHp": 40,
           "init": 13,
-          "id": "https://www.dndbeyond.com/characters/4"
+          "id": "4"
         },
         {
           "hp": 157,
@@ -277,7 +278,7 @@
       },
       "ac": 18,
       "class": "Fighter",
-      "dndBeyondUrl": "https://www.dndbeyond.com/characters/1",
+      "dndBeyondUrl": "1",
       "initiativeBonus": 1,
       "level": 5,
       "maxHp": 48,
@@ -304,7 +305,7 @@
       },
       "ac": 13,
       "class": "Wizard",
-      "dndBeyondUrl": "https://www.dndbeyond.com/characters/2",
+      "dndBeyondUrl": "2",
       "initiativeBonus": 3,
       "level": 5,
       "maxHp": 28,
@@ -331,7 +332,7 @@
       },
       "ac": 16,
       "class": "Rogue",
-      "dndBeyondUrl": "https://www.dndbeyond.com/characters/3",
+      "dndBeyondUrl": "3",
       "initiativeBonus": 4,
       "level": 5,
       "maxHp": 35,
@@ -359,7 +360,7 @@
       },
       "ac": 18,
       "class": "Cleric",
-      "dndBeyondUrl": "https://www.dndbeyond.com/characters/4",
+      "dndBeyondUrl": "4",
       "level": 5,
       "maxHp": 40,
       "name": "Brother Aldric",

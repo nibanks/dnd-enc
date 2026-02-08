@@ -1178,7 +1178,7 @@ def clean_adventure_for_storage(data):
         if not url:
             return url
         # Match pattern like username/characters/NUMBER or just NUMBER
-        match = re.search(r'(\d{8,})$', url)  # At least 8 digits at the end
+        match = re.search(r'(\d+)$', url)  # Any number of digits at the end
         if match:
             return match.group(1)
         return url
@@ -1209,7 +1209,7 @@ def clean_adventure_for_storage(data):
                         url = combatant['id']
                         
                         # If it's a character URL (contains only digits or profile path), it's a player
-                        is_character = bool(re.search(r'/characters/|^\d{8,}$', url))
+                        is_character = bool(re.search(r'/characters/|^\d+$', url))
                         
                         if is_character:
                             # Extract just the character ID
