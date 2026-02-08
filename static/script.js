@@ -7,6 +7,7 @@ let monstersLoaded = false;
 let hasCookies = false; // Track cookie authentication status
 let playersExpanded = true; // Track players section state
 let playersEditMode = false; // Track players edit mode
+let encounterEditMode = {}; // Track edit mode for completed encounters by index
 let initiativeChart = null; // Chart instance for initiative distribution
 let crChart = null; // Chart instance for CR over time
 let damageChart = null; // Chart instance for damage dealt per encounter
@@ -758,16 +759,97 @@ function renderDamageChart() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     
-    // Calculate total damage for each encounter
-    const encounterData = [];
+    // Collect all player names
+    const playerNames = currentAdventure.players?.map(p => p.name) || [];
     
+    // Colors for players (matching initiative chart)
+    const colors = [
+        '#e74c3c',  // Red
+        '#3498db',  // Blue
+        '#2ecc71',  // Green
+        '#f39c12',  // Orange
+        '#9b59b6',  // Purple
+        '#e91e63',  // Pink
+        '#00bcd4',  // Cyan
+        '#ff5722'   // Deep Orange
+    ];
+    
+    // Build datasets for each player + "Other"
+    const datasets = [];
+    
+    // First, create total enemy damage dealt dataset (separate stack)
+    const totalEnemyDamageData = [];
     currentAdventure.encounters.forEach((encounter, index) => {
-        if (!encounter.combatants) return;
+        if (!encounter.combatants) {
+            totalEnemyDamageData.push({ x: index + 1, y: 0 });
+            return;
+        }
         
+        // Calculate total damage dealt by enemies (sum of dmg field for all monsters/NPCs)
+        let totalEnemyDamage = 0;
+        encounter.combatants.forEach(combatant => {
+            if (isPlayerCombatant(combatant)) return;
+            
+            totalEnemyDamage += combatant.dmg || 0;
+        });
+        
+        totalEnemyDamageData.push({ x: index + 1, y: totalEnemyDamage });
+    });
+    
+    datasets.push({
+        label: 'Enemy Damage',
+        data: totalEnemyDamageData,
+        backgroundColor: '#e7474780',
+        borderColor: '#c0392b',
+        borderWidth: 2,
+        stack: 'taken'
+    });
+    
+    // Create a dataset for each player
+    playerNames.forEach((playerName, idx) => {
+        const color = colors[idx % colors.length];
+        const playerData = [];
+        
+        currentAdventure.encounters.forEach((encounter, index) => {
+            if (!encounter.combatants) {
+                playerData.push({ x: index + 1, y: 0 });
+                return;
+            }
+            
+            // Sum damage for this player in this encounter
+            let playerDamage = 0;
+            encounter.combatants.forEach(combatant => {
+                if (isPlayerCombatant(combatant)) {
+                    const combatantName = getCombatantName(combatant);
+                    if (combatantName === playerName) {
+                        playerDamage += combatant.dmg || 0;
+                    }
+                }
+            });
+            
+            playerData.push({ x: index + 1, y: playerDamage });
+        });
+        
+        datasets.push({
+            label: playerName,
+            data: playerData,
+            backgroundColor: color,
+            borderColor: color,
+            borderWidth: 1,
+            stack: 'players'
+        });
+    });
+    
+    // Create "Other" dataset for unattributed damage
+    const otherData = [];
+    currentAdventure.encounters.forEach((encounter, index) => {
+        if (!encounter.combatants) {
+            otherData.push({ x: index + 1, y: 0 });
+            return;
+        }
+        
+        // Calculate total actual damage (maxHp - currentHp for all monsters)
         let totalDamage = 0;
-        let encounterName = encounter.name || `Encounter ${index + 1}`;
-        
-        // Sum up damage dealt to all NPCs (maxHp - finalHp)
         encounter.combatants.forEach(combatant => {
             if (isPlayerCombatant(combatant)) return;
             
@@ -777,31 +859,41 @@ function renderDamageChart() {
             totalDamage += damageTaken;
         });
         
-        encounterData.push({
-            x: index + 1,
-            y: totalDamage,
-            label: encounterName,
-            state: encounter.state
+        // Calculate total tracked player damage
+        let trackedDamage = 0;
+        encounter.combatants.forEach(combatant => {
+            if (isPlayerCombatant(combatant)) {
+                trackedDamage += combatant.dmg || 0;
+            }
         });
+        
+        // Difference is "Other" damage
+        const otherDamage = Math.max(0, totalDamage - trackedDamage);
+        otherData.push({ x: index + 1, y: otherDamage });
     });
+    
+    // Only add "Other" if there's any unattributed damage
+    const hasOtherDamage = otherData.some(d => d.y > 0);
+    if (hasOtherDamage) {
+        datasets.push({
+            label: 'Other',
+            data: otherData,
+            backgroundColor: '#95a5a6',
+            borderColor: '#7f8c8d',
+            borderWidth: 1,
+            stack: 'players'
+        });
+    }
     
     // Destroy existing chart if it exists
     if (damageChart) {
         damageChart.destroy();
     }
     
-    // Create new chart
+    // Create new stacked bar chart
     damageChart = new Chart(ctx, {
         type: 'bar',
-        data: {
-            datasets: [{
-                label: 'Total Damage Dealt',
-                data: encounterData,
-                backgroundColor: encounterData.map(d => d.state === 'complete' ? '#2ecc71' : '#95a5a6'),
-                borderColor: encounterData.map(d => d.state === 'complete' ? '#27ae60' : '#7f8c8d'),
-                borderWidth: 2
-            }]
-        },
+        data: { datasets },
         options: {
             responsive: true,
             maintainAspectRatio: true,
@@ -817,10 +909,16 @@ function renderDamageChart() {
                 tooltip: {
                     callbacks: {
                         title: function(context) {
-                            return encounterData[context[0].dataIndex].label;
+                            const encounterIndex = context[0].parsed.x - 1;
+                            const encounter = currentAdventure.encounters[encounterIndex];
+                            return encounter?.name || `Encounter ${encounterIndex + 1}`;
                         },
                         label: function(context) {
-                            return 'Damage Dealt: ' + context.parsed.y + ' HP';
+                            return context.dataset.label + ': ' + context.parsed.y + ' HP';
+                        },
+                        footer: function(context) {
+                            const total = context.reduce((sum, item) => sum + item.parsed.y, 0);
+                            return 'Total: ' + total + ' HP';
                         }
                     }
                 }
@@ -2037,7 +2135,7 @@ function createEncounterCard(encounter, encounterIndex) {
             <button class="btn-small" onclick="endEncounter(${encounterIndex})" style="background: #e74c3c;" title="End encounter">End</button>
         `;
     } else if (encounter.state === 'complete') {
-        // Encounter ended - show Reset button
+        // Encounter ended - show Reset button (Edit button will be in top right)
         encounterButtons = `
             <button class="btn-small" onclick="resetEncounter(${encounterIndex})" style="background: #ff9800;" title="Reset encounter to unstarted state">Reset</button>
         `;
@@ -2067,6 +2165,9 @@ function createEncounterCard(encounter, encounterIndex) {
                     <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap; margin-left: 10px;">CR: ${calculateEncounterCR(encounter)} | XP: ${calculateEncounterXP(encounter)}</span>
                 </div>
                 <div class="encounter-controls">
+                    ${encounter.state === 'complete' && !encounter.minimized ? `
+                        <button class="btn-add" onclick="toggleEncounterEdit(${encounterIndex})" style="background: ${encounterEditMode[encounterIndex] ? '#2ecc71' : '#f39c12'};" title="${encounterEditMode[encounterIndex] ? 'Save changes' : 'Edit HP, DMG, Heal columns'}">${encounterEditMode[encounterIndex] ? '💾' : '✏️'}</button>
+                    ` : ''}
                     ${showControls ? `
                         <button class="btn-small" onclick="addMonsterFromLibrary(${encounterIndex})" style="background: #27ae60;" title="Add a monster to this encounter">+</button>
                         <button class="btn-small" onclick="refreshPlayers(${encounterIndex})" style="background: #3498db;" title="Refresh player stats from Players section">↻</button>
@@ -2208,11 +2309,11 @@ function createEncounterCard(encounter, encounterIndex) {
             <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.initiative || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'initiative', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.initiative || 0}</span>`}</td>
             <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${ac}</span></td>
             <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.maxHp || 0}" style="text-align: center; width: 100%;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'maxHp', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.maxHp || 0}</span>`}</td>
-            <td style="text-align: center;">${encounter.state === 'complete' ? `<span style="color: ${(combatant.hp || 0) <= 0 ? '#e74c3c' : '#666'}; font-weight: 500;">${combatant.hp || 0}</span>` : `<input type="number" class="hp-input" value="${combatant.hp || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
+            <td style="text-align: center;">${encounter.state === 'complete' && !encounterEditMode[encounterIndex] ? `<span style="color: ${(combatant.hp || 0) <= 0 ? '#e74c3c' : '#666'}; font-weight: 500;">${combatant.hp || 0}</span>` : `<input type="number" class="hp-input" value="${combatant.hp || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))">`}</td>
-            <td style="text-align: center;">${encounter.state === 'complete' ? `<span style="color: #666; font-weight: 500;">${combatant.dmg || 0}</span>` : `<input type="number" class="dmg-input" value="${combatant.dmg || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
+            <td style="text-align: center;">${encounter.state === 'complete' && !encounterEditMode[encounterIndex] ? `<span style="color: #666; font-weight: 500;">${combatant.dmg || 0}</span>` : `<input type="number" class="dmg-input" value="${combatant.dmg || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'dmg', parseInt(this.value))">`}</td>
-            <td style="text-align: center;">${encounter.state === 'complete' ? `<span style="color: #666; font-weight: 500;">${combatant.heal || 0}</span>` : `<input type="number" class="heal-input" value="${combatant.heal || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
+            <td style="text-align: center;">${encounter.state === 'complete' && !encounterEditMode[encounterIndex] ? `<span style="color: #666; font-weight: 500;">${combatant.heal || 0}</span>` : `<input type="number" class="heal-input" value="${combatant.heal || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'heal', parseInt(this.value))">`}</td>
             <td><input type="text" value="${combatant.notes || ''}" 
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'notes', this.value)"></td>
@@ -2670,8 +2771,22 @@ function resetEncounter(encounterIndex) {
     encounter.currentRound = 0;
     encounter.activeCombatant = null;
     
+    // Clear edit mode
+    delete encounterEditMode[encounterIndex];
+    
     renderEncounters();
     autoSave();
+}
+
+// Toggle edit mode for completed encounters
+function toggleEncounterEdit(encounterIndex) {
+    encounterEditMode[encounterIndex] = !encounterEditMode[encounterIndex];
+    renderEncounters();
+    
+    // If we're saving (turning edit mode off), trigger autosave
+    if (!encounterEditMode[encounterIndex]) {
+        autoSave();
+    }
 }
 
 // Generate treasure/loot based on encounter enemies

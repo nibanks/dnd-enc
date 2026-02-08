@@ -1327,8 +1327,8 @@ def restore_adventure_from_storage(data):
                     if combatant['dndBeyondUrl']:
                         url = combatant['dndBeyondUrl']
                         
-                        # Check if this looks like a character ID (8+ digits)
-                        if url.isdigit() and len(url) >= 8:
+                        # Check if this looks like a character ID (digits only)
+                        if url.isdigit():
                             # It's a player - restore URL and look up name from players list
                             combatant['dndBeyondUrl'] = character_prefix + url
                             

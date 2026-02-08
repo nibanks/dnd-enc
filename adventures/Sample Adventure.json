@@ -14,262 +14,366 @@
       "chapter": "Chapter 1: The Beginning",
       "combatants": [
         {
-          "hp": 28,
+          "ac": 16,
+          "dmg": 22,
+          "hp": 22,
           "maxHp": 35,
-          "name": "Finn Quickfoot",
-          "notes": "Used Second Wind",
-          "init": 22
+          "notes": "Sneak attack critical!",
+          "init": 22,
+          "id": "https://www.dndbeyond.com/characters/3"
         },
         {
-          "hp": 28,
+          "ac": 13,
+          "dmg": 24,
+          "hp": 15,
           "maxHp": 28,
-          "name": "Elara Moonwhisper",
-          "init": 19
+          "notes": "Cast Fireball",
+          "init": 19,
+          "id": "https://www.dndbeyond.com/characters/2"
         },
         {
+          "dmg": 12,
+          "maxHp": 39,
+          "name": "Guard Drake",
+          "notes": "Defeated",
+          "init": 17
+        },
+        {
+          "ac": 18,
+          "heal": 21,
+          "hp": 32,
+          "maxHp": 40,
+          "notes": "Cast Healing Word on Thorin",
+          "init": 14,
+          "id": "https://www.dndbeyond.com/characters/4"
+        },
+        {
+          "dmg": 5,
           "maxHp": 9,
           "name": "Cultist 1",
           "notes": "Defeated",
-          "init": 15
+          "init": 13
         },
         {
-          "hp": 40,
-          "maxHp": 40,
-          "name": "Brother Aldric",
-          "init": 14
-        },
-        {
-          "maxHp": 9,
-          "name": "Cultist 2",
-          "notes": "Defeated",
+          "dmg": 8,
+          "maxHp": 27,
+          "name": "Acolyte",
+          "notes": "Defeated, cast Sacred Flame",
           "init": 12
         },
         {
-          "hp": 35,
+          "ac": 18,
+          "dmg": 38,
+          "hp": 26,
           "maxHp": 48,
-          "name": "Thorin Ironshield",
-          "notes": "Took 13 damage",
-          "init": 11
+          "notes": "Great Weapon Master attack",
+          "init": 11,
+          "id": "https://www.dndbeyond.com/characters/1"
+        },
+        {
+          "dmg": 4,
+          "maxHp": 9,
+          "name": "Cultist 2",
+          "notes": "Defeated",
+          "init": 10
         }
       ],
-      "currentRound": 6,
+      "currentRound": 4,
       "name": "Keep Defense",
       "state": "complete",
-      "treasure": "Coins: 12 CP, 9 SP"
+      "treasure": "Coins: 15 GP, 42 SP, 18 CP\nEquipment: chain shirt, 2 scimitars"
     },
     {
       "chapter": "Chapter 1: The Beginning",
       "combatants": [
         {
-          "hp": 35,
+          "ac": 16,
+          "dmg": 38,
+          "hp": 18,
           "maxHp": 35,
-          "name": "Finn Quickfoot",
-          "notes": "Hidden (advantage on next attack)",
-          "init": 21
+          "notes": "Multiple sneak attacks",
+          "init": 21,
+          "id": "https://www.dndbeyond.com/characters/3"
         },
         {
-          "hp": 39,
+          "dmg": 14,
+          "hp": 17,
           "maxHp": 39,
-          "name": "Dragonclaw 1",
-          "init": 16
+          "name": "Veteran 1",
+          "notes": "Hit by Great Weapon Master",
+          "init": 18
         },
         {
-          "hp": 28,
+          "ac": 13,
+          "dmg": 40,
+          "hp": 9,
           "maxHp": 28,
-          "name": "Elara Moonwhisper",
-          "notes": "Concentrating on Haste",
-          "init": 15
+          "notes": "Cast Scorching Ray and Fireball",
+          "init": 15,
+          "id": "https://www.dndbeyond.com/characters/2"
         },
         {
-          "hp": 40,
+          "ac": 18,
+          "dmg": 25,
+          "heal": 19,
+          "hp": 23,
           "maxHp": 40,
-          "name": "Brother Aldric",
-          "notes": "Bless active on party",
-          "init": 13
+          "notes": "Cast Cure Wounds on Elara and Spiritual Weapon",
+          "init": 13,
+          "id": "https://www.dndbeyond.com/characters/4"
         },
         {
-          "hp": 20,
+          "dmg": 11,
           "maxHp": 39,
-          "name": "Dragonclaw 2",
-          "notes": "Injured",
+          "name": "Veteran 2",
+          "notes": "Defeated",
           "init": 12
         },
         {
-          "hp": 48,
+          "ac": 18,
+          "dmg": 51,
+          "hp": 28,
           "maxHp": 48,
-          "name": "Thorin Ironshield",
-          "init": 9
+          "notes": "Action Surge, 4 attacks",
+          "init": 9,
+          "id": "https://www.dndbeyond.com/characters/1"
+        },
+        {
+          "dmg": 18,
+          "maxHp": 93,
+          "name": "Ogre",
+          "notes": "Defeated, attacked recklessly",
+          "init": 5
         }
       ],
+      "currentRound": 5,
       "name": "Ambush on the Road",
-      "treasure": "Coins: 8 CP, 1 SP\nEquipment: belt pouch"
+      "state": "complete",
+      "treasure": "Coins: 25 GP, 18 SP\nEquipment: 2 longswords, chain mail, sack with 3 days rations"
     },
     {
       "chapter": "Chapter 2: The Journey",
       "combatants": [
         {
+          "ac": 18,
           "hp": 48,
           "maxHp": 48,
-          "name": "Thorin Ironshield"
+          "init": 14,
+          "id": "https://www.dndbeyond.com/characters/1"
         },
         {
+          "ac": 13,
           "hp": 28,
           "maxHp": 28,
-          "name": "Elara Moonwhisper"
+          "init": 18,
+          "id": "https://www.dndbeyond.com/characters/2"
         },
         {
+          "ac": 16,
           "hp": 35,
           "maxHp": 35,
-          "name": "Finn Quickfoot"
+          "init": 22,
+          "id": "https://www.dndbeyond.com/characters/3"
         },
         {
+          "ac": 18,
           "hp": 40,
           "maxHp": 40,
-          "name": "Brother Aldric"
+          "init": 12,
+          "id": "https://www.dndbeyond.com/characters/4"
         },
         {
           "hp": 39,
           "maxHp": 39,
-          "name": "Guard Drake"
+          "name": "Guard Drake 1",
+          "init": 11
+        },
+        {
+          "hp": 39,
+          "maxHp": 39,
+          "name": "Guard Drake 2",
+          "init": 10
+        },
+        {
+          "hp": 39,
+          "maxHp": 39,
+          "name": "Veteran",
+          "init": 15
         },
         {
           "hp": 9,
           "maxHp": 9,
-          "name": "Cultist"
+          "name": "Cultist 1",
+          "init": 8
         },
         {
           "hp": 9,
           "maxHp": 9,
-          "name": "Cultist"
+          "name": "Cultist 2",
+          "init": 7
         }
       ],
+      "currentRound": 1,
       "minimized": true,
       "name": "Cave Entrance Guards",
-      "state": "unstarted"
+      "state": "unstarted",
+      "treasure": "No treasure generated yet. Click regenerate to generate treasure."
     },
     {
       "chapter": "Chapter 3: The Finale",
       "combatants": [
         {
+          "ac": 18,
           "hp": 48,
           "maxHp": 48,
-          "name": "Thorin Ironshield"
+          "init": 10,
+          "id": "https://www.dndbeyond.com/characters/1"
         },
         {
+          "ac": 13,
           "hp": 28,
           "maxHp": 28,
-          "name": "Elara Moonwhisper"
+          "init": 16,
+          "id": "https://www.dndbeyond.com/characters/2"
         },
         {
+          "ac": 16,
           "hp": 35,
           "maxHp": 35,
-          "name": "Finn Quickfoot"
+          "init": 21,
+          "id": "https://www.dndbeyond.com/characters/3"
         },
         {
+          "ac": 18,
           "hp": 40,
           "maxHp": 40,
-          "name": "Brother Aldric"
+          "init": 13,
+          "id": "https://www.dndbeyond.com/characters/4"
+        },
+        {
+          "hp": 157,
+          "maxHp": 157,
+          "name": "Young White Dragon",
+          "init": 12
         }
       ],
+      "currentRound": 1,
       "minimized": true,
-      "name": "Boss: Langdedrosa Cyanwrath",
-      "state": "unstarted"
+      "name": "Boss: Young White Dragon",
+      "state": "unstarted",
+      "treasure": "No treasure generated yet. Click regenerate to generate treasure."
     }
   ],
   "name": "Sample Adventure",
   "players": [
     {
+      "abilityScores": {
+        "cha": 10,
+        "con": 16,
+        "dex": 12,
+        "int": 10,
+        "str": 16,
+        "wis": 12
+      },
       "ac": 18,
       "class": "Fighter",
+      "dndBeyondUrl": "https://www.dndbeyond.com/characters/1",
       "initiativeBonus": 1,
       "level": 5,
       "maxHp": 48,
       "name": "Thorin Ironshield",
       "notes": "Great Weapon Master feat, uses magic greatsword +1",
+      "passiveInsight": 10,
+      "passiveInvestigation": 10,
+      "passivePerception": 10,
       "playerName": "Alice",
       "race": "Dwarf",
-      "speed": 25,
-      "abilityScores": {
-        "str": 16,
-        "dex": 12,
-        "con": 16,
-        "int": 10,
-        "wis": 12,
-        "cha": 10
-      },
       "skillProficiencies": {
         "perception": true
-      }
+      },
+      "speed": 25
     },
     {
+      "abilityScores": {
+        "cha": 10,
+        "con": 14,
+        "dex": 16,
+        "int": 18,
+        "str": 8,
+        "wis": 12
+      },
       "ac": 13,
       "class": "Wizard",
+      "dndBeyondUrl": "https://www.dndbeyond.com/characters/2",
       "initiativeBonus": 3,
       "level": 5,
       "maxHp": 28,
       "name": "Elara Moonwhisper",
       "notes": "Sculpt Spells feature, has Fireball and Counterspell prepared",
+      "passiveInsight": 10,
+      "passiveInvestigation": 10,
+      "passivePerception": 10,
       "playerName": "Bob",
       "race": "Half-Elf",
-      "speed": 30,
-      "abilityScores": {
-        "str": 8,
-        "dex": 16,
-        "con": 14,
-        "int": 18,
-        "wis": 12,
-        "cha": 10
-      },
       "skillProficiencies": {
         "investigation": true
-      }
+      },
+      "speed": 30
     },
     {
+      "abilityScores": {
+        "cha": 12,
+        "con": 14,
+        "dex": 18,
+        "int": 13,
+        "str": 10,
+        "wis": 14
+      },
       "ac": 16,
       "class": "Rogue",
+      "dndBeyondUrl": "https://www.dndbeyond.com/characters/3",
       "initiativeBonus": 4,
       "level": 5,
       "maxHp": 35,
       "name": "Finn Quickfoot",
       "notes": "Sneak attack 3d6, has poisoner's kit and thieves' tools",
+      "passiveInsight": 10,
+      "passiveInvestigation": 10,
+      "passivePerception": 10,
       "playerName": "Charlie",
       "race": "Halfling",
-      "speed": 25,
-      "abilityScores": {
-        "str": 10,
-        "dex": 18,
-        "con": 14,
-        "int": 13,
-        "wis": 14,
-        "cha": 12
-      },
       "skillProficiencies": {
-        "perception": true,
-        "insight": true
-      }
+        "insight": true,
+        "perception": true
+      },
+      "speed": 25
     },
     {
+      "abilityScores": {
+        "cha": 12,
+        "con": 14,
+        "dex": 10,
+        "int": 10,
+        "str": 14,
+        "wis": 18
+      },
       "ac": 18,
       "class": "Cleric",
+      "dndBeyondUrl": "https://www.dndbeyond.com/characters/4",
       "level": 5,
       "maxHp": 40,
       "name": "Brother Aldric",
       "notes": "Channel Divinity available, prepared healing spells",
+      "passiveInsight": 10,
+      "passiveInvestigation": 10,
+      "passivePerception": 10,
       "playerName": "Dana",
       "race": "Human",
-      "speed": 30,
-      "abilityScores": {
-        "str": 14,
-        "dex": 10,
-        "con": 14,
-        "int": 10,
-        "wis": 18,
-        "cha": 12
-      },
       "skillProficiencies": {
-        "perception": true,
-        "insight": true
-      }
+        "insight": true,
+        "perception": true
+      },
+      "speed": 30
     }
   ]
 }
