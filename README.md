@@ -17,7 +17,11 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
 
 - 📊 **Intuitive UI** - Clean, modern interface with context-aware controls
 - 💾 **Auto-save** - Changes are automatically saved to JSON files
-- 📝 **Simple File Format** - JSON files that are easy to edit manually
+- 📝 **Optimized File Format** - JSON files with intelligent compression:
+  - Shortened field names (init/id vs initiative/dndBeyondUrl)
+  - Stripped empty values and defaults
+  - Character ID extraction (stores just "12345" vs full URL)
+  - ~30% file size reduction while maintaining readability
 - 🏰 **Multi-Adventure Support** - Create and manage multiple campaigns
 - 📖 **Chapter Organization** - Organize encounters by chapters with dedicated notes
 - 🎲 **Player Management** - Track detailed player stats including:
@@ -33,8 +37,19 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
   - Turn-by-turn combat tracking
   - Round counter
   - Active turn highlighting
-  - HP tracking with visual indicators (red names when HP ≤ 0)
+  - HP, Damage, and Healing tracking
+  - Damage modal (Ctrl+D) for quick damage assignment
+  - Healing modal (Ctrl+H) for healing tracking
+  - Edit mode for completed encounters (✏️ button)
   - Context-sensitive controls (edit controls hidden during combat)
+  - ESC key closes all modals
+- 📊 **Statistics & Charts** - Comprehensive campaign analytics:
+  - Initiative Distribution chart (per-player initiative rolls)
+  - CR Over Time chart (encounter difficulty progression)
+  - Damage Analysis chart with:
+    - Stacked bars showing per-player damage contributions
+    - Enemy damage dealt to players
+    - "Other" category for environmental/untracked damage
 - 🔄 **Initiative System** - Automatic initiative rolling with DEX modifiers
 - 🐉 **D&D Beyond Integration**:
   - Cookie-based authentication
@@ -44,7 +59,12 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
   - Automatic initiative rolling (d20 + modifier)
   - Smart caching with per-monster cache files
 - ⭐ **XP Calculator** - Automatic XP calculation based on CR values
+- ⌨️ **Keyboard Shortcuts**:
+  - Ctrl+D: Open damage tracking modal
+  - Ctrl+H: Open healing tracking modal
+  - ESC: Close any open modal
 - 🔗 **URL Routing** - Direct links to specific adventures and chapters
+- 📍 **Scroll Persistence** - Automatically restores scroll position on page refresh
 - 🎯 **Smart UI** - Context-aware interface that adapts to workflow:
   - Adventure selection page with dropdown
   - Adventure page with title and management controls
@@ -136,20 +156,28 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
 2. **Click "Start"**: 
    - Encounter begins
    - Combatants sorted by initiative
-   - Stats lock (except current HP and Notes)
+   - Stats lock (except HP, DMG, Heal, and Notes)
    - Round counter starts at 1
    - Edit controls (+, ↻, ×) hidden
 3. **During Combat**:
    - Active combatant highlighted with ▶ arrow
    - Click "Next Turn" to advance
    - Track HP changes (red name when HP ≤ 0)
+   - Track damage dealt (DMG column)
+   - Track healing (Heal column)
    - Add notes/conditions
-   - Only HP and Notes editable
+   - Use Ctrl+D for quick damage assignment
+   - Use Ctrl+H for quick healing
 4. **Click "End"**: 
    - Marks encounter complete
    - Encounter card background turns light green
    - Round counter preserved
-5. **Click "Reset"**: 
+   - Shows ✏️ Edit button when maximized
+5. **Edit Completed Encounters**:
+   - Click ✏️ (Edit) button on completed encounters
+   - Enables editing of HP, DMG, and Heal columns
+   - Click 💾 (Save) to finalize changes
+6. **Click "Reset"**: 
    - Returns to unstarted state
    - Re-enables all editing controls
 
@@ -160,7 +188,15 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
 
 ## File Format
 
-Adventures are stored in the `adventures/` directory as JSON files. The format uses references to reduce duplication - monster and player details are looked up dynamically from the D&D Beyond cache and players array.
+Adventures are stored in the `adventures/` directory as JSON files. The format is optimized for storage efficiency while remaining human-readable.
+
+**Optimizations:**
+- Field names shortened: `init` instead of `initiative`, `id` instead of `dndBeyondUrl`
+- Empty values, zeros, and defaults are stripped
+- Character IDs stored as numbers only (e.g., "159764903" instead of full URL)
+- Player combatants identified by absence of `name` field
+- Monster details looked up from D&D Beyond cache
+- ~30% file size reduction compared to verbose format
 
 **Simplified Structure:**
 ```json
@@ -179,38 +215,30 @@ Adventures are stored in the `adventures/` directory as JSON files. The format u
       "level": 5,
       "maxHp": 48,
       "ac": 18,
-      "speed": 25,
-      "initiativeBonus": 2,
-      "passivePerception": 14,
-      "passiveInsight": 12,
-      "passiveInvestigation": 12,
-      "notes": "Uses a magic shield",
-      "dndBeyondUrl": "https://www.dndbeyond.com/characters/12345"
+      "dndBeyondUrl": "159764903"
     }
   ],
   "encounters": [
     {
       "name": "Boss Fight",
       "chapter": "Chapter 1",
-      "state": "started",
+      "state": "complete",
       "currentRound": 3,
-      "activeCombatant": 0,
       "combatants": [
         {
-          "name": "Thorin Ironshield",
-          "initiative": 15,
+          "init": 15,
           "hp": 32,
           "maxHp": 48,
-          "notes": "Concentrating on spell",
-          "isPlayer": true
+          "dmg": 12,
+          "heal": 5,
+          "id": "159764903",
+          "ac": 18
         },
         {
           "name": "Cultist",
-          "initiative": 12,
-          "hp": 9,
+          "init": 12,
           "maxHp": 9,
-          "notes": "",
-          "isPlayer": false
+          "dmg": 3
         }
       ]
     }
@@ -219,19 +247,26 @@ Adventures are stored in the `adventures/` directory as JSON files. The format u
 ```
 
 **Key Points:**
-- Combatants only store instance-specific data (initiative, HP, notes)
-- Player details (AC, D&D Beyond URL) are looked up from the `players` array
-- Monster details (AC, CR, D&D Beyond URL) are looked up from the cached monster list
-- This eliminates duplication and reduces file size by ~50%
+- Combatants with `id` but no `name` are players (looked up from players array)
+- Combatants with `name` are monsters/NPCs (details from D&D Beyond cache)
+- Fields with default values (0, empty string, etc.) are omitted
+- App automatically restores full field names and URLs when loading
 
 ## Tips
 
 - **D&D Beyond Cookies**: Cookies expire periodically. If monster fetching stops working, re-export and import fresh cookies
+- **Keyboard Shortcuts**: 
+  - Ctrl+D for damage tracking (quick damage assignment between combatants)
+  - Ctrl+H for healing tracking (track healing done)
+  - ESC to close any modal
+- **Statistics Charts**: View campaign analytics on the main page showing initiative distributions, CR progression, and damage analysis
+- **Damage Tracking**: The damage chart shows per-player contributions with an "Other" bar for environmental/untracked damage when totals don't match
+- **Edit Completed Encounters**: Use the ✏️ button on completed encounters to adjust HP/DMG/Heal values after the fact
 - **Initiative Rolling**: Initiative is automatically rolled (d20 + modifier) when monsters are added. Edit before starting the encounter
 - **Encounter States**: 
   - Unstarted: Full editing capability, setup mode
-  - Started: Combat in progress, limited editing
-  - Complete: Finished encounter, shown with green background
+  - Started: Combat in progress, limited editing (HP, DMG, Heal, Notes)
+  - Complete: Finished encounter, shown with green background, editable via ✏️ button
 - **Chapter Organization**: Use chapters to organize encounters by story progression
 - **Chapter Notes**: Add session notes, NPC information, or plot points to each chapter
 - **XP Tracking**: Total XP is automatically calculated from monster CR values
@@ -241,7 +276,8 @@ Adventures are stored in the `adventures/` directory as JSON files. The format u
   - Light green background for completed encounters
 - **Monster Tooltips**: Hover over any monster name to see full stat block
 - **Minimize Encounters**: Keep your interface clean by minimizing encounters you're not actively using
-- **Manual File Editing**: JSON files can be edited directly for bulk changes
+- **Scroll Position**: Page automatically remembers scroll position on refresh
+- **Manual File Editing**: JSON files can be edited directly for bulk changes (field names will be shortened on next save)
 - **Backup**: The JSON files are your data - back them up regularly!
 
 ## Project Structure
@@ -255,7 +291,8 @@ dnd-enc/
 │   └── index.html             # Main HTML template
 ├── static/
 │   ├── style.css              # Styling with toast notifications
-│   └── script.js              # Frontend JavaScript (~2000 lines)
+│   ├── script.js              # Frontend JavaScript (~3500 lines)
+│   └── chart.umd.min.js       # Chart.js library (local)
 ├── adventures/                 # JSON data files (auto-created)
 │   └── Sample Adventure.json  # Example adventure (included)
 └── .cache/                     # Cache directory (auto-created, gitignored)
@@ -268,25 +305,28 @@ dnd-enc/
 ## Technical Details
 
 - **Backend**: Flask 3.0.0 with BeautifulSoup4 for web scraping
-- **Frontend**: Vanilla JavaScript (no frameworks)
-- **Data Storage**: JSON files for easy editing and version control
+- **Frontend**: Vanilla JavaScript (no frameworks) with Chart.js for analytics
+- **Data Storage**: Optimized JSON files with intelligent compression
 - **Caching**: Per-monster cache files with individual timestamps
 - **Authentication**: Cookie-based D&D Beyond session persistence
 - **Monster Library**: 2,824 monsters from D&D Beyond
 - **Dynamic Lookups**: Monster and player details fetched on-demand to reduce file size
 - **URL Routing**: Adventure and chapter state preserved in URL parameters
 - **State Management**: Three encounter states (unstarted, started, complete) with appropriate UI controls
+- **Charts**: Initiative distribution, CR progression, and damage analysis with per-player breakdowns
 
 ## Sample Adventure
 
 The included "Sample Adventure" demonstrates:
 - Multiple chapters with notes
-- Four diverse player characters
+- Four diverse player characters with placeholder character IDs
 - Encounters in different states:
-  - Complete encounter (finished combat with green background)
+  - Complete encounters with damage/healing tracking (finished combat with green background)
   - Started encounter (active combat with turn tracking)
   - Unstarted encounters (ready to begin)
-- Proper use of notes for tracking combat conditions
+- Proper use of DMG and Heal columns
+- Damage tracking showing realistic combat scenarios
+- Statistics charts with real data
 - Chapter organization and navigation
 
 Load it to see the full feature set in action!
