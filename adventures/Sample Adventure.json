@@ -20,19 +20,19 @@
           ],
           "dmg": 22,
           "hp": 22,
+          "id": "3",
           "maxHp": 35,
           "notes": "Sneak attack critical!",
-          "init": 22,
-          "id": "3"
+          "init": 22
         },
         {
           "ac": 13,
           "dmg": 24,
           "hp": 15,
+          "id": "2",
           "maxHp": 28,
           "notes": "Cast Fireball",
-          "init": 19,
-          "id": "2"
+          "init": 19
         },
         {
           "conditions": [
@@ -49,11 +49,11 @@
           "concentrating": true,
           "heal": 21,
           "hp": 32,
+          "id": "4",
           "maxHp": 40,
           "notes": "Cast Healing Word on Thorin",
           "tempHp": 5,
-          "init": 14,
-          "id": "4"
+          "init": 14
         },
         {
           "conditions": [
@@ -76,11 +76,11 @@
           "ac": 18,
           "dmg": 38,
           "hp": 26,
+          "id": "1",
           "maxHp": 48,
           "notes": "Great Weapon Master attack",
           "tempHp": 8,
-          "init": 11,
-          "id": "1"
+          "init": 11
         },
         {
           "dmg": 4,
@@ -91,6 +91,7 @@
         }
       ],
       "currentRound": 4,
+      "minimized": true,
       "name": "Keep Defense",
       "state": "complete",
       "treasure": "Coins: 15 GP, 42 SP, 18 CP\nEquipment: chain shirt, 2 scimitars"
@@ -105,10 +106,10 @@
           ],
           "dmg": 38,
           "hp": 18,
+          "id": "3",
           "maxHp": 35,
           "notes": "Multiple sneak attacks",
-          "init": 21,
-          "id": "3"
+          "init": 21
         },
         {
           "conditions": [
@@ -125,10 +126,10 @@
           "ac": 13,
           "dmg": 40,
           "hp": 9,
+          "id": "2",
           "maxHp": 28,
           "notes": "Cast Scorching Ray and Fireball",
-          "init": 15,
-          "id": "2"
+          "init": 15
         },
         {
           "ac": 18,
@@ -136,11 +137,11 @@
           "dmg": 25,
           "heal": 19,
           "hp": 23,
+          "id": "4",
           "maxHp": 40,
           "notes": "Cast Cure Wounds on Elara and Spiritual Weapon",
           "tempHp": 3,
-          "init": 13,
-          "id": "4"
+          "init": 13
         },
         {
           "conditions": [
@@ -156,11 +157,11 @@
           "ac": 18,
           "dmg": 51,
           "hp": 28,
+          "id": "1",
           "maxHp": 48,
           "notes": "Action Surge, 4 attacks",
           "tempHp": 5,
-          "init": 9,
-          "id": "1"
+          "init": 9
         },
         {
           "conditions": [
@@ -174,82 +175,585 @@
         }
       ],
       "currentRound": 5,
+      "minimized": true,
       "name": "Ambush on the Road",
       "state": "complete",
       "treasure": "Coins: 25 GP, 18 SP\nEquipment: 2 longswords, chain mail, sack with 3 days rations"
+    },
+    {
+      "chapter": "Chapter 1: The Beginning",
+      "combatants": [
+        {
+          "ac": 18,
+          "dmg": 26,
+          "hp": 40,
+          "id": "1",
+          "maxHp": 48,
+          "notes": "Took minor damage",
+          "init": 12
+        },
+        {
+          "ac": 13,
+          "dmg": 19,
+          "hp": 23,
+          "id": "2",
+          "maxHp": 28,
+          "notes": "Cast Magic Missile",
+          "init": 17
+        },
+        {
+          "ac": 16,
+          "dmg": 22,
+          "hp": 35,
+          "id": "3",
+          "maxHp": 35,
+          "notes": "Unharmed",
+          "init": 20
+        },
+        {
+          "ac": 18,
+          "dmg": 26,
+          "heal": 11,
+          "hp": 40,
+          "id": "4",
+          "maxHp": 40,
+          "notes": "Healed Thorin",
+          "init": 14
+        },
+        {
+          "conditions": [
+            "Unconscious"
+          ],
+          "dmg": 3,
+          "maxHp": 9,
+          "name": "Cultist 1",
+          "notes": "Defeated",
+          "init": 10
+        },
+        {
+          "dmg": 2,
+          "maxHp": 9,
+          "name": "Cultist 2",
+          "notes": "Defeated",
+          "init": 9
+        },
+        {
+          "dmg": 4,
+          "maxHp": 9,
+          "name": "Cultist 3",
+          "notes": "Defeated",
+          "init": 8
+        },
+        {
+          "dmg": 2,
+          "maxHp": 9,
+          "name": "Cultist 4",
+          "notes": "Defeated",
+          "init": 7
+        },
+        {
+          "dmg": 3,
+          "maxHp": 9,
+          "name": "Cultist 5",
+          "notes": "Defeated",
+          "init": 6
+        },
+        {
+          "dmg": 2,
+          "maxHp": 9,
+          "name": "Cultist 6",
+          "notes": "Defeated",
+          "init": 5
+        },
+        {
+          "conditions": [
+            "Unconscious"
+          ],
+          "dmg": 27,
+          "maxHp": 39,
+          "name": "Veteran",
+          "notes": "Leader, defeated",
+          "init": 16
+        }
+      ],
+      "currentRound": 4,
+      "minimized": true,
+      "name": "Cultist Patrol",
+      "state": "complete",
+      "treasure": "Coins: 8 GP, 25 SP, 30 CP\nItems: 6 cultist robes, unholy symbols, veteran's longsword"
+    },
+    {
+      "chapter": "Chapter 1: The Beginning",
+      "combatants": [
+        {
+          "ac": 18,
+          "dmg": 30,
+          "heal": 14,
+          "hp": 44,
+          "id": "1",
+          "maxHp": 48,
+          "notes": "Protected civilians",
+          "init": 11
+        },
+        {
+          "ac": 13,
+          "dmg": 26,
+          "hp": 16,
+          "id": "2",
+          "maxHp": 28,
+          "notes": "Cast Burning Hands",
+          "init": 16
+        },
+        {
+          "ac": 16,
+          "dmg": 31,
+          "hp": 29,
+          "id": "3",
+          "maxHp": 35,
+          "notes": "Rescued two civilians",
+          "init": 19
+        },
+        {
+          "ac": 18,
+          "dmg": 30,
+          "heal": 22,
+          "hp": 40,
+          "id": "4",
+          "maxHp": 40,
+          "notes": "Cast Cure Wounds on Thorin and Elara",
+          "init": 13
+        },
+        {
+          "conditions": [
+            "Unconscious"
+          ],
+          "dmg": 8,
+          "maxHp": 27,
+          "name": "Acolyte 1",
+          "notes": "Defeated",
+          "init": 15
+        },
+        {
+          "dmg": 9,
+          "maxHp": 27,
+          "name": "Acolyte 2",
+          "notes": "Defeated",
+          "init": 14
+        },
+        {
+          "dmg": 5,
+          "maxHp": 9,
+          "name": "Cultist 1",
+          "notes": "Defeated",
+          "init": 10
+        },
+        {
+          "dmg": 3,
+          "maxHp": 9,
+          "name": "Cultist 2",
+          "notes": "Defeated",
+          "init": 9
+        },
+        {
+          "dmg": 4,
+          "maxHp": 9,
+          "name": "Cultist 3",
+          "notes": "Defeated",
+          "init": 8
+        },
+        {
+          "dmg": 3,
+          "maxHp": 9,
+          "name": "Cultist 4",
+          "notes": "Defeated",
+          "init": 7
+        },
+        {
+          "dmg": 7,
+          "maxHp": 27,
+          "name": "Acolyte 3",
+          "notes": "Defeated",
+          "init": 12
+        }
+      ],
+      "currentRound": 5,
+      "minimized": true,
+      "name": "Trapped Civilians",
+      "state": "complete",
+      "treasure": "Coins: 12 GP, 35 SP\nEquipment: 3 maces, leather armor\nSpecial: grateful civilians give a healing potion"
     },
     {
       "chapter": "Chapter 2: The Journey",
       "combatants": [
         {
           "ac": 18,
-          "conditions": [
-            "Blinded",
-            "Grappled",
-            "Invisible"
-          ],
-          "deathSaves": {
-            "failures": 1
-          },
-          "hp": 48,
+          "dmg": 33,
+          "heal": 8,
+          "hp": 41,
+          "id": "1",
           "maxHp": 48,
-          "init": 14,
-          "id": "1"
+          "notes": "Drake bite hurt",
+          "init": 14
+        },
+        {
+          "ac": 13,
+          "dmg": 35,
+          "hp": 9,
+          "id": "2",
+          "maxHp": 28,
+          "notes": "Cast Fireball on drakes",
+          "init": 18
+        },
+        {
+          "ac": 16,
+          "dmg": 37,
+          "hp": 21,
+          "id": "3",
+          "maxHp": 35,
+          "notes": "Took hits from veteran",
+          "init": 22
+        },
+        {
+          "ac": 18,
+          "concentrating": true,
+          "dmg": 30,
+          "heal": 27,
+          "hp": 40,
+          "id": "4",
+          "maxHp": 40,
+          "notes": "Cast Prayer of Healing after combat",
+          "tempHp": 4,
+          "init": 12
+        },
+        {
+          "conditions": [
+            "Prone"
+          ],
+          "dmg": 12,
+          "maxHp": 39,
+          "name": "Guard Drake 1",
+          "notes": "Defeated by Fireball",
+          "init": 11
+        },
+        {
+          "dmg": 14,
+          "maxHp": 39,
+          "name": "Guard Drake 2",
+          "notes": "Defeated",
+          "init": 10
+        },
+        {
+          "conditions": [
+            "Unconscious"
+          ],
+          "dmg": 18,
+          "maxHp": 39,
+          "name": "Veteran",
+          "notes": "Defeated",
+          "init": 15
+        },
+        {
+          "dmg": 3,
+          "maxHp": 9,
+          "name": "Cultist 1",
+          "notes": "Defeated",
+          "init": 8
+        },
+        {
+          "dmg": 2,
+          "maxHp": 9,
+          "name": "Cultist 2",
+          "notes": "Defeated",
+          "init": 7
+        }
+      ],
+      "currentRound": 5,
+      "minimized": true,
+      "name": "Cave Entrance Guards",
+      "state": "complete",
+      "treasure": "Coins: 18 GP, 40 SP\nEquipment: longsword, chain mail\nMap: crude drawing of camp layout"
+    },
+    {
+      "chapter": "Chapter 2: The Journey",
+      "combatants": [
+        {
+          "ac": 18,
+          "dmg": 18,
+          "heal": 12,
+          "hp": 32,
+          "id": "1",
+          "maxHp": 48,
+          "notes": "Hit by both Ettin heads",
+          "init": 13
+        },
+        {
+          "ac": 13,
+          "dmg": 16,
+          "hp": 21,
+          "id": "2",
+          "maxHp": 28,
+          "notes": "Used Counterspell",
+          "init": 17
+        },
+        {
+          "ac": 16,
+          "dmg": 18,
+          "hp": 24,
+          "id": "3",
+          "maxHp": 35,
+          "notes": "Multiple sneak attacks on Ettin",
+          "init": 21
+        },
+        {
+          "ac": 18,
+          "dmg": 16,
+          "heal": 31,
+          "hp": 40,
+          "id": "4",
+          "maxHp": 40,
+          "notes": "Cast Cure Wounds twice on Thorin",
+          "tempHp": 7,
+          "init": 14
+        },
+        {
+          "conditions": [
+            "Unconscious"
+          ],
+          "dmg": 37,
+          "maxHp": 68,
+          "name": "Ettin",
+          "notes": "Defeated after tough fight",
+          "init": 9
+        }
+      ],
+      "currentRound": 6,
+      "minimized": true,
+      "name": "Camp Perimeter",
+      "state": "complete",
+      "treasure": "Coins: 30 GP (from Ettin's bag)\nItems: 2 health potions\nEttin had various stolen items"
+    },
+    {
+      "chapter": "Chapter 2: The Journey",
+      "combatants": [
+        {
+          "ac": 18,
+          "dmg": 31,
+          "heal": 16,
+          "hp": 42,
+          "id": "1",
+          "maxHp": 48,
+          "notes": "Freed Leosin",
+          "init": 11
+        },
+        {
+          "ac": 13,
+          "dmg": 24,
+          "hp": 14,
+          "id": "2",
+          "maxHp": 28,
+          "notes": "Cast Shatter",
+          "init": 16
+        },
+        {
+          "ac": 16,
+          "dmg": 30,
+          "hp": 27,
+          "id": "3",
+          "maxHp": 35,
+          "notes": "Picked locks, sneak attacks",
+          "init": 20
+        },
+        {
+          "ac": 18,
+          "dmg": 20,
+          "heal": 24,
+          "hp": 40,
+          "id": "4",
+          "maxHp": 40,
+          "notes": "Healed party and Leosin",
+          "init": 13
+        },
+        {
+          "conditions": [
+            "Frightened"
+          ],
+          "dmg": 17,
+          "maxHp": 39,
+          "name": "Veteran 1",
+          "notes": "Defeated",
+          "init": 15
+        },
+        {
+          "conditions": [
+            "Unconscious"
+          ],
+          "dmg": 19,
+          "maxHp": 39,
+          "name": "Veteran 2",
+          "notes": "Defeated",
+          "init": 14
+        },
+        {
+          "dmg": 6,
+          "maxHp": 27,
+          "name": "Acolyte",
+          "notes": "Defeated",
+          "init": 12
+        }
+      ],
+      "currentRound": 4,
+      "minimized": true,
+      "name": "Prisoner Tent",
+      "state": "complete",
+      "treasure": "Coins: 22 GP, 50 SP\nKeys: ring of keys to prisoner cages\nLeosin's equipment returned"
+    },
+    {
+      "chapter": "Chapter 2: The Journey",
+      "combatants": [
+        {
+          "ac": 18,
+          "dmg": 23,
+          "hp": 26,
+          "id": "1",
+          "maxHp": 48,
+          "notes": "Taking heavy damage",
+          "init": 12
+        },
+        {
+          "ac": 13,
+          "concentrating": true,
+          "dmg": 14,
+          "hp": 20,
+          "id": "2",
+          "maxHp": 28,
+          "notes": "Concentrating on Haste",
+          "init": 18
+        },
+        {
+          "ac": 16,
+          "dmg": 18,
+          "hp": 15,
+          "id": "3",
+          "maxHp": 35,
+          "notes": "Badly wounded",
+          "init": 22
+        },
+        {
+          "ac": 18,
+          "dmg": 6,
+          "heal": 14,
+          "hp": 40,
+          "id": "4",
+          "maxHp": 40,
+          "notes": "Just healed Finn",
+          "tempHp": 6,
+          "init": 14
+        },
+        {
+          "dmg": 10,
+          "hp": 23,
+          "id": "16836-cult-fanatic",
+          "maxHp": 33,
+          "name": "Cult Fanatic 1",
+          "notes": "Casting spells",
+          "init": 16
+        },
+        {
+          "dmg": 12,
+          "hp": 21,
+          "id": "16836-cult-fanatic",
+          "maxHp": 33,
+          "name": "Cult Fanatic 2",
+          "notes": "Wounded",
+          "init": 15
+        },
+        {
+          "conditions": [
+            "Prone"
+          ],
+          "dmg": 14,
+          "maxHp": 39,
+          "name": "Guard Drake",
+          "notes": "Just defeated",
+          "init": 10
+        }
+      ],
+      "currentRound": 3,
+      "name": "Commander's Tent",
+      "state": "active",
+      "treasure": "No treasure generated yet. Click regenerate to generate treasure."
+    },
+    {
+      "chapter": "Chapter 2: The Journey",
+      "combatants": [
+        {
+          "ac": 18,
+          "hp": 48,
+          "id": "1",
+          "maxHp": 48,
+          "init": 13
         },
         {
           "ac": 13,
           "hp": 28,
+          "id": "2",
           "maxHp": 28,
-          "init": 18,
-          "id": "2"
+          "init": 17
         },
         {
           "ac": 16,
           "hp": 35,
+          "id": "3",
           "maxHp": 35,
-          "init": 22,
-          "id": "3"
+          "init": 21
         },
         {
           "ac": 18,
           "hp": 40,
+          "id": "4",
           "maxHp": 40,
-          "init": 12,
-          "id": "4"
-        },
-        {
-          "hp": 39,
-          "maxHp": 39,
-          "name": "Guard Drake 1",
-          "init": 11
-        },
-        {
-          "hp": 39,
-          "maxHp": 39,
-          "name": "Guard Drake 2",
-          "init": 10
-        },
-        {
-          "hp": 39,
-          "maxHp": 39,
-          "name": "Veteran",
           "init": 15
+        },
+        {
+          "hp": 39,
+          "maxHp": 39,
+          "name": "Veteran 1",
+          "init": 14
+        },
+        {
+          "hp": 39,
+          "maxHp": 39,
+          "name": "Veteran 2",
+          "init": 12
         },
         {
           "hp": 9,
           "maxHp": 9,
           "name": "Cultist 1",
-          "init": 8
+          "init": 9
         },
         {
           "hp": 9,
           "maxHp": 9,
           "name": "Cultist 2",
+          "init": 8
+        },
+        {
+          "hp": 9,
+          "maxHp": 9,
+          "name": "Cultist 3",
           "init": 7
+        },
+        {
+          "hp": 9,
+          "maxHp": 9,
+          "name": "Cultist 4",
+          "init": 6
         }
       ],
       "currentRound": 1,
-      "name": "Cave Entrance Guards",
+      "minimized": true,
+      "name": "Camp Escape",
       "state": "unstarted",
       "treasure": "No treasure generated yet. Click regenerate to generate treasure."
     },
@@ -259,40 +763,179 @@
         {
           "ac": 18,
           "hp": 48,
+          "id": "1",
           "maxHp": 48,
-          "init": 10,
-          "id": "1"
+          "init": 12
         },
         {
           "ac": 13,
           "hp": 28,
+          "id": "2",
           "maxHp": 28,
-          "init": 16,
-          "id": "2"
+          "init": 17
         },
         {
           "ac": 16,
           "hp": 35,
+          "id": "3",
           "maxHp": 35,
-          "init": 21,
-          "id": "3"
+          "init": 21
         },
         {
           "ac": 18,
           "hp": 40,
+          "id": "4",
           "maxHp": 40,
-          "init": 13,
-          "id": "4"
+          "init": 14
         },
         {
-          "hp": 157,
-          "maxHp": 157,
-          "name": "Young White Dragon",
-          "init": 12
+          "hp": 33,
+          "id": "16836-cult-fanatic",
+          "maxHp": 33,
+          "name": "Cult Fanatic 1",
+          "init": 15
+        },
+        {
+          "hp": 33,
+          "id": "16836-cult-fanatic",
+          "maxHp": 33,
+          "name": "Cult Fanatic 2",
+          "init": 13
+        },
+        {
+          "hp": 39,
+          "maxHp": 39,
+          "name": "Guard Drake 1",
+          "init": 10
+        },
+        {
+          "hp": 39,
+          "maxHp": 39,
+          "name": "Guard Drake 2",
+          "init": 9
         }
       ],
       "currentRound": 1,
-      "minimized": true,
+      "name": "Stronghold Entrance",
+      "state": "unstarted",
+      "treasure": "No treasure generated yet. Click regenerate to generate treasure."
+    },
+    {
+      "chapter": "Chapter 3: The Finale",
+      "combatants": [
+        {
+          "ac": 18,
+          "hp": 48,
+          "id": "1",
+          "maxHp": 48,
+          "init": 11
+        },
+        {
+          "ac": 13,
+          "hp": 28,
+          "id": "2",
+          "maxHp": 28,
+          "init": 16
+        },
+        {
+          "ac": 16,
+          "hp": 35,
+          "id": "3",
+          "maxHp": 35,
+          "init": 20
+        },
+        {
+          "ac": 18,
+          "hp": 40,
+          "id": "4",
+          "maxHp": 40,
+          "init": 13
+        },
+        {
+          "hp": 16,
+          "id": "17470-dragonclaw",
+          "maxHp": 16,
+          "name": "Dragonclaw 1",
+          "init": 15
+        },
+        {
+          "hp": 16,
+          "id": "17470-dragonclaw",
+          "maxHp": 16,
+          "name": "Dragonclaw 2",
+          "init": 14
+        },
+        {
+          "hp": 33,
+          "id": "21899-dragonwing",
+          "maxHp": 33,
+          "name": "Dragonwing",
+          "notes": "Flying spellcaster",
+          "init": 17
+        }
+      ],
+      "currentRound": 1,
+      "name": "Elite Guards",
+      "state": "unstarted",
+      "treasure": "No treasure generated yet. Click regenerate to generate treasure."
+    },
+    {
+      "chapter": "Chapter 3: The Finale",
+      "combatants": [
+        {
+          "ac": 18,
+          "hp": 48,
+          "id": "1",
+          "maxHp": 48,
+          "init": 10
+        },
+        {
+          "ac": 13,
+          "hp": 28,
+          "id": "2",
+          "maxHp": 28,
+          "init": 16
+        },
+        {
+          "ac": 16,
+          "hp": 35,
+          "id": "3",
+          "maxHp": 35,
+          "init": 21
+        },
+        {
+          "ac": 18,
+          "hp": 40,
+          "id": "4",
+          "maxHp": 40,
+          "init": 13
+        },
+        {
+          "hp": 123,
+          "id": "5195287-young-white-dragon",
+          "maxHp": 123,
+          "name": "Young White Dragon",
+          "notes": "Breath weapon ready",
+          "init": 12
+        },
+        {
+          "hp": 16,
+          "id": "17470-dragonclaw",
+          "maxHp": 16,
+          "name": "Dragonclaw Champion",
+          "notes": "Elite bodyguard",
+          "init": 14
+        },
+        {
+          "hp": 33,
+          "id": "16836-cult-fanatic",
+          "maxHp": 33,
+          "name": "Cult Fanatic",
+          "notes": "High Priest",
+          "init": 11
+        }
+      ],
+      "currentRound": 1,
       "name": "Boss: Young White Dragon",
       "state": "unstarted",
       "treasure": "No treasure generated yet. Click regenerate to generate treasure."

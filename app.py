@@ -33,17 +33,32 @@ if COOKIES_CACHE.exists():
 
 @app.route('/api/dndbeyond/set-cookies', methods=['POST'])
 def set_dndbeyond_cookies():
-    """Store D&D Beyond authentication cookies"""
+    """Store D&D Beyond authentication cookies - accepts multiple formats"""
     global DNDBEYOND_COOKIES
     data = request.json
-    DNDBEYOND_COOKIES = data.get('cookies', {})
+    cookies_input = data.get('cookies')
+    
+    # Auto-detect and convert cookie format
+    if isinstance(cookies_input, list):
+        # EditThisCookie format (array of cookie objects)
+        print(f"Detected EditThisCookie format ({len(cookies_input)} cookies)")
+        DNDBEYOND_COOKIES = {}
+        for cookie in cookies_input:
+            if isinstance(cookie, dict) and 'name' in cookie and 'value' in cookie:
+                DNDBEYOND_COOKIES[cookie['name']] = cookie['value']
+    elif isinstance(cookies_input, dict):
+        # Already in key-value format
+        print(f"Detected key-value format ({len(cookies_input)} cookies)")
+        DNDBEYOND_COOKIES = cookies_input
+    else:
+        return jsonify({"success": False, "error": "Invalid cookie format"})
     
     # Save to file
     with open(COOKIES_CACHE, 'w', encoding='utf-8') as f:
         json.dump(DNDBEYOND_COOKIES, f, indent=2)
     
     print(f"Stored {len(DNDBEYOND_COOKIES)} cookies and saved to cache")
-    return jsonify({"success": True})
+    return jsonify({"success": True, "count": len(DNDBEYOND_COOKIES)})
 
 @app.route('/api/dndbeyond/clear-cookies', methods=['POST'])
 def clear_dndbeyond_cookies():
@@ -662,27 +677,27 @@ def get_monster_details(monster_url):
                     print(f"Cache expired for {monster_id} (age: {cache_age/86400:.1f} days)")
         
         # Need to scrape
-        if not DNDBEYOND_COOKIES:
-            print("No cookies available for fetching monster details")
-            return jsonify({'success': False, 'error': 'No authentication cookies available'})
-        
-        print(f"Scraping monster page with {len(DNDBEYOND_COOKIES)} cookies...")
-        
         # Use a session to properly handle cookies and redirects
         session = requests.Session()
         
-        # Add all cookies to the session
-        for cookie_name, cookie_value in DNDBEYOND_COOKIES.items():
-            session.cookies.set(cookie_name, cookie_value, domain='.dndbeyond.com')
+        # Try to establish session like a browser: visit homepage first
+        print(f"Establishing session - visiting D&D Beyond homepage first...")
+        
+        # Add cookies if we have them
+        if DNDBEYOND_COOKIES:
+            for cookie_name, cookie_value in DNDBEYOND_COOKIES.items():
+                session.cookies.set(cookie_name, cookie_value, domain='.dndbeyond.com')
+            print(f"  Loaded {len(DNDBEYOND_COOKIES)} cookies from cache")
         
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate, br, zstd',
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache',
-            'Sec-Ch-Ua': '"Microsoft Edge";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
+            'Priority': 'u=0, i',
+            'Sec-Ch-Ua': '"Not(A:Brand";v="8", "Chromium";v="144", "Microsoft Edge";v="144"',
             'Sec-Ch-Ua-Mobile': '?0',
             'Sec-Ch-Ua-Platform': '"Windows"',
             'Sec-Fetch-Dest': 'document',
@@ -692,35 +707,39 @@ def get_monster_details(monster_url):
             'Upgrade-Insecure-Requests': '1'
         }
         
-        # Try to prevent redirect by setting allow_redirects=False first
-        response = session.get(monster_url, headers=headers, timeout=15, allow_redirects=False)
+        # Visit homepage first to establish session (like a browser would)
+        try:
+            homepage_response = session.get('https://www.dndbeyond.com/', headers=headers, timeout=10)
+            print(f"  Homepage: Status {homepage_response.status_code}")
+            print(f"  Session now has {len(session.cookies)} cookies")
+        except Exception as e:
+            print(f"  Warning: Homepage visit failed: {e}")
         
-        # If we get a redirect, try following it with our cookies
-        if response.status_code in [301, 302, 303, 307, 308]:
-            redirect_location = response.headers.get('Location', 'Unknown')
-            print(f"  Got redirect to: {redirect_location}")
-            print(f"  Attempting to follow redirect with authentication...")
-            
-            # If it's redirecting to marketplace, that's a hard fail
-            if 'marketplace' in redirect_location.lower():
-                error_msg = 'Monster requires purchase of Tyranny of Dragons adventure'
-                print(f"  ERROR: {error_msg}")
-                cache_data = {
-                    'url': monster_url,
-                    'data': {},
-                    'error': error_msg,
-                    'timestamp': time.time()
-                }
-                with open(cache_file, 'w') as f:
-                    json.dump(cache_data, f)
-                return jsonify({'success': False, 'error': error_msg})
-            
-            # Try following the redirect with cookies
-            response = session.get(redirect_location, headers=headers, timeout=15, allow_redirects=True)
+        # Update headers to include Referer (showing we came from D&D Beyond)
+        headers['Referer'] = 'https://www.dndbeyond.com/'
+        headers['Sec-Fetch-Site'] = 'same-origin'
+        
+        # Now try to fetch the monster page with the established session
+        print(f"\n{'='*80}")
+        print(f"FETCHING: {monster_url}")
+        print(f"Session cookies: {len(session.cookies)}")
+        print(f"{'='*80}")
+        
+        response = session.get(monster_url, headers=headers, timeout=15, allow_redirects=True)
+        
+        # Diagnostic output
+        print(f"  Status Code: {response.status_code}")
+        print(f"  Final URL: {response.url}")
+        print(f"  Content-Encoding: {response.headers.get('Content-Encoding', 'none')}")
+        print(f"  Content-Type: {response.headers.get('Content-Type', 'none')}")
+        print(f"  Content-Length: {len(response.content)} bytes")
+        
+        # Ensure content is decoded properly
+        response.encoding = response.apparent_encoding or 'utf-8'
         
         if response.status_code != 200:
             error_msg = f'HTTP {response.status_code}'
-            print(f"Failed to fetch monster page: {error_msg}")
+            print(f"  ❌ ERROR: {error_msg}")
             return jsonify({'success': False, 'error': error_msg})
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -729,15 +748,12 @@ def get_monster_details(monster_url):
         page_title = soup.find('title')
         if page_title:
             title_text = page_title.get_text().lower()
+            print(f"  Page Title: '{title_text}'")
             # Check for various error/redirect indicators
-            if 'shop' in title_text or 'marketplace' in title_text or 'category' in title_text:
+            if 'shop' in title_text or 'marketplace' in title_text:
                 error_msg = 'Monster page redirected to marketplace - may not be accessible'
-                print(f"  ERROR: {error_msg} (title: {title_text})")
-                # Save debug HTML
-                debug_file = CACHE_DIR / f"monster_debug_{monster_id}.html"
-                with open(debug_file, 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                print(f"  Saved debug HTML to {debug_file}")
+                print(f"  ❌ REDIRECT ERROR: {error_msg}")
+                print(f"  💡 This usually means cookies are expired or invalid")
                 # Save error to cache to avoid repeated attempts
                 cache_data = {
                     'url': monster_url,
@@ -747,7 +763,19 @@ def get_monster_details(monster_url):
                 }
                 with open(cache_file, 'w') as f:
                     json.dump(cache_data, f)
-                return jsonify({'success': False, 'error': error_msg})
+                return jsonify({'success': False, 'error': error_msg, 'auth_failed': True})
+        
+        # Check for main stat blocks to verify we got a valid monster page
+        stat_block_2014 = soup.find('div', class_='mon-stat-block')
+        stat_block_2024 = soup.find('div', class_='mon-stat-block-2024')
+        
+        if stat_block_2014:
+            print(f"  ✓ Found 2014 format stat block")
+        if stat_block_2024:
+            print(f"  ✓ Found 2024 format stat block")
+        
+        if not stat_block_2014 and not stat_block_2024:
+            print(f"  ⚠️  WARNING: No stat block found in page")
         
         details = {}
         
@@ -1110,7 +1138,19 @@ def get_monster_details(monster_url):
                 f.write(response.text)
             print(f"  Saved debug HTML to {debug_file}")
         
-        print(f"Extracted details: {details}")
+        # Log what was extracted
+        print(f"\n  EXTRACTED DATA:")
+        print(f"    AC: {details.get('ac', 'NOT FOUND')}")
+        print(f"    HP: {details.get('hp', 'NOT FOUND')}")
+        print(f"    Initiative: {details.get('initiativeModifier', 'NOT FOUND')}")
+        print(f"    Abilities: {'YES' if details.get('abilities') else 'NO'}")
+        print(f"    Actions: {len(details.get('actions', []))} found")
+        print(f"    Is Legacy: {details.get('isLegacy', False)}")
+        
+        if not details.get('ac') and not details.get('hp'):
+            print(f"  ⚠️  WARNING: No core stats extracted - data may be incomplete")
+        else:
+            print(f"  ✓ Successfully extracted monster stats")
         
         # Cache the details with timestamp in individual file
         cache_data = {
@@ -1121,7 +1161,8 @@ def get_monster_details(monster_url):
         with open(cache_file, 'w', encoding='utf-8') as f:
             json.dump(cache_data, f, indent=2)
         
-        print(f"Cached to {cache_file}")
+        print(f"  💾 Cached to {cache_file}")
+        print(f"{'='*80}\n")
         
         return jsonify({'success': True, 'details': details, 'cached': False})
     
@@ -1309,9 +1350,10 @@ def restore_adventure_from_storage(data):
                         combatant['initiative'] = combatant['init']
                         del combatant['init']
                     
+                    # Keep 'id' field for player lookup, also set dndBeyondUrl for display
                     if 'id' in combatant:
                         combatant['dndBeyondUrl'] = combatant['id']
-                        del combatant['id']
+                        # Keep 'id' for player combatant lookup
                     
                     # Provide combatant-level defaults
                     ensure_defaults(combatant, {

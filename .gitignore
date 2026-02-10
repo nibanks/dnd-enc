@@ -1,5 +1,6 @@
 # Cache directory
 .cache/
+.cache_backup/
 
 # Python
 __pycache__/

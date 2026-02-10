@@ -164,22 +164,32 @@
             </div>
             <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">\n                <p style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-weight: bold;">\n                    ⚠️ D&D Beyond authentication is REQUIRED for this app to function. Without cookies, you cannot create adventures or add monsters.\n                </p>
                 <h3>How to get your D&D Beyond cookies:</h3>
-                <ol style="line-height: 1.8; margin-bottom: 20px; padding-left: 20px;">
-                    <li>Open <a href="https://www.dndbeyond.com" target="_blank">dndbeyond.com</a> in your browser</li>
-                    <li><strong>Log in</strong> to your D&D Beyond account (must be logged in!)</li>
-                    <li>Press <strong>F12</strong> to open Developer Tools</li>
-                    <li>Go to the <strong>Console</strong> tab</li>
-                    <li>Copy and paste this command into the console:
-                        <pre style="background: #f5f5f5; padding: 10px; border-radius: 5px; margin: 10px 0; overflow-x: auto; font-family: monospace; user-select: all;">document.cookie</pre>
-                    </li>
-                    <li>Press <strong>Enter</strong> and copy the <strong>entire</strong> result (it will be a long string with multiple cookies separated by semicolons)</li>
-                    <li>Paste it in the text box below and click <strong>Save Cookies</strong></li>
-                    <li>If successful, you can now create adventures and add monsters!</li>
-                </ol>
-                <p style="background: #e3f2fd; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
-                    <strong>Note:</strong> This gets all authentication cookies needed to access D&D Beyond content. Monster details are fetched on-demand when you add them to encounters.
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                    <strong>📋 Method 1: EditThisCookie Extension (Easiest)</strong>
+                    <ol style="line-height: 1.8; margin-bottom: 0; padding-left: 20px;">
+                        <li>Install <a href="https://chrome.google.com/webstore/search/editthiscookie" target="_blank">EditThisCookie</a> extension</li>
+                        <li>Go to <a href="https://www.dndbeyond.com" target="_blank">D&D Beyond</a> and <strong>log in</strong></li>
+                        <li>Click the EditThisCookie icon in your browser toolbar</li>
+                        <li>Click the <strong>Export</strong> icon (document icon at bottom)</li>
+                        <li>Paste the JSON below and click Save Cookies</li>
+                    </ol>
+                </div>
+                
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                    <strong>🔧 Method 2: Browser Console</strong>
+                    <ol style="line-height: 1.8; margin-bottom: 0; padding-left: 20px;">
+                        <li>Go to <a href="https://www.dndbeyond.com" target="_blank">D&D Beyond</a> and <strong>log in</strong></li>
+                        <li>Press <strong>F12</strong> to open Developer Tools</li>
+                        <li>Go to <strong>Console</strong> tab</li>
+                        <li>Type: <code style="background: white; padding: 2px 5px; border-radius: 3px;">document.cookie</code> and press Enter</li>
+                        <li>Copy the result and paste below</li>
+                    </ol>
+                </div>
+                
+                <p style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 13px;">
+                    <strong>💡 Auto-Detection:</strong> Paste any format (EditThisCookie JSON, browser cookie string, or JSON object) - the app will detect and convert automatically!
                 </p>
-                <textarea id="cookieInput" placeholder="Paste your cookies here..." style="width: 100%; height: 150px; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-family: monospace; font-size: 12px;"></textarea>
+                <textarea id="cookieInput" placeholder="Paste cookies here (any format: EditThisCookie JSON array, browser cookie string, or JSON object)..." style="width: 100%; height: 180px; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-family: monospace; font-size: 12px;"></textarea>
                 <div style="margin-top: 20px;">
                     <button onclick="saveCookies()" style="background: #2ecc71; margin-right: 10px;">Save Cookies</button>
                     <button onclick="clearCookies()" style="background: #e74c3c;">Clear Cookies</button>

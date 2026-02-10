@@ -95,230 +95,6 @@ const CONDITION_ICONS = {
     'Hidden': '🫥'
 };
 
-// Expanded monster database (D&D 2024)
-const FALLBACK_MONSTERS = {
-    // CR 0
-    'Baboon': { cr: '0', ac: 12, hp: 3, url: 'https://www.dndbeyond.com/monsters/4775818-baboon' },
-    'Badger': { cr: '0', ac: 10, hp: 3, url: 'https://www.dndbeyond.com/monsters/4775819-badger' },
-    'Cat': { cr: '0', ac: 12, hp: 2, url: 'https://www.dndbeyond.com/monsters/4775828-cat' },
-    'Commoner': { cr: '0', ac: 10, hp: 4, url: 'https://www.dndbeyond.com/monsters/4775835-commoner' },
-    'Crab': { cr: '0', ac: 11, hp: 2, url: 'https://www.dndbeyond.com/monsters/4775837-crab' },
-    'Deer': { cr: '0', ac: 13, hp: 4, url: 'https://www.dndbeyond.com/monsters/4775840-deer' },
-    'Eagle': { cr: '0', ac: 12, hp: 3, url: 'https://www.dndbeyond.com/monsters/4775844-eagle' },
-    'Frog': { cr: '0', ac: 11, hp: 1, url: 'https://www.dndbeyond.com/monsters/4775850-frog' },
-    'Goat': { cr: '0', ac: 10, hp: 4, url: 'https://www.dndbeyond.com/monsters/4775855-goat' },
-    'Hyena': { cr: '0', ac: 11, hp: 5, url: 'https://www.dndbeyond.com/monsters/4775868-hyena' },
-    'Jackal': { cr: '0', ac: 12, hp: 3, url: 'https://www.dndbeyond.com/monsters/4775869-jackal' },
-    'Rat': { cr: '0', ac: 10, hp: 1, url: 'https://www.dndbeyond.com/monsters/4775917-rat' },
-    'Raven': { cr: '0', ac: 12, hp: 1, url: 'https://www.dndbeyond.com/monsters/4775918-raven' },
-    'Spider': { cr: '0', ac: 12, hp: 1, url: 'https://www.dndbeyond.com/monsters/4775934-spider' },
-    
-    // CR 1/8
-    'Bandit': { cr: '1/8', ac: 12, hp: 11, url: 'https://www.dndbeyond.com/monsters/4775821-bandit' },
-    'Cultist': { cr: '1/8', ac: 12, hp: 9, url: 'https://www.dndbeyond.com/monsters/16835-cultist' },
-    'Flying Snake': { cr: '1/8', ac: 14, hp: 5, url: 'https://www.dndbeyond.com/monsters/4775849-flying-snake' },
-    'Giant Crab': { cr: '1/8', ac: 15, hp: 13, url: 'https://www.dndbeyond.com/monsters/4775852-giant-crab' },
-    'Giant Rat': { cr: '1/8', ac: 12, hp: 7, url: 'https://www.dndbeyond.com/monsters/4775859-giant-rat' },
-    'Giant Weasel': { cr: '1/8', ac: 13, hp: 9, url: 'https://www.dndbeyond.com/monsters/4775862-giant-weasel' },
-    'Guard': { cr: '1/8', ac: 16, hp: 11, url: 'https://www.dndbeyond.com/monsters/4775866-guard' },
-    'Kobold': { cr: '1/8', ac: 12, hp: 5, url: 'https://www.dndbeyond.com/monsters/4775879-kobold' },
-    'Mastiff': { cr: '1/8', ac: 12, hp: 5, url: 'https://www.dndbeyond.com/monsters/4775893-mastiff' },
-    'Mule': { cr: '1/8', ac: 10, hp: 11, url: 'https://www.dndbeyond.com/monsters/4775897-mule' },
-    'Poisonous Snake': { cr: '1/8', ac: 13, hp: 2, url: 'https://www.dndbeyond.com/monsters/4775912-poisonous-snake' },
-    'Stirge': { cr: '1/8', ac: 14, hp: 2, url: 'https://www.dndbeyond.com/monsters/4775937-stirge' },
-    'Tribal Warrior': { cr: '1/8', ac: 12, hp: 11, url: 'https://www.dndbeyond.com/monsters/4775944-tribal-warrior' },
-    
-    // CR 1/4
-    'Acolyte': { cr: '1/4', ac: 10, hp: 9, url: 'https://www.dndbeyond.com/monsters/4775812-acolyte' },
-    'Axe Beak': { cr: '1/4', ac: 11, hp: 19, url: 'https://www.dndbeyond.com/monsters/4775817-axe-beak' },
-    'Blink Dog': { cr: '1/4', ac: 13, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775824-blink-dog' },
-    'Boar': { cr: '1/4', ac: 11, hp: 11, url: 'https://www.dndbeyond.com/monsters/4775825-boar' },
-    'Constrictor Snake': { cr: '1/4', ac: 12, hp: 13, url: 'https://www.dndbeyond.com/monsters/4775836-constrictor-snake' },
-    'Dretchling': { cr: '1/4', ac: 11, hp: 18, url: 'https://www.dndbeyond.com/monsters/4775842-dretchling' },
-    'Elk': { cr: '1/4', ac: 10, hp: 13, url: 'https://www.dndbeyond.com/monsters/4775846-elk' },
-    'Giant Bat': { cr: '1/4', ac: 13, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775850-giant-bat' },
-    'Giant Frog': { cr: '1/4', ac: 11, hp: 18, url: 'https://www.dndbeyond.com/monsters/4775851-giant-frog' },
-    'Giant Lizard': { cr: '1/4', ac: 12, hp: 19, url: 'https://www.dndbeyond.com/monsters/4775855-giant-lizard' },
-    'Giant Owl': { cr: '1/4', ac: 12, hp: 19, url: 'https://www.dndbeyond.com/monsters/4775857-giant-owl' },
-    'Giant Poisonous Snake': { cr: '1/4', ac: 14, hp: 11, url: 'https://www.dndbeyond.com/monsters/4775858-giant-poisonous-snake' },
-    'Giant Wolf Spider': { cr: '1/4', ac: 13, hp: 11, url: 'https://www.dndbeyond.com/monsters/4775863-giant-wolf-spider' },
-    'Goblin': { cr: '1/4', ac: 15, hp: 7, url: 'https://www.dndbeyond.com/monsters/4775864-goblin' },
-    'Panther': { cr: '1/4', ac: 12, hp: 13, url: 'https://www.dndbeyond.com/monsters/4775909-panther' },
-    'Pteranodon': { cr: '1/4', ac: 13, hp: 13, url: 'https://www.dndbeyond.com/monsters/4775914-pteranodon' },
-    'Riding Horse': { cr: '1/4', ac: 10, hp: 13, url: 'https://www.dndbeyond.com/monsters/4775919-riding-horse' },
-    'Skeleton': { cr: '1/4', ac: 13, hp: 13, url: 'https://www.dndbeyond.com/monsters/4775927-skeleton' },
-    'Swarm of Bats': { cr: '1/4', ac: 12, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775938-swarm-of-bats' },
-    'Swarm of Rats': { cr: '1/4', ac: 10, hp: 24, url: 'https://www.dndbeyond.com/monsters/4775940-swarm-of-rats' },
-    'Velociraptor': { cr: '1/4', ac: 13, hp: 10, url: 'https://www.dndbeyond.com/monsters/4775947-velociraptor' },
-    'Wolf': { cr: '1/4', ac: 13, hp: 11, url: 'https://www.dndbeyond.com/monsters/4775951-wolf' },
-    'Zombie': { cr: '1/4', ac: 8, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775952-zombie' },
-    
-    // CR 1/2
-    'Ape': { cr: '1/2', ac: 12, hp: 19, url: 'https://www.dndbeyond.com/monsters/4775813-ape' },
-    'Black Bear': { cr: '1/2', ac: 11, hp: 19, url: 'https://www.dndbeyond.com/monsters/4775823-black-bear' },
-    'Crocodile': { cr: '1/2', ac: 12, hp: 19, url: 'https://www.dndbeyond.com/monsters/4775838-crocodile' },
-    'Giant Goat': { cr: '1/2', ac: 11, hp: 19, url: 'https://www.dndbeyond.com/monsters/4775853-giant-goat' },
-    'Giant Sea Horse': { cr: '1/2', ac: 13, hp: 16, url: 'https://www.dndbeyond.com/monsters/4775860-giant-sea-horse' },
-    'Giant Wasp': { cr: '1/2', ac: 12, hp: 13, url: 'https://www.dndbeyond.com/monsters/4775861-giant-wasp' },
-    'Gnoll': { cr: '1/2', ac: 15, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775862-gnoll' },
-    'Hobgoblin': { cr: '1/2', ac: 18, hp: 11, url: 'https://www.dndbeyond.com/monsters/4775867-hobgoblin' },
-    'Lizardfolk': { cr: '1/2', ac: 15, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775888-lizardfolk' },
-    'Orc': { cr: '1/2', ac: 13, hp: 15, url: 'https://www.dndbeyond.com/monsters/4775905-orc' },
-    'Reef Shark': { cr: '1/2', ac: 12, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775918-reef-shark' },
-    'Rust Monster': { cr: '1/2', ac: 14, hp: 27, url: 'https://www.dndbeyond.com/monsters/4775920-rust-monster' },
-    'Satyr': { cr: '1/2', ac: 14, hp: 31, url: 'https://www.dndbeyond.com/monsters/4775922-satyr' },
-    'Scout': { cr: '1/2', ac: 13, hp: 16, url: 'https://www.dndbeyond.com/monsters/4775923-scout' },
-    'Shadow': { cr: '1/2', ac: 12, hp: 16, url: 'https://www.dndbeyond.com/monsters/4775925-shadow' },
-    'Swarm of Insects': { cr: '1/2', ac: 12, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775939-swarm-of-insects' },
-    'Thug': { cr: '1/2', ac: 11, hp: 32, url: 'https://www.dndbeyond.com/monsters/4775943-thug' },
-    'Warhorse': { cr: '1/2', ac: 11, hp: 19, url: 'https://www.dndbeyond.com/monsters/4775949-warhorse' },
-    'Worg': { cr: '1/2', ac: 13, hp: 26, url: 'https://www.dndbeyond.com/monsters/4775952-worg' },
-    
-    // CR 1
-    'Animated Armor': { cr: '1', ac: 18, hp: 33, url: 'https://www.dndbeyond.com/monsters/4775812-animated-armor' },
-    'Brown Bear': { cr: '1', ac: 11, hp: 34, url: 'https://www.dndbeyond.com/monsters/4775826-brown-bear' },
-    'Bugbear': { cr: '1', ac: 16, hp: 27, url: 'https://www.dndbeyond.com/monsters/4775827-bugbear' },
-    'Death Dog': { cr: '1', ac: 12, hp: 39, url: 'https://www.dndbeyond.com/monsters/4775839-death-dog' },
-    'Dire Wolf': { cr: '1', ac: 14, hp: 37, url: 'https://www.dndbeyond.com/monsters/4775841-dire-wolf' },
-    'Dryad': { cr: '1', ac: 11, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775843-dryad' },
-    'Ghoul': { cr: '1', ac: 12, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775863-ghoul' },
-    'Giant Eagle': { cr: '1', ac: 13, hp: 26, url: 'https://www.dndbeyond.com/monsters/4775845-giant-eagle' },
-    'Giant Hyena': { cr: '1', ac: 12, hp: 45, url: 'https://www.dndbeyond.com/monsters/4775854-giant-hyena' },
-    'Giant Octopus': { cr: '1', ac: 11, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775856-giant-octopus' },
-    'Giant Spider': { cr: '1', ac: 14, hp: 26, url: 'https://www.dndbeyond.com/monsters/4775862-giant-spider' },
-    'Giant Toad': { cr: '1', ac: 11, hp: 39, url: 'https://www.dndbeyond.com/monsters/4775862-giant-toad' },
-    'Giant Vulture': { cr: '1', ac: 10, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775863-giant-vulture' },
-    'Harpy': { cr: '1', ac: 11, hp: 38, url: 'https://www.dndbeyond.com/monsters/4775866-harpy' },
-    'Hippogriff': { cr: '1', ac: 11, hp: 19, url: 'https://www.dndbeyond.com/monsters/4775867-hippogriff' },
-    'Imp': { cr: '1', ac: 13, hp: 10, url: 'https://www.dndbeyond.com/monsters/4775868-imp' },
-    'Lion': { cr: '1', ac: 12, hp: 26, url: 'https://www.dndbeyond.com/monsters/4775887-lion' },
-    'Quasit': { cr: '1', ac: 13, hp: 7, url: 'https://www.dndbeyond.com/monsters/4775915-quasit' },
-    'Specter': { cr: '1', ac: 12, hp: 22, url: 'https://www.dndbeyond.com/monsters/4775933-specter' },
-    'Spy': { cr: '1', ac: 12, hp: 27, url: 'https://www.dndbeyond.com/monsters/4775935-spy' },
-    'Tiger': { cr: '1', ac: 12, hp: 37, url: 'https://www.dndbeyond.com/monsters/4775942-tiger' },
-    
-    // CR 2
-    'Ankheg': { cr: '2', ac: 14, hp: 39, url: 'https://www.dndbeyond.com/monsters/4775813-ankheg' },
-    'Bandit Captain': { cr: '2', ac: 15, hp: 65, url: 'https://www.dndbeyond.com/monsters/4775820-bandit-captain' },
-    'Berserker': { cr: '2', ac: 13, hp: 67, url: 'https://www.dndbeyond.com/monsters/4775822-berserker' },
-    'Black Dragon Wyrmling': { cr: '2', ac: 17, hp: 33, url: 'https://www.dndbeyond.com/monsters/4775824-black-dragon-wyrmling' },
-    'Cult Fanatic': { cr: '2', ac: 13, hp: 33, url: 'https://www.dndbeyond.com/monsters/4775838-cult-fanatic' },
-    'Druid': { cr: '2', ac: 11, hp: 27, url: 'https://www.dndbeyond.com/monsters/4775843-druid' },
-    'Ettercap': { cr: '2', ac: 13, hp: 44, url: 'https://www.dndbeyond.com/monsters/4775845-ettercap' },
-    'Gargoyle': { cr: '2', ac: 15, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775862-gargoyle' },
-    'Gelatinous Cube': { cr: '2', ac: 6, hp: 84, url: 'https://www.dndbeyond.com/monsters/4775862-gelatinous-cube' },
-    'Ghast': { cr: '2', ac: 13, hp: 36, url: 'https://www.dndbeyond.com/monsters/4775862-ghast' },
-    'Giant Boar': { cr: '2', ac: 12, hp: 42, url: 'https://www.dndbeyond.com/monsters/4775851-giant-boar' },
-    'Giant Constrictor Snake': { cr: '2', ac: 12, hp: 60, url: 'https://www.dndbeyond.com/monsters/4775852-giant-constrictor-snake' },
-    'Giant Elk': { cr: '2', ac: 14, hp: 42, url: 'https://www.dndbeyond.com/monsters/4775854-giant-elk' },
-    'Griffon': { cr: '2', ac: 12, hp: 59, url: 'https://www.dndbeyond.com/monsters/4775865-griffon' },
-    'Hunter Shark': { cr: '2', ac: 12, hp: 45, url: 'https://www.dndbeyond.com/monsters/4775867-hunter-shark' },
-    'Mimic': { cr: '2', ac: 12, hp: 58, url: 'https://www.dndbeyond.com/monsters/4775896-mimic' },
-    'Ogre': { cr: '2', ac: 11, hp: 59, url: 'https://www.dndbeyond.com/monsters/4775902-ogre' },
-    'Ogre Zombie': { cr: '2', ac: 8, hp: 85, url: 'https://www.dndbeyond.com/monsters/4775904-ogre-zombie' },
-    'Polar Bear': { cr: '2', ac: 12, hp: 42, url: 'https://www.dndbeyond.com/monsters/4775913-polar-bear' },
-    'Priest': { cr: '2', ac: 13, hp: 27, url: 'https://www.dndbeyond.com/monsters/4775914-priest' },
-    'Rhinoceros': { cr: '2', ac: 11, hp: 45, url: 'https://www.dndbeyond.com/monsters/4775919-rhinoceros' },
-    'Saber-Toothed Tiger': { cr: '2', ac: 12, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775921-saber-toothed-tiger' },
-    'Sea Hag': { cr: '2', ac: 14, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775924-sea-hag' },
-    
-    // CR 3
-    'Ankylosaurus': { cr: '3', ac: 15, hp: 68, url: 'https://www.dndbeyond.com/monsters/4775813-ankylosaurus' },
-    'Basilisk': { cr: '3', ac: 12, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775821-basilisk' },
-    'Bearded Devil': { cr: '3', ac: 13, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775822-bearded-devil' },
-    'Blue Dragon Wyrmling': { cr: '3', ac: 17, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775825-blue-dragon-wyrmling' },
-    'Displacer Beast': { cr: '3', ac: 13, hp: 85, url: 'https://www.dndbeyond.com/monsters/4775842-displacer-beast' },
-    'Doppelganger': { cr: '3', ac: 14, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775843-doppelganger' },
-    'Giant Scorpion': { cr: '3', ac: 15, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775860-giant-scorpion' },
-    'Green Hag': { cr: '3', ac: 17, hp: 82, url: 'https://www.dndbeyond.com/monsters/4775864-green-hag' },
-    'Hell Hound': { cr: '3', ac: 15, hp: 45, url: 'https://www.dndbeyond.com/monsters/4775867-hell-hound' },
-    'Killer Whale': { cr: '3', ac: 12, hp: 90, url: 'https://www.dndbeyond.com/monsters/4775878-killer-whale' },
-    'Knight': { cr: '3', ac: 18, hp: 52, url: 'https://www.dndbeyond.com/monsters/4775882-knight' },
-    'Manticore': { cr: '3', ac: 14, hp: 68, url: 'https://www.dndbeyond.com/monsters/4775891-manticore' },
-    'Minotaur': { cr: '3', ac: 14, hp: 76, url: 'https://www.dndbeyond.com/monsters/4775897-minotaur' },
-    'Mummy': { cr: '3', ac: 11, hp: 58, url: 'https://www.dndbeyond.com/monsters/4775898-mummy' },
-    'Owlbear': { cr: '3', ac: 13, hp: 59, url: 'https://www.dndbeyond.com/monsters/4775907-owlbear' },
-    'Phase Spider': { cr: '3', ac: 13, hp: 32, url: 'https://www.dndbeyond.com/monsters/4775910-phase-spider' },
-    'Veteran': { cr: '3', ac: 17, hp: 58, url: 'https://www.dndbeyond.com/monsters/4775948-veteran' },
-    'Werewolf': { cr: '3', ac: 11, hp: 58, url: 'https://www.dndbeyond.com/monsters/4775950-werewolf' },
-    'Wight': { cr: '3', ac: 14, hp: 45, url: 'https://www.dndbeyond.com/monsters/4775950-wight' },
-    'Winter Wolf': { cr: '3', ac: 13, hp: 75, url: 'https://www.dndbeyond.com/monsters/4775951-winter-wolf' },
-    'Yeti': { cr: '3', ac: 12, hp: 51, url: 'https://www.dndbeyond.com/monsters/4775952-yeti' },
-    
-    // CR 4
-    'Banshee': { cr: '4', ac: 12, hp: 58, url: 'https://www.dndbeyond.com/monsters/4775820-banshee' },
-    'Black Pudding': { cr: '4', ac: 7, hp: 85, url: 'https://www.dndbeyond.com/monsters/4775824-black-pudding' },
-    'Cloaker': { cr: '4', ac: 14, hp: 78, url: 'https://www.dndbeyond.com/monsters/4775834-cloaker' },
-    'Couatl': { cr: '4', ac: 19, hp: 97, url: 'https://www.dndbeyond.com/monsters/4775837-couatl' },
-    'Elephant': { cr: '4', ac: 12, hp: 76, url: 'https://www.dndbeyond.com/monsters/4775846-elephant' },
-    'Ettin': { cr: '4', ac: 12, hp: 85, url: 'https://www.dndbeyond.com/monsters/4775845-ettin' },
-    'Flameskull': { cr: '4', ac: 13, hp: 40, url: 'https://www.dndbeyond.com/monsters/4775848-flameskull' },
-    'Ghost': { cr: '4', ac: 11, hp: 45, url: 'https://www.dndbeyond.com/monsters/4775862-ghost' },
-    'Helmed Horror': { cr: '4', ac: 20, hp: 60, url: 'https://www.dndbeyond.com/monsters/4775867-helmed-horror' },
-    'Succubus/Incubus': { cr: '4', ac: 15, hp: 66, url: 'https://www.dndbeyond.com/monsters/4775937-succubus-incubus' },
-    'Wereboar': { cr: '4', ac: 10, hp: 78, url: 'https://www.dndbeyond.com/monsters/4775949-wereboar' },
-    'Weretiger': { cr: '4', ac: 12, hp: 120, url: 'https://www.dndbeyond.com/monsters/4775950-weretiger' },
-    
-    // CR 5
-    'Air Elemental': { cr: '5', ac: 15, hp: 90, url: 'https://www.dndbeyond.com/monsters/4775812-air-elemental' },
-    'Bulette': { cr: '5', ac: 17, hp: 94, url: 'https://www.dndbeyond.com/monsters/4775827-bulette' },
-    'Earth Elemental': { cr: '5', ac: 17, hp: 126, url: 'https://www.dndbeyond.com/monsters/4775844-earth-elemental' },
-    'Fire Elemental': { cr: '5', ac: 13, hp: 102, url: 'https://www.dndbeyond.com/monsters/4775847-fire-elemental' },
-    'Flesh Golem': { cr: '5', ac: 9, hp: 93, url: 'https://www.dndbeyond.com/monsters/4775848-flesh-golem' },
-    'Giant Crocodile': { cr: '5', ac: 14, hp: 85, url: 'https://www.dndbeyond.com/monsters/4775852-giant-crocodile' },
-    'Giant Shark': { cr: '5', ac: 13, hp: 126, url: 'https://www.dndbeyond.com/monsters/4775861-giant-shark' },
-    'Gladiator': { cr: '5', ac: 16, hp: 112, url: 'https://www.dndbeyond.com/monsters/4775863-gladiator' },
-    'Gorgon': { cr: '5', ac: 19, hp: 114, url: 'https://www.dndbeyond.com/monsters/4775864-gorgon' },
-    'Hill Giant': { cr: '5', ac: 13, hp: 105, url: 'https://www.dndbeyond.com/monsters/4775867-hill-giant' },
-    'Night Hag': { cr: '5', ac: 17, hp: 112, url: 'https://www.dndbeyond.com/monsters/4775901-night-hag' },
-    'Otyugh': { cr: '5', ac: 14, hp: 114, url: 'https://www.dndbeyond.com/monsters/4775906-otyugh' },
-    'Red Slaad': { cr: '5', ac: 14, hp: 93, url: 'https://www.dndbeyond.com/monsters/4775918-red-slaad' },
-    'Roper': { cr: '5', ac: 20, hp: 93, url: 'https://www.dndbeyond.com/monsters/4775920-roper' },
-    'Salamander': { cr: '5', ac: 15, hp: 90, url: 'https://www.dndbeyond.com/monsters/4775921-salamander' },
-    'Shambling Mound': { cr: '5', ac: 15, hp: 136, url: 'https://www.dndbeyond.com/monsters/4775926-shambling-mound' },
-    'Triceratops': { cr: '5', ac: 13, hp: 95, url: 'https://www.dndbeyond.com/monsters/4775944-triceratops' },
-    'Troll': { cr: '5', ac: 15, hp: 84, url: 'https://www.dndbeyond.com/monsters/4775945-troll' },
-    'Unicorn': { cr: '5', ac: 12, hp: 67, url: 'https://www.dndbeyond.com/monsters/4775946-unicorn' },
-    'Vampire Spawn': { cr: '5', ac: 15, hp: 82, url: 'https://www.dndbeyond.com/monsters/4775947-vampire-spawn' },
-    'Water Elemental': { cr: '5', ac: 14, hp: 114, url: 'https://www.dndbeyond.com/monsters/4775949-water-elemental' },
-    'Wraith': { cr: '5', ac: 13, hp: 67, url: 'https://www.dndbeyond.com/monsters/4775952-wraith' },
-    'Xorn': { cr: '5', ac: 19, hp: 73, url: 'https://www.dndbeyond.com/monsters/4775952-xorn' },
-    
-    // CR 6-10
-    'Cyclops': { cr: '6', ac: 14, hp: 138, url: 'https://www.dndbeyond.com/monsters/4775839-cyclops' },
-    'Mage': { cr: '6', ac: 12, hp: 40, url: 'https://www.dndbeyond.com/monsters/4775889-mage' },
-    'Medusa': { cr: '6', ac: 15, hp: 127, url: 'https://www.dndbeyond.com/monsters/4775895-medusa' },
-    'Wyvern': { cr: '6', ac: 13, hp: 110, url: 'https://www.dndbeyond.com/monsters/4775952-wyvern' },
-    'Stone Giant': { cr: '7', ac: 17, hp: 126, url: 'https://www.dndbeyond.com/monsters/4775936-stone-giant' },
-    'Young Black Dragon': { cr: '7', ac: 18, hp: 127, url: 'https://www.dndbeyond.com/monsters/4775952-young-black-dragon' },
-    'Assassin': { cr: '8', ac: 15, hp: 78, url: 'https://www.dndbeyond.com/monsters/4775816-assassin' },
-    'Frost Giant': { cr: '8', ac: 15, hp: 138, url: 'https://www.dndbeyond.com/monsters/4775850-frost-giant' },
-    'Hydra': { cr: '8', ac: 15, hp: 172, url: 'https://www.dndbeyond.com/monsters/4775868-hydra' },
-    'Young Blue Dragon': { cr: '9', ac: 18, hp: 152, url: 'https://www.dndbeyond.com/monsters/4775952-young-blue-dragon' },
-    'Fire Giant': { cr: '9', ac: 18, hp: 162, url: 'https://www.dndbeyond.com/monsters/4775847-fire-giant' },
-    'Young Red Dragon': { cr: '10', ac: 18, hp: 178, url: 'https://www.dndbeyond.com/monsters/4775952-young-red-dragon' },
-    'Aboleth': { cr: '10', ac: 17, hp: 135, url: 'https://www.dndbeyond.com/monsters/4775811-aboleth' },
-    
-    // CR 11-15
-    'Behir': { cr: '11', ac: 17, hp: 168, url: 'https://www.dndbeyond.com/monsters/4775822-behir' },
-    'Horned Devil': { cr: '11', ac: 18, hp: 178, url: 'https://www.dndbeyond.com/monsters/4775867-horned-devil' },
-    'Archmage': { cr: '12', ac: 12, hp: 99, url: 'https://www.dndbeyond.com/monsters/4775814-archmage' },
-    'Efreeti': { cr: '11', ac: 17, hp: 200, url: 'https://www.dndbeyond.com/monsters/4775845-efreeti' },
-    'Beholder': { cr: '13', ac: 18, hp: 180, url: 'https://www.dndbeyond.com/monsters/4775822-beholder' },
-    'Adult Black Dragon': { cr: '14', ac: 19, hp: 195, url: 'https://www.dndbeyond.com/monsters/4775811-adult-black-dragon' },
-    'Adult Blue Dragon': { cr: '16', ac: 19, hp: 225, url: 'https://www.dndbeyond.com/monsters/4775812-adult-blue-dragon' },
-    'Iron Golem': { cr: '16', ac: 20, hp: 210, url: 'https://www.dndbeyond.com/monsters/4775871-iron-golem' },
-    
-    // CR 17+
-    'Adult Red Dragon': { cr: '17', ac: 19, hp: 256, url: 'https://www.dndbeyond.com/monsters/4775813-adult-red-dragon' },
-    'Dragon Turtle': { cr: '17', ac: 20, hp: 341, url: 'https://www.dndbeyond.com/monsters/4775843-dragon-turtle' },
-    'Ancient Black Dragon': { cr: '21', ac: 22, hp: 367, url: 'https://www.dndbeyond.com/monsters/4775811-ancient-black-dragon' },
-    'Lich': { cr: '21', ac: 17, hp: 135, url: 'https://www.dndbeyond.com/monsters/4775886-lich' },
-    'Ancient Blue Dragon': { cr: '23', ac: 22, hp: 481, url: 'https://www.dndbeyond.com/monsters/4775812-ancient-blue-dragon' },
-    'Ancient Red Dragon': { cr: '24', ac: 22, hp: 546, url: 'https://www.dndbeyond.com/monsters/4775813-ancient-red-dragon' },
-    'Tarrasque': { cr: '30', ac: 25, hp: 676, url: 'https://www.dndbeyond.com/monsters/4775941-tarrasque' }
-};
-
 // Load monsters from D&D Beyond
 async function loadMonsters() {
     if (monstersLoaded) return true;
@@ -345,10 +121,11 @@ async function loadMonsters() {
         console.warn('Could not load from D&D Beyond, using fallback library:', error);
         // Use fallback monsters
         DND_MONSTERS = FALLBACK_MONSTERS;
-        monstersLoaded = true;
-        console.log(`✓ Loaded ${Object.keys(DND_MONSTERS).length} monsters from fallback library`);
+        monsterserror('Failed to load monsters from D&D Beyond:', error);
+        DND_MONSTERS = {};
+        monstersLoaded = false;
         updateAuthButton(false);
-        return true;
+        return false;
     }
 }
 
@@ -660,50 +437,25 @@ function renderCRChart() {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     
-    // Calculate total CR for each encounter
+    // Calculate total CR for each encounter using the proper calculation
     const encounterData = [];
     
     currentAdventure.encounters.forEach((encounter, index) => {
-        if (!encounter.combatants) return;
+        const crString = calculateEncounterCR(encounter);
+        let crValue = 0;
         
-        let totalCR = 0;
-        let encounterName = encounter.name || `Encounter ${index + 1}`;
-        
-        // Sum up CR values from all monsters (non-players)
-        encounter.combatants.forEach(combatant => {
-            if (isPlayerCombatant(combatant)) return;
-            
-            // Try to get CR from combatant first, then look up in monster list
-            let cr = combatant.cr || '';
-            
-            // If no CR stored, try looking up from monster database
-            if (!cr) {
-                // Extract base monster name (remove numbering like "Cultist 1" -> "Cultist")
-                const baseName = combatant.name.replace(/\s+\d+$/, '');
-                const monster = DND_MONSTERS[baseName];
-                cr = monster?.cr || '0';
-            }
-            
-            // Convert CR to numeric value
-            let crValue = 0;
-            if (typeof cr === 'string') {
-                // Handle fractional CRs like "1/8", "1/4", "1/2"
-                if (cr.includes('/')) {
-                    const parts = cr.split('/');
-                    crValue = parseInt(parts[0]) / parseInt(parts[1]);
-                } else {
-                    crValue = parseFloat(cr) || 0;
-                }
-            } else {
-                crValue = cr || 0;
-            }
-            totalCR += crValue;
-        });
+        // Convert CR string to numeric value for chart
+        if (crString.includes('/')) {
+            const parts = crString.split('/');
+            crValue = parseInt(parts[0]) / parseInt(parts[1]);
+        } else {
+            crValue = parseFloat(crString) || 0;
+        }
         
         encounterData.push({
             x: index + 1,
-            y: totalCR,
-            label: encounterName,
+            y: crValue,
+            label: encounter.name || `Encounter ${index + 1}`,
             state: encounter.state
         });
     });
@@ -822,12 +574,12 @@ function renderDamageChart() {
             return;
         }
         
-        // Calculate total damage dealt by enemies (sum of dmg field for all monsters/NPCs)
+        // Calculate total damage dealt by enemies (sum of dmg field for monsters/NPCs)
         let totalEnemyDamage = 0;
         encounter.combatants.forEach(combatant => {
-            if (isPlayerCombatant(combatant)) return;
-            
-            totalEnemyDamage += combatant.dmg || 0;
+            if (!isPlayerCombatant(combatant)) {
+                totalEnemyDamage += combatant.dmg || 0;
+            }
         });
         
         totalEnemyDamageData.push({ x: index + 1, y: totalEnemyDamage });
@@ -888,12 +640,12 @@ function renderDamageChart() {
         // Calculate total actual damage (maxHp - currentHp for all monsters)
         let totalDamage = 0;
         encounter.combatants.forEach(combatant => {
-            if (isPlayerCombatant(combatant)) return;
-            
-            const maxHp = combatant.maxHp || 0;
-            const currentHp = combatant.hp || 0;
-            const damageTaken = Math.max(0, maxHp - currentHp);
-            totalDamage += damageTaken;
+            if (!isPlayerCombatant(combatant)) {
+                const maxHp = combatant.maxHp || 0;
+                const currentHp = combatant.hp || 0;
+                const damageTaken = Math.max(0, maxHp - currentHp);
+                totalDamage += damageTaken;
+            }
         });
         
         // Calculate total tracked player damage
@@ -1297,17 +1049,26 @@ async function saveCookies() {
         return;
     }
     
-    // Parse cookie string into object
-    const cookies = {};
-    cookieString.split(';').forEach(cookie => {
-        const [name, ...value] = cookie.trim().split('=');
-        if (name) {
-            cookies[name] = value.join('=');
-        }
-    });
+    let cookies;
+    
+    // Try to parse as JSON first (EditThisCookie format or key-value object)
+    try {
+        cookies = JSON.parse(cookieString);
+        console.log('Parsed as JSON:', Array.isArray(cookies) ? 'EditThisCookie array format' : 'Key-value object format');
+    } catch (e) {
+        // Not JSON - try to parse as browser cookie string (name1=value1; name2=value2)
+        console.log('Not JSON, parsing as browser cookie string');
+        cookies = {};
+        cookieString.split(';').forEach(cookie => {
+            const [name, ...value] = cookie.trim().split('=');
+            if (name) {
+                cookies[name] = value.join('=');
+            }
+        });
+    }
     
     try {
-        // Send cookies to backend
+        // Send cookies to backend (backend will auto-detect format)
         const response = await fetch('/api/dndbeyond/set-cookies', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1317,7 +1078,7 @@ async function saveCookies() {
         const result = await response.json();
         
         if (result.success) {
-            showCookieStatus(`✓ Cookies saved! You can now create adventures and add monsters.`, 'success');
+            showCookieStatus(`✓ Saved ${result.count} cookies! You can now use D&D Beyond features.`, 'success');
             // Update cookie status and UI
             await checkCookieStatus();
         } else {
@@ -1359,6 +1120,50 @@ function showCookieStatus(message, type) {
     
     statusDiv.style.background = colors[type] || colors.info;
     statusDiv.style.color = '#333';
+}
+
+function showCookieExpirationWarning(monsterName) {
+    // Only show warning once per session to avoid spam
+    if (window.cookieWarningShown) return;
+    window.cookieWarningShown = true;
+    
+    // Create notification banner
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ff6b6b;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        max-width: 500px;
+        text-align: center;
+        font-size: 14px;
+    `;
+    banner.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 8px;">🔒 Authentication Failed</div>
+        <div style="margin-bottom: 12px;">Unable to load "${monsterName}" from D&D Beyond. Your cookies may be expired.</div>
+        <button onclick="document.getElementById('settingsBtn').click(); this.parentElement.remove(); window.cookieWarningShown = false;" 
+                style="background: white; color: #ff6b6b; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            Update Cookies
+        </button>
+        <button onclick="this.parentElement.remove()" 
+                style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 8px;">
+            Dismiss
+        </button>
+    `;
+    document.body.appendChild(banner);
+    
+    // Auto-dismiss after 15 seconds
+    setTimeout(() => {
+        if (banner.parentElement) {
+            banner.remove();
+        }
+    }, 15000);
 }
 
 // Show toast notification (for monster fetch feedback)
@@ -2050,10 +1855,13 @@ function isPlayerCombatant(combatant) {
 // Get combatant display name (look up from players if needed)
 function getCombatantName(combatant) {
     if (isPlayerCombatant(combatant)) {
-        // Look up player name from URL
-        if (combatant.dndBeyondUrl) {
-            const charId = combatant.dndBeyondUrl.split('/').pop();
-            const player = currentAdventure.players?.find(p => p.dndBeyondUrl && p.dndBeyondUrl.includes(charId));
+        // Look up player name by id field (which matches dndBeyondUrl)
+        if (combatant.id) {
+            const player = currentAdventure?.players?.find(p => {
+                // Handle both full URL and just ID formats
+                const playerId = p.dndBeyondUrl?.split('/').pop() || p.dndBeyondUrl;
+                return playerId === combatant.id;
+            });
             if (player) {
                 return player.name;
             }
@@ -2152,56 +1960,115 @@ function renderEncounters() {
 function calculateEncounterXP(encounter) {
     if (!encounter.combatants) return 0;
     
-    const totalXP = encounter.combatants
-        .filter(combatant => !isPlayerCombatant(combatant))
-        .reduce((sum, combatant) => {
-            // Try to get CR from combatant first, then look up in monster list
-            let cr = combatant.cr || '';
-            
-            // If no CR stored, try looking up from monster database
-            if (!cr) {
-                // Extract base monster name (remove numbering like "Cultist 1" -> "Cultist")
-                const baseName = combatant.name.replace(/\s+\d+$/, '');
-                const monster = DND_MONSTERS[baseName];
-                cr = monster?.cr || '';
-            }
-            
-            const xp = CR_TO_XP[cr] || 0;
-            return sum + xp;
-        }, 0);
+    const monsters = encounter.combatants.filter(combatant => !isPlayerCombatant(combatant));
     
-    return totalXP.toLocaleString();
+    const totalXP = monsters.reduce((sum, combatant) => {
+        // Try to get CR from combatant first, then look up in monster list
+        let cr = combatant.cr || '';
+        
+        // If no CR stored, try looking up from monster database
+        if (!cr) {
+            // Extract base monster name (remove numbering like "Cultist 1" -> "Cultist")
+            const baseName = combatant.name.replace(/\s+\d+$/, '');
+            const monster = DND_MONSTERS[baseName];
+            cr = monster?.cr || '';
+            
+            // If still no CR and we have a D&D Beyond URL, extract monster ID and look up
+            if (!cr && (combatant.dndBeyondUrl || combatant.id)) {
+                const url = combatant.dndBeyondUrl || combatant.id;
+                const monsterIdMatch = url.match(/(\d+)-([^\/]+)$/);
+                if (monsterIdMatch) {
+                    const monsterName = monsterIdMatch[2].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    const foundMonster = DND_MONSTERS[monsterName];
+                    if (foundMonster) {
+                        cr = foundMonster.cr || '';
+                    }
+                }
+            }
+        }
+        
+        const xp = CR_TO_XP[cr] || 0;
+        return sum + xp;
+    }, 0);
+    
+    // Apply multiplier based on number of monsters (D&D 5e rules)
+    const monsterCount = monsters.length;
+    let multiplier = 1;
+    if (monsterCount === 0) multiplier = 1;
+    else if (monsterCount === 1) multiplier = 1;
+    else if (monsterCount === 2) multiplier = 1.5;
+    else if (monsterCount >= 3 && monsterCount <= 6) multiplier = 2;
+    else if (monsterCount >= 7 && monsterCount <= 10) multiplier = 2.5;
+    else if (monsterCount >= 11 && monsterCount <= 14) multiplier = 3;
+    else multiplier = 4;
+    
+    const adjustedXP = Math.round(totalXP * multiplier);
+    return adjustedXP.toLocaleString();
 }
 
 function calculateEncounterCR(encounter) {
     if (!encounter.combatants) return '0';
     
-    const totalCR = encounter.combatants
-        .filter(combatant => !isPlayerCombatant(combatant))
-        .reduce((sum, combatant) => {
-            // Try to get CR from combatant first, then look up in monster list
-            let cr = combatant.cr || '';
-            
-            // If no CR stored, try looking up from monster database
-            if (!cr) {
-                // Extract base monster name (remove numbering like "Cultist 1" -> "Cultist")
-                const baseName = combatant.name.replace(/\s+\d+$/, '');
-                const monster = DND_MONSTERS[baseName];
-                cr = monster?.cr || '0';
-            }
-            
-            // Convert CR to numeric value
-            if (cr === '1/8') return sum + 0.125;
-            else if (cr === '1/4') return sum + 0.25;
-            else if (cr === '1/2') return sum + 0.5;
-            else return sum + (parseFloat(cr) || 0);
-        }, 0);
+    const monsters = encounter.combatants.filter(combatant => !isPlayerCombatant(combatant));
     
-    // Format the total CR nicely
-    if (totalCR === 0) return '0';
-    if (totalCR < 1) return totalCR.toFixed(2).replace(/\.?0+$/, ''); // Remove trailing zeros
-    if (totalCR % 1 === 0) return totalCR.toString(); // Whole number
-    return totalCR.toFixed(1); // One decimal place
+    // Calculate total base XP
+    const totalXP = monsters.reduce((sum, combatant) => {
+        let cr = combatant.cr || '';
+        
+        if (!cr) {
+            const baseName = combatant.name.replace(/\s+\d+$/, '');
+            const monster = DND_MONSTERS[baseName];
+            cr = monster?.cr || '';
+            
+            // If still no CR and we have a D&D Beyond URL, extract monster ID and look up
+            if (!cr && (combatant.dndBeyondUrl || combatant.id)) {
+                const url = combatant.dndBeyondUrl || combatant.id;
+                const monsterIdMatch = url.match(/(\d+)-([^\/]+)$/);
+                if (monsterIdMatch) {
+                    const monsterName = monsterIdMatch[2].split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    const foundMonster = DND_MONSTERS[monsterName];
+                    if (foundMonster) {
+                        cr = foundMonster.cr || '';
+                    }
+                }
+            }
+        }
+        
+        const xp = CR_TO_XP[cr] || 0;
+        return sum + xp;
+    }, 0);
+    
+    // Apply multiplier based on number of monsters (D&D 5e rules)
+    const monsterCount = monsters.length;
+    let multiplier = 1;
+    if (monsterCount === 0) multiplier = 1;
+    else if (monsterCount === 1) multiplier = 1;
+    else if (monsterCount === 2) multiplier = 1.5;
+    else if (monsterCount >= 3 && monsterCount <= 6) multiplier = 2;
+    else if (monsterCount >= 7 && monsterCount <= 10) multiplier = 2.5;
+    else if (monsterCount >= 11 && monsterCount <= 14) multiplier = 3;
+    else multiplier = 4;
+    
+    const adjustedXP = Math.round(totalXP * multiplier);
+    
+    // Convert adjusted XP back to equivalent CR
+    const xpToCR = [
+        [10, '0'], [25, '1/8'], [50, '1/4'], [100, '1/2'],
+        [200, '1'], [450, '2'], [700, '3'], [1100, '4'], [1800, '5'],
+        [2300, '6'], [2900, '7'], [3900, '8'], [5000, '9'], [5900, '10'],
+        [7200, '11'], [8400, '12'], [10000, '13'], [11500, '14'], [13000, '15'],
+        [15000, '16'], [18000, '17'], [20000, '18'], [22000, '19'], [25000, '20'],
+        [33000, '21'], [41000, '22'], [50000, '23'], [62000, '24'], [75000, '25'],
+        [90000, '26'], [105000, '27'], [120000, '28'], [135000, '29'], [155000, '30']
+    ];
+    
+    for (let i = xpToCR.length - 1; i >= 0; i--) {
+        if (adjustedXP >= xpToCR[i][0]) {
+            return xpToCR[i][1];
+        }
+    }
+    
+    return '0';
 }
 
 // Create encounter card
@@ -2321,6 +2188,10 @@ function createEncounterCard(encounter, encounterIndex) {
         const row = tbody.insertRow();
         const isPlayer = isPlayerCombatant(combatant);
         
+        if (isPlayer) {
+
+        }
+        
         // Get combatant name
         const combatantName = getCombatantName(combatant);
         
@@ -2333,9 +2204,13 @@ function createEncounterCard(encounter, encounterIndex) {
         let dndBeyondUrl = combatant.dndBeyondUrl || '';
         
         if (isPlayer) {
-            // Look up player details from players array
-            const charId = combatant.dndBeyondUrl.split('/').pop();
-            const player = currentAdventure.players?.find(p => p.dndBeyondUrl && p.dndBeyondUrl.includes(charId));
+            // Look up player details from players array using id field
+            const player = currentAdventure.players?.find(p => {
+                // Handle both full URL and just ID formats
+                const playerId = p.dndBeyondUrl?.split('/').pop() || p.dndBeyondUrl;
+                return playerId === combatant.id;
+            });
+
             if (player) {
                 ac = player.ac || 10;
                 dndBeyondUrl = player.dndBeyondUrl || '';
@@ -2354,6 +2229,15 @@ function createEncounterCard(encounter, encounterIndex) {
                 }
                 if (!combatant.dndBeyondUrl) {
                     dndBeyondUrl = monster.url || '';
+                }
+            }
+            
+            // If still no CR but we have a D&D Beyond URL/ID, try to fetch from cached details
+            if (!cr && (combatant.dndBeyondUrl || combatant.id)) {
+                const monsterUrl = combatant.dndBeyondUrl || combatant.id;
+                if (monsterUrl && monsterUrl.includes('dndbeyond.com')) {
+                    // Try to get CR from server-side cache asynchronously
+                    fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex);
                 }
             }
         }
@@ -2763,6 +2647,12 @@ async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterName) {
         
         if (!data.success) {
             console.error(`Failed to fetch monster details: ${data.error}`);
+            
+            // Check if this is an authentication failure (expired cookies)
+            if (data.auth_failed) {
+                showCookieExpirationWarning(monsterName);
+            }
+            
             showToast(`Failed to fetch ${monsterName} details: ${data.error}`, 'error', 5000);
             return;
         }
@@ -2795,6 +2685,10 @@ async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterName) {
                 if (details.hp && combatant.maxHp === 0) {
                     combatant.maxHp = details.hp;
                     combatant.hp = details.hp;  // Set current HP to max
+                }
+                // Always update CR if available from D&D Beyond (more accurate than monster list)
+                if (details.cr) {
+                    combatant.cr = details.cr;
                 }
                 updated++;
             }
@@ -2837,6 +2731,33 @@ async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterName) {
         showToast(`Error fetching ${monsterName} details: ${error.message}`, 'error', 5000);
     }
 }
+
+// Fetch CR from cached monster data
+async function fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex) {
+    try {
+        const encodedUrl = encodeURIComponent(monsterUrl);
+        const response = await fetch(`/api/dndbeyond/monster/${encodedUrl}`);
+        
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        
+        if (data.success && data.details && data.details.cr) {
+            // Update the combatant's CR
+            const encounter = currentAdventure.encounters[encounterIndex];
+            if (encounter && encounter.combatants[combatantIndex]) {
+                encounter.combatants[combatantIndex].cr = data.details.cr;
+                // Only re-render and save if we actually updated something
+                renderEncounters();
+                autoSave();
+            }
+        }
+    } catch (error) {
+        // Silently fail - this is just for backfilling missing CRs
+        console.log(`Could not fetch CR for ${monsterUrl}:`, error.message);
+    }
+}
+
 
 // Helper to parse CR for sorting
 function parseCR(cr) {
@@ -2915,6 +2836,7 @@ function refreshPlayers(encounterIndex) {
     // Add all players from the Players section
     currentAdventure.players.forEach(player => {
         encounter.combatants.push({
+            id: player.dndBeyondUrl, // Store player ID for lookup
             initiative: 0,
             hp: player.maxHp || 0,
             maxHp: player.maxHp || 0,
@@ -3735,7 +3657,7 @@ function showMonsterTooltip(entityName, entityUrl, event) {
     // Determine if this is a character or monster
     const isCharacter = isLocalPlayer || isCharacterUrl(entityUrl);
     const entityType = isCharacter ? 'character' : 'monster';
-    console.log('Entity type:', entityType, 'URL:', entityUrl, 'isLocalPlayer:', isLocalPlayer);
+    
     
     // First, try to find the entity in our current encounters or players (it's already loaded)
     let cachedDetails = null;
@@ -3817,13 +3739,16 @@ function showMonsterTooltip(entityName, entityUrl, event) {
             
             // Check if there was an error
             if (!data.success || data.error) {
+                // Check for authentication failure
+                if (data.auth_failed) {
+                    showCookieExpirationWarning(entityName);
+                }
+                
                 if (isCharacter) {
                     // For characters, fall back to local player data if available
-                    console.log('Character API failed, checking for local player data...');
                     if (currentAdventure && currentAdventure.players) {
                         for (const player of currentAdventure.players) {
                             if (player.name === entityName || (player.dndBeyondUrl && player.dndBeyondUrl === entityUrl)) {
-                                console.log('Found local player data:', player);
                                 renderTooltipContent(tooltip, entityName, player, true);
                                 return;
                             }
