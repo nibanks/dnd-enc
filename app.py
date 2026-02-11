@@ -7,8 +7,14 @@ from functools import lru_cache
 import time
 from bs4 import BeautifulSoup
 import re
+import logging
 
 app = Flask(__name__)
+
+# Suppress Flask auto-refresh logging for spectator view
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
 DATA_DIR = Path("adventures")
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -1176,6 +1182,116 @@ def get_monster_details(monster_url):
 def index():
     return render_template('index.html')
 
+@app.route('/spectator')
+def spectator():
+    """Spectator view for players to watch combat"""
+    return render_template('spectator.html')
+
+@app.route('/api/current-encounter')
+def get_current_encounter():
+    """Get the current active encounter state for spectator view"""
+    # Find the most recently modified adventure file
+    adventure_files = list(DATA_DIR.glob("*.json"))
+    if not adventure_files:
+        return jsonify({'active': False, 'message': 'No adventures found'})
+    
+    # Get the most recently modified adventure
+    latest_adventure = max(adventure_files, key=lambda f: f.stat().st_mtime)
+    
+    with open(latest_adventure, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # Find active or most recent encounter
+    active_encounter = None
+    active_index = -1
+    
+    for idx, encounter in enumerate(data.get('encounters', [])):
+        if encounter.get('state') == 'started':
+            active_encounter = encounter
+            active_index = idx
+            break
+    
+    if not active_encounter:
+        return jsonify({'active': False, 'message': 'No active encounter'})
+    
+    # Restore full URLs
+    data = restore_adventure_from_storage(data)
+    active_encounter = data['encounters'][active_index]
+    
+    # Enrich combatants with player character names
+    # Extract just the character ID from the full URL for dictionary keys
+    players_dict = {}
+    for p in data.get('players', []):
+        url = p.get('dndBeyondUrl', '')
+        # Extract ID from URL like 'https://www.dndbeyond.com/characters/159889233'
+        if '/characters/' in url:
+            char_id = url.split('/characters/')[-1]
+            players_dict[char_id] = p
+        elif url.isdigit():
+            # Already just an ID
+            players_dict[url] = p
+    
+    enriched_combatants = []
+    
+    for combatant in active_encounter.get('combatants', []):
+        combatant_copy = combatant.copy()
+        # If combatant is a player (has numeric ID), add character name and initiative bonus
+        if combatant.get('id'):
+            combatant_id = str(combatant['id'])
+            if combatant_id.isdigit():
+                player = players_dict.get(combatant_id)
+                if player:
+                    combatant_copy['playerCharacterName'] = player.get('name', f"Player {combatant_id}")
+                    combatant_copy['initiativeBonus'] = player.get('initiativeBonus', 0)
+        # For monsters, get initiative modifier from their cached data
+        if combatant_copy.get('dndBeyondUrl'):
+            url = combatant_copy['dndBeyondUrl']
+            if '/monsters/' in url:
+                monster_id = url.split('/monsters/')[-1]
+                cache_file = MONSTER_DETAILS_DIR / f"{monster_id}.json"
+                if cache_file.exists():
+                    with open(cache_file, 'r', encoding='utf-8') as f:
+                        cached = json.load(f)
+                        monster_data = cached.get('data', {})
+                        # Try initiativeModifier first, then dex modifier
+                        init_mod = monster_data.get('initiativeModifier')
+                        if init_mod is None:
+                            abilities = monster_data.get('abilities', {})
+                            dex = abilities.get('dex', {})
+                            init_mod = dex.get('modifier', 0)
+                        if init_mod is not None:
+                            combatant_copy['initiativeBonus'] = init_mod
+        enriched_combatants.append(combatant_copy)
+    
+    # Return encounter data
+    return jsonify({
+        'active': True,
+        'name': active_encounter.get('name', 'Combat'),
+        'round': active_encounter.get('currentRound', 1),
+        'state': active_encounter.get('state'),
+        'activeCombatant': active_encounter.get('activeCombatant', ''),
+        'combatants': enriched_combatants,
+        'adventureName': data.get('name', 'Adventure')
+    })
+
+@app.route('/api/server-info')
+def get_server_info():
+    """Get server IP address for spectator URL"""
+    import socket
+    try:
+        # Get local IP address
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        ip = "localhost"
+    
+    return jsonify({
+        'ip': ip,
+        'port': request.environ.get('SERVER_PORT', '5000')
+    })
+
 @app.route('/api/adventures', methods=['GET'])
 def list_adventures():
     """List all adventure files"""
@@ -1448,4 +1564,10 @@ def create_adventure():
     return jsonify({"success": True})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    print("="*50)
+    print("D&D Encounter Tracker Server")
+    print("="*50)
+    print(f"Starting server on port 5000...")
+    print(f"Listening on all network interfaces (0.0.0.0)")
+    print()
+    app.run(debug=True, port=5000, host='0.0.0.0')

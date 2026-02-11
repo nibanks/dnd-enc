@@ -11,6 +11,7 @@ let encounterEditMode = {}; // Track edit mode for completed encounters by index
 let initiativeChart = null; // Chart instance for initiative distribution
 let crChart = null; // Chart instance for CR over time
 let damageChart = null; // Chart instance for damage dealt per encounter
+let cachedSpectatorUrl = null; // Cached spectator URL to prevent flashing
 
 // D&D 5e/2024 Classes
 const DND_CLASSES = [
@@ -1877,8 +1878,12 @@ let draggedEncounterIndex = null;
 let dropTargetIndex = null;
 
 function handleDragStart(e) {
-    draggedEncounterIndex = parseInt(e.currentTarget.dataset.encounterIndex);
-    e.currentTarget.style.opacity = '0.4';
+    // Get the encounter card (parent of header)
+    const card = e.currentTarget.closest('.encounter-card');
+    if (card) {
+        draggedEncounterIndex = parseInt(card.dataset.encounterIndex);
+        card.style.opacity = '0.4';
+    }
     e.dataTransfer.effectAllowed = 'move';
 }
 
@@ -1898,10 +1903,14 @@ function handleDrop(e) {
         e.preventDefault();
     }
     
-    const targetIndex = parseInt(e.currentTarget.dataset.encounterIndex);
-    
-    if (draggedEncounterIndex !== null && draggedEncounterIndex !== targetIndex) {
-        dropTargetIndex = targetIndex;
+    // Get the encounter card
+    const card = e.currentTarget.closest('.encounter-card') || e.currentTarget;
+    if (card && card.dataset.encounterIndex) {
+        const targetIndex = parseInt(card.dataset.encounterIndex);
+        
+        if (draggedEncounterIndex !== null && draggedEncounterIndex !== targetIndex) {
+            dropTargetIndex = targetIndex;
+        }
     }
     
     return false;
@@ -1919,8 +1928,12 @@ function handleDragEnd(e) {
         
         // Re-render immediately
         renderEncounters();
-    } else if (e.currentTarget) {
-        e.currentTarget.style.opacity = '1';
+    } else {
+        // Restore opacity on the card
+        const card = e.currentTarget.closest('.encounter-card');
+        if (card) {
+            card.style.opacity = '1';
+        }
     }
     
     draggedEncounterIndex = null;
@@ -1953,6 +1966,11 @@ function renderEncounters() {
         }
         
         container.appendChild(card);
+        
+        // Update spectator URL for active encounters
+        if (encounter.state === 'started') {
+            updateSpectatorUrl(index);
+        }
     });
 }
 
@@ -1967,7 +1985,7 @@ function calculateEncounterXP(encounter) {
         let cr = combatant.cr || '';
         
         // If no CR stored, try looking up from monster database
-        if (!cr) {
+        if (!cr && combatant.name) {
             // Extract base monster name (remove numbering like "Cultist 1" -> "Cultist")
             const baseName = combatant.name.replace(/\s+\d+$/, '');
             const monster = DND_MONSTERS[baseName];
@@ -2015,7 +2033,7 @@ function calculateEncounterCR(encounter) {
     const totalXP = monsters.reduce((sum, combatant) => {
         let cr = combatant.cr || '';
         
-        if (!cr) {
+        if (!cr && combatant.name) {
             const baseName = combatant.name.replace(/\s+\d+$/, '');
             const monster = DND_MONSTERS[baseName];
             cr = monster?.cr || '';
@@ -2075,17 +2093,21 @@ function calculateEncounterCR(encounter) {
 function createEncounterCard(encounter, encounterIndex) {
     const card = document.createElement('div');
     card.className = 'encounter-card';
-    card.draggable = true;
     card.dataset.encounterIndex = encounterIndex;
-    
-    // Drag and drop event handlers
-    card.addEventListener('dragstart', handleDragStart);
-    card.addEventListener('dragover', handleDragOver);
-    card.addEventListener('drop', handleDrop);
-    card.addEventListener('dragend', handleDragEnd);
     
     const header = document.createElement('div');
     header.className = 'encounter-header';
+    
+    // Make header draggable
+    header.draggable = true;
+    header.addEventListener('dragstart', handleDragStart);
+    header.addEventListener('dragover', handleDragOver);
+    header.addEventListener('drop', handleDrop);
+    header.addEventListener('dragend', handleDragEnd);
+    
+    // Also need dragover/drop on card for proper drop zones
+    card.addEventListener('dragover', handleDragOver);
+    card.addEventListener('drop', handleDrop);
     
     // Determine which buttons to show based on encounter state
     let encounterButtons = '';
@@ -2124,6 +2146,11 @@ function createEncounterCard(encounter, encounterIndex) {
                         <span class="encounter-title" style="font-size: 20px; font-weight: 600; width: 280px; max-width: 280px;">${encounter.name || 'New Encounter'}</span>
                     `}
                     <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap; margin-left: 10px;">CR: ${calculateEncounterCR(encounter)} | XP: ${calculateEncounterXP(encounter)}</span>
+                    ${encounter.state === 'started' ? `
+                        <span id="spectatorUrlContainer-${encounterIndex}" style="${cachedSpectatorUrl ? '' : 'display: none;'} color: #2e7d32; font-size: 14px; white-space: nowrap; margin-left: 25px;">
+                            📺 <span id="spectatorUrl-${encounterIndex}" style="font-family: monospace; color: #1976d2; user-select: all; cursor: pointer;" onclick="copySpectatorUrl(${encounterIndex})" title="Click to copy">${cachedSpectatorUrl || ''}</span>
+                        </span>
+                    ` : ''}
                 </div>
                 <div class="encounter-controls">
                     ${!encounter.minimized ? `
@@ -2215,7 +2242,7 @@ function createEncounterCard(encounter, encounterIndex) {
                 ac = player.ac || 10;
                 dndBeyondUrl = player.dndBeyondUrl || '';
             }
-        } else {
+        } else if (combatant.name) {
             // Look up monster details from DND_MONSTERS (only if not already saved on combatant)
             const baseName = combatant.name.split(' ')[0]; // Get base name (e.g., "Cultist" from "Cultist 2")
             const monster = DND_MONSTERS[baseName];
@@ -2390,14 +2417,19 @@ function createEncounterCard(encounter, encounterIndex) {
 // Add encounter
 function addEncounter() {
     // Auto-populate with players
-    const combatants = currentAdventure.players.map(player => ({
-        initiative: 0,
-        hp: player.maxHp || 0,
-        maxHp: player.maxHp || 0,
-        ac: player.ac || 10,
-        notes: '',
-        dndBeyondUrl: player.dndBeyondUrl || ''
-    }));
+    const combatants = currentAdventure.players.map(player => {
+        // Extract player ID from dndBeyondUrl
+        const playerId = player.dndBeyondUrl?.split('/').pop() || player.dndBeyondUrl || '';
+        return {
+            id: playerId,
+            initiative: 0,
+            hp: player.maxHp || 0,
+            maxHp: player.maxHp || 0,
+            ac: player.ac || 10,
+            notes: '',
+            dndBeyondUrl: player.dndBeyondUrl || ''
+        };
+    });
     
     const newEncounterIndex = currentAdventure.encounters.length;
     
@@ -2548,11 +2580,16 @@ function renderMonsterList(searchTerm) {
 
 // Select monster and add to encounter
 function selectMonster(monsterName) {
+    console.log('selectMonster called with:', monsterName);
     const monster = DND_MONSTERS[monsterName];
     if (!monster) {
-        console.error('Monster not found:', monsterName);
+        console.error('Monster not found in DND_MONSTERS:', monsterName);
+        console.log('Available monsters:', Object.keys(DND_MONSTERS).slice(0, 10));
+        alert(`Monster "${monsterName}" not found in monster library.`);
         return;
     }
+    
+    console.log('Monster found:', monster);
     
     // Validate we have a valid encounter selected
     if (!currentAdventure || !currentAdventure.encounters || currentEncounterIndex === null || !currentAdventure.encounters[currentEncounterIndex]) {
@@ -2581,6 +2618,9 @@ function selectMonster(monsterName) {
     
     // Check for existing monsters with this name
     existingCombatants.forEach(combatant => {
+        // Skip player combatants (they don't have a name field)
+        if (!combatant.name) return;
+        
         // Check if name matches pattern "MonsterName" or "MonsterName N"
         if (combatant.name === monsterName) {
             maxNumber = Math.max(maxNumber, 1);
@@ -2673,6 +2713,9 @@ async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterName) {
         
         let updated = 0;
         encounter.combatants.forEach(combatant => {
+            // Skip player combatants (they don't have a name field)
+            if (!combatant.name) return;
+            
             // Check if this is a monster we just added (name matches or is numbered version)
             const isMatch = combatant.name === monsterName || 
                            combatant.name.startsWith(monsterName + ' ');
@@ -2712,6 +2755,9 @@ async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterName) {
         // Roll initiative for newly added monsters if we have the modifier
         if (details.initiativeModifier !== undefined) {
             encounter.combatants.forEach(combatant => {
+                // Skip player combatants (they don't have a name field)
+                if (!combatant.name) return;
+                
                 const isMatch = combatant.name === monsterName || 
                                combatant.name.startsWith(monsterName + ' ');
                 
@@ -3145,7 +3191,19 @@ function updateTreasure(encounterIndex, value) {
 // Start encounter - sort by initiative and mark as started
 function startEncounter(encounterIndex) {
     const encounter = currentAdventure.encounters[encounterIndex];
-    encounter.combatants.sort((a, b) => (b.initiative || 0) - (a.initiative || 0));
+    encounter.combatants.sort((a, b) => {
+        const initA = a.initiative || 0;
+        const initB = b.initiative || 0;
+        
+        // If initiative is the same, use initiative bonus as tiebreaker
+        if (initA === initB) {
+            const bonusA = a.initiativeBonus || 0;
+            const bonusB = b.initiativeBonus || 0;
+            return bonusB - bonusA;
+        }
+        
+        return initB - initA;
+    });
     encounter.state = 'started';
     encounter.currentTurn = 0;
     encounter.currentRound = 1;
@@ -3157,6 +3215,66 @@ function startEncounter(encounterIndex) {
     
     renderEncounters();
     autoSave();
+    
+    // Fetch and display spectator URL
+    updateSpectatorUrl(encounterIndex);
+}
+
+// Fetch server info and update spectator URL display
+async function updateSpectatorUrl(encounterIndex) {
+    // If we already have the URL cached, use it immediately
+    if (cachedSpectatorUrl) {
+        const urlElement = document.getElementById(`spectatorUrl-${encounterIndex}`);
+        const containerElement = document.getElementById(`spectatorUrlContainer-${encounterIndex}`);
+        if (urlElement) {
+            urlElement.textContent = cachedSpectatorUrl;
+            urlElement.dataset.url = cachedSpectatorUrl;
+            if (containerElement) {
+                containerElement.style.display = '';
+            }
+        }
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/server-info');
+        const data = await response.json();
+        const url = `http://${data.ip}:${data.port}/spectator`;
+        cachedSpectatorUrl = url; // Cache for future use
+        
+        const urlElement = document.getElementById(`spectatorUrl-${encounterIndex}`);
+        const containerElement = document.getElementById(`spectatorUrlContainer-${encounterIndex}`);
+        if (urlElement) {
+            urlElement.textContent = url;
+            urlElement.dataset.url = url;
+            // Show the container now that we have the URL
+            if (containerElement) {
+                containerElement.style.display = '';
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching server info:', error);
+    }
+}
+
+// Copy spectator URL to clipboard
+function copySpectatorUrl(encounterIndex) {
+    const urlElement = document.getElementById(`spectatorUrl-${encounterIndex}`);
+    if (urlElement && urlElement.dataset.url) {
+        navigator.clipboard.writeText(urlElement.dataset.url).then(() => {
+            // Visual feedback
+            const originalText = urlElement.textContent;
+            urlElement.textContent = '✓ Copied!';
+            urlElement.style.color = '#4caf50';
+            setTimeout(() => {
+                urlElement.textContent = originalText;
+                urlElement.style.color = '#1976d2';
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Failed to copy URL. Please copy manually: ' + urlElement.dataset.url);
+        });
+    }
 }
 
 // End encounter - mark as not started
@@ -3677,7 +3795,7 @@ function showMonsterTooltip(entityName, entityUrl, event) {
         for (const encounter of currentAdventure.encounters) {
             if (encounter.combatants) {
                 for (const combatant of encounter.combatants) {
-                    if (combatant.name === entityName && combatant.dndBeyondUrl === entityUrl) {
+                    if (combatant.name && combatant.name === entityName && combatant.dndBeyondUrl === entityUrl) {
                         cachedDetails = combatant;
                         break;
                     }

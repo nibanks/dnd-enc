@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Combat Spectator View</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .round-indicator {
+            font-size: 1.5em;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: rgba(46, 204, 113, 0.3);
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .initiative-list {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .combatant {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 5px solid #2ecc71;
+            transition: all 0.3s ease;
+            color: #2c3e50;
+        }
+
+        .combatant.active {
+            background: linear-gradient(135deg, #a8e6cf 0%, #56ab91 100%);
+            border-left-color: #27ae60;
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
+            transform: scale(1.02);
+        }
+
+        .combatant.unconscious {
+            opacity: 0.5;
+            border-left-color: #e74c3c;
+        }
+
+        /* HP status classes - must come after player/active to override */
+        .combatant.hp-healthy {
+            border-left-color: #2ecc71 !important;
+        }
+
+        .combatant.hp-wounded {
+            border-left-color: #f39c12 !important;
+        }
+
+        .combatant.hp-critical {
+            border-left-color: #e74c3c !important;
+        }
+
+        .initiative-number {
+            font-size: 2em;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+            color: #3498db;
+        }
+
+        .combatant-info {
+            flex: 1;
+            margin-left: 20px;
+        }
+
+        .combatant-name {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .combatant.active .combatant-name {
+            font-size: 1.6em;
+        }
+
+        .hp-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .hp-bar {
+            flex: 1;
+            height: 25px;
+            background: #ecf0f1;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .hp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2ecc71 0%, #27ae60 100%);
+            transition: width 0.5s ease, background 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .hp-fill.low {
+            background: linear-gradient(90deg, #f39c12 0%, #e67e22 100%);
+        }
+
+        .hp-fill.critical {
+            background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .hp-text {
+            min-width: 80px;
+            text-align: right;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .conditions {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-left: auto;
+            padding-left: 15px;
+        }
+
+        .condition-badge {
+            padding: 0 5px;
+            font-size: 1.5em;
+        }
+
+        .no-encounter {
+            text-align: center;
+            padding: 60px 20px;
+            font-size: 1.5em;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .turn-separator {
+            margin: 20px 0;
+            padding: 15px;
+            background: linear-gradient(135deg, rgba(142, 68, 173, 0.2) 0%, rgba(155, 89, 182, 0.2) 100%);
+            border: 2px dashed #9b59b6;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 2em;
+            font-weight: 600;
+            color: #9b59b6;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="encounterName">Loading Combat...</h1>
+            <div id="adventureName" style="font-size: 1.2em; opacity: 0.9; margin-top: 5px;"></div>
+            <div class="round-indicator" id="roundIndicator">Round 1</div>
+        </div>
+
+        <div id="encounterContent">
+            <div class="no-encounter">Waiting for combat to begin...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+
+        async function fetchEncounterData() {
+            try {
+                const response = await fetch('/api/current-encounter');
+                const data = await response.json();
+                
+                if (data.active) {
+                    updateDisplay(data);
+                } else {
+                    showNoEncounter(data.message);
+                }
+            } catch (error) {
+                console.error('Error fetching encounter data:', error);
+                showNoEncounter('Connection error');
+            }
+        }
+
+        function updateDisplay(data) {
+            // Update header
+            document.getElementById('encounterName').textContent = data.name;
+            document.getElementById('adventureName').textContent = data.adventureName;
+            document.getElementById('roundIndicator').textContent = `Round ${data.round}`;
+
+            // Check if combatants are sorted by initiative (with dex modifier as tiebreaker)
+            const combatants = [...data.combatants].sort((a, b) => {
+                const initA = a.initiative || a.init || 0;
+                const initB = b.initiative || b.init || 0;
+                
+                // If initiative is the same, use initiative bonus as tiebreaker
+                if (initA === initB) {
+                    const bonusA = a.initiativeBonus || 0;
+                    const bonusB = b.initiativeBonus || 0;
+                    return bonusB - bonusA;
+                }
+                
+                return initB - initA;
+            });
+
+            // Rotate the list so the active combatant is at the top
+            const activeIndex = combatants.findIndex(c => {
+                const name = getCombatantName(c);
+                return name === data.activeCombatant;
+            });
+            
+            let separatorPosition = -1;
+            if (activeIndex > 0) {
+                // Rotate: move everyone before active to the end
+                const rotated = [...combatants.slice(activeIndex), ...combatants.slice(0, activeIndex)];
+                combatants.length = 0;
+                combatants.push(...rotated);
+                // Separator goes right before the combatants who already went (now at the end)
+                separatorPosition = combatants.length - activeIndex;
+            }
+
+            // Build combatant list with separator
+            const htmlParts = [];
+            combatants.forEach((combatant, index) => {
+                // Insert separator before combatants who already took their turn
+                if (index === separatorPosition) {
+                    htmlParts.push(`
+                        <div class="turn-separator">
+                            Round ${data.round + 1} Starts
+                        </div>
+                    `);
+                }
+                
+                const name = getCombatantName(combatant);
+                const init = combatant.initiative || combatant.init || 0;
+                const initBonus = combatant.initiativeBonus;
+                let displayInit;
+                if (initBonus !== undefined && initBonus !== null) {
+                    const modifier = initBonus < 0 ? 0 : initBonus;
+                    displayInit = `${init}<span style="font-size: 0.6em;">.${modifier}</span>`;
+                } else {
+                    displayInit = init;
+                }
+                const isActive = name === data.activeCombatant;
+                const isPlayer = isPlayerCombatant(combatant);
+                const hp = combatant.hp || 0;
+                const maxHp = combatant.maxHp || 0;
+                const isUnconscious = hp <= 0;
+                const conditions = combatant.conditions || [];
+
+                let hpPercent = maxHp > 0 ? (hp / maxHp) * 100 : 0;
+
+                let combatantClasses = 'combatant';
+                if (isActive) combatantClasses += ' active';
+                if (isPlayer) combatantClasses += ' player';
+                if (isUnconscious) combatantClasses += ' unconscious';
+                
+                // Add HP status class for visual indicator
+                if (hpPercent > 50) {
+                    combatantClasses += ' hp-healthy';
+                } else if (hpPercent > 10) {
+                    combatantClasses += ' hp-wounded';
+                } else {
+                    combatantClasses += ' hp-critical';
+                }
+
+                let conditionsHtml = '';
+                if (conditions.length > 0) {
+                    conditionsHtml = `
+                        <div class="conditions">
+                            ${conditions.map(c => `<span class="condition-badge" title="${c}">${getConditionIcon(c)}</span>`).join('')}
+                        </div>
+                    `;
+                }
+
+                htmlParts.push(`
+                    <div class="${combatantClasses}">
+                        <div class="initiative-number">${displayInit}</div>
+                        <div class="combatant-info">
+                            <div class="combatant-name">${name}</div>
+                        </div>
+                        ${conditionsHtml}
+                    </div>
+                `);
+            });
+
+            document.getElementById('encounterContent').innerHTML = `
+                <div class="initiative-list">
+                    ${htmlParts.join('')}
+                </div>
+            `;
+        }
+
+        function showNoEncounter(message) {
+            document.getElementById('encounterName').textContent = 'No Active Combat';
+            document.getElementById('adventureName').textContent = '';
+            document.getElementById('roundIndicator').textContent = 'Waiting...';
+            document.getElementById('encounterContent').innerHTML = `
+                <div class="no-encounter">${message}</div>
+            `;
+        }
+
+        function getCombatantName(combatant) {
+            // For monsters, use the name field
+            if (combatant.name) return combatant.name;
+            // For players, prioritize character name over player name
+            if (combatant.characterName) return combatant.characterName;
+            if (combatant.playerCharacterName) return combatant.playerCharacterName;
+            // Fallback to player ID
+            return `Player ${combatant.id}`;
+        }
+
+        // Condition icons mapping
+        const CONDITION_ICONS = {
+            'Blinded': '🙈',
+            'Charmed': '💖',
+            'Deafened': '🔇',
+            'Frightened': '😱',
+            'Grappled': '🤼',
+            'Incapacitated': '😵',
+            'Invisible': '👻',
+            'Paralyzed': '🧊',
+            'Petrified': '🗿',
+            'Poisoned': '☠️',
+            'Prone': '⬇️',
+            'Restrained': '⛓️',
+            'Stunned': '💫',
+            'Unconscious': '⚰️',
+            'Concentrating': '⚡',
+            'Blessed': '✨',
+            'Hasted': '⏩',
+            'Raging': '💢',
+            'Hidden': '🫥'
+        };
+
+        function getConditionIcon(condition) {
+            return CONDITION_ICONS[condition] || condition;
+        }
+
+        function isPlayerCombatant(combatant) {
+            // Players have numeric IDs like "1", "2", etc.
+            return combatant.id && /^\d+$/.test(combatant.id);
+        }
+
+        // Auto-refresh every 3 seconds
+        setInterval(() => {
+            fetchEncounterData();
+        }, 3000);
+
+        // Initial load
+        fetchEncounterData();
+    </script>
+</body>
+</html>
