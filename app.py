@@ -1837,10 +1837,115 @@ def create_adventure():
     return jsonify({"success": True})
 
 if __name__ == '__main__':
+    # Allow custom port via environment variable
+    import os
+    import threading
+    from werkzeug.serving import make_server
+    
     print("="*50)
     print("D&D Encounter Tracker Server")
     print("="*50)
-    print(f"Starting server on port 5000...")
-    print(f"Listening on all network interfaces (0.0.0.0)")
+    
+    # Get local IP for display
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except:
+        local_ip = "127.0.0.1"
+    
+    # Check for SSL certificate
+    ssl_context = None
+    ssl_config_file = Path('.cache/ssl_config.json')
+    https_enabled = False
+    
+    if ssl_config_file.exists():
+        try:
+            with open(ssl_config_file, 'r') as f:
+                ssl_config = json.load(f)
+            
+            cert_path = Path(ssl_config['cert_path'])
+            key_path = Path(ssl_config['key_path'])
+            
+            if cert_path.exists() and key_path.exists():
+                ssl_context = (str(cert_path), str(key_path))
+                https_enabled = True
+                print("🔐 SSL certificate found - enabling HTTPS")
+                print(f"   Certificate: {cert_path}")
+        except Exception as e:
+            print(f"⚠️  Could not load SSL config: {e}")
+    
+    if not https_enabled:
+        print("ℹ️  No SSL certificate - HTTP only mode")
+    
     print()
-    app.run(debug=True, port=5000, host='0.0.0.0')
+    
+    # Setup external access (DDNS + UPnP) - suppress errors for cleaner output
+    try:
+        from ddns_upnp import setup_external_access
+        if https_enabled:
+            # HTTPS: external port 443 -> internal port 8443
+            setup_external_access(internal_port=8443, external_port=443)
+        else:
+            # HTTP: external port 5000 -> internal port 5000
+            setup_external_access(internal_port=5000, external_port=5000)
+    except Exception:
+        pass  # Silently continue if external access setup fails
+    
+    # Display access URLs
+    print("Access URLs:")
+    if https_enabled:
+        print(f"  🌍 External HTTPS: https://nbanks.dev")
+        print(f"  🔒 Local HTTPS:    https://{local_ip}:8443 (certificate warning expected)")
+        print(f"  🏠 Local HTTP:     http://{local_ip}:5000 (no SSL)")
+    else:
+        print(f"  🏠 Local HTTP:     http://{local_ip}:5000")
+    print()
+    print("Starting servers...")
+    print()
+    
+    servers = []
+    
+    # Start HTTP server on port 5000 (always available)
+    try:
+        http_server = make_server('0.0.0.0', 5000, app, threaded=True)
+        http_thread = threading.Thread(target=http_server.serve_forever, daemon=True)
+        http_thread.start()
+        servers.append(('HTTP', 5000, http_server))
+        print(f"✓ HTTP server running on port 5000")
+    except Exception as e:
+        print(f"✗ Failed to start HTTP server: {e}")
+    
+    # Start HTTPS server on port 8443 if certificate available
+    if https_enabled:
+        try:
+            https_server = make_server('0.0.0.0', 8443, app, threaded=True, ssl_context=ssl_context)
+            https_thread = threading.Thread(target=https_server.serve_forever, daemon=True)
+            https_thread.start()
+            servers.append(('HTTPS', 8443, https_server))
+            print(f"✓ HTTPS server running on port 8443")
+        except Exception as e:
+            print(f"✗ Failed to start HTTPS server: {e}")
+    
+    if not servers:
+        print("❌ No servers could be started!")
+        sys.exit(1)
+    
+    print()
+    print("Press Ctrl+C to stop all servers")
+    print("="*50)
+    print()
+    
+    # Keep main thread alive
+    try:
+        import time
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n\nStopping servers...")
+        for name, port, server in servers:
+            print(f"  Stopping {name} server on port {port}...")
+            server.shutdown()
+        print("Done!")

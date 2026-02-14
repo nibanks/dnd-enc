@@ -1,2 +1,6 @@
 Flask==3.0.0
 requests==2.31.0
+miniupnpc>=2.3.3
+beautifulsoup4
+certbot
+dnslib

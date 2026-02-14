@@ -24,14 +24,36 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Starting D&D Encounter Tracker..." -ForegroundColor Green
 
+# Activate virtual environment if it exists
+if (Test-Path ".venv\Scripts\Activate.ps1") {
+    Write-Host "Activating virtual environment..." -ForegroundColor Cyan
+    & .venv\Scripts\Activate.ps1
+}
+
+# Check if SSL is configured
+$sslConfigured = Test-Path ".cache\ssl_config.json"
+
 # Get local IP address
 $localIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch 'Loopback' -and $_.IPAddress -notmatch '^169\.254\.' } | Select-Object -First 1).IPAddress
 
 Write-Host "Server will be available at:" -ForegroundColor Cyan
-Write-Host "  Local:     http://127.0.0.1:5000" -ForegroundColor Cyan
-if ($localIP) {
-    Write-Host "  Network:   http://${localIP}:5000" -ForegroundColor Green
-    Write-Host "  Spectator: http://${localIP}:5000/spectator" -ForegroundColor Magenta
+if ($sslConfigured) {
+    Write-Host "  HTTPS (External): https://nbanks.dev" -ForegroundColor Green
+    Write-Host "  HTTP (Local):     http://127.0.0.1:5000" -ForegroundColor Cyan
+    if ($localIP) {
+        Write-Host "  HTTP (Network):   http://${localIP}:5000" -ForegroundColor Cyan
+        Write-Host "  Spectator:        http://${localIP}:5000/spectator" -ForegroundColor Magenta
+    }
+} else {
+    Write-Host "  Local:     http://127.0.0.1:5000" -ForegroundColor Cyan
+    if ($localIP) {
+        Write-Host "  Network:   http://${localIP}:5000" -ForegroundColor Green
+        Write-Host "  Spectator: http://${localIP}:5000/spectator" -ForegroundColor Magenta
+    }
+    Write-Host ""
+    Write-Host "  💡 To enable HTTPS access:" -ForegroundColor Yellow
+    Write-Host "     1. Stop the server (Ctrl+C)" -ForegroundColor Gray
+    Write-Host "     2. Run: python setup_https.py" -ForegroundColor Gray
 }
 Write-Host ""
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
