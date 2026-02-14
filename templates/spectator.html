@@ -15,7 +15,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: #fff;
-            padding: 20px;
+            padding: 10px;
             min-height: 100vh;
         }
 
@@ -26,8 +26,8 @@
 
         .header {
             text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
+            margin-bottom: 15px;
+            padding: 15px;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             backdrop-filter: blur(10px);
@@ -91,6 +91,46 @@
         .combatant.hp-critical {
             border-left-color: #e74c3c !important;
         }
+        
+        .combatant a {
+            display: block;
+            line-height: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .combatant a:hover {
+            opacity: 0.8;
+        }
+        
+        .combatant-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 15px;
+            border: 3px solid #fff;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        
+        .combatant.active .combatant-avatar {
+            width: 70px;
+            height: 70px;
+            border-width: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .combatant-avatar.placeholder {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+        }
 
         .initiative-number {
             font-size: 2em;
@@ -106,13 +146,9 @@
         }
 
         .combatant-name {
-            font-size: 1.4em;
+            font-size: 1.2em;
             font-weight: 600;
             margin-bottom: 5px;
-        }
-
-        .combatant.active .combatant-name {
-            font-size: 1.6em;
         }
 
         .hp-container {
@@ -196,9 +232,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 id="encounterName">Loading Combat...</h1>
-            <div id="adventureName" style="font-size: 1.2em; opacity: 0.9; margin-top: 5px;"></div>
-            <div class="round-indicator" id="roundIndicator">Round 1</div>
+            <h1 id="adventureName" style="opacity: 0.9;"></h1>
+            <h3 id="roundIndicator" style="opacity: 0.85; margin-top: 10px;"></h3>
         </div>
 
         <div id="encounterContent">
@@ -227,7 +262,6 @@
 
         function updateDisplay(data) {
             // Update header
-            document.getElementById('encounterName').textContent = data.name;
             document.getElementById('adventureName').textContent = data.adventureName;
             document.getElementById('roundIndicator').textContent = `Round ${data.round}`;
 
@@ -264,6 +298,7 @@
 
             // Build combatant list with separator
             const htmlParts = [];
+            
             combatants.forEach((combatant, index) => {
                 // Insert separator before combatants who already took their turn
                 if (index === separatorPosition) {
@@ -315,9 +350,22 @@
                         </div>
                     `;
                 }
+                
+                // Generate avatar HTML
+                let avatarHtml = '';
+                if (combatant.avatarUrl) {
+                    avatarHtml = `<a href="${combatant.avatarUrl}" target="_blank" rel="noopener noreferrer">
+                                      <img src="${combatant.avatarUrl}" alt="${name}" class="combatant-avatar" onerror="this.style.display='none'; this.parentElement.nextSibling.style.display='flex';">
+                                  </a>
+                                  <div class="combatant-avatar placeholder" style="display:none;">${name.charAt(0).toUpperCase()}</div>`;
+                } else {
+                    // Placeholder with first letter of name
+                    avatarHtml = `<div class="combatant-avatar placeholder">${name.charAt(0).toUpperCase()}</div>`;
+                }
 
                 htmlParts.push(`
                     <div class="${combatantClasses}">
+                        ${avatarHtml}
                         <div class="initiative-number">${displayInit}</div>
                         <div class="combatant-info">
                             <div class="combatant-name">${name}</div>
@@ -335,9 +383,8 @@
         }
 
         function showNoEncounter(message) {
-            document.getElementById('encounterName').textContent = 'No Active Combat';
             document.getElementById('adventureName').textContent = '';
-            document.getElementById('roundIndicator').textContent = 'Waiting...';
+            document.getElementById('roundIndicator').textContent = '';
             document.getElementById('encounterContent').innerHTML = `
                 <div class="no-encounter">${message}</div>
             `;

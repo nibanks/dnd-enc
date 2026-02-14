@@ -369,6 +369,25 @@ def get_character_details(character_url):
         passive_perception = 10 + ability_mods['wis']
         # TODO: Add proficiency if skilled in Perception
         
+        # Extract avatar URL
+        avatar_url = None
+        decorations = char_data.get('decorations', {})
+        if decorations:
+            # Try avatarUrl field
+            avatar_url = decorations.get('avatarUrl')
+            # If not found, try themeColor with avatar construction
+            if not avatar_url and decorations.get('avatarId'):
+                avatar_id = decorations.get('avatarId')
+                # D&D Beyond avatar URL pattern
+                avatar_url = f"https://www.dndbeyond.com/avatars/{avatar_id}/avatar.jpg"
+        
+        # Fallback to checking if there's a direct avatarUrl in character data
+        if not avatar_url:
+            avatar_url = char_data.get('avatarUrl')
+        
+        if avatar_url:
+            print(f"  Found character avatar: {avatar_url}")
+        
         # Build character details
         character_details = {
             'success': True,
@@ -384,6 +403,7 @@ def get_character_details(character_url):
             'initiative': initiative,
             'passive_perception': passive_perception,
             'proficiency_bonus': proficiency_bonus,
+            'avatarUrl': avatar_url,
             'timestamp': time.time()
         }
         
@@ -1136,6 +1156,43 @@ def get_monster_details(monster_url):
             details['reactions'] = reactions
             print(f"  Found {len(reactions)} Reactions")
         
+        # Extract avatar/image URL
+        avatar_url = None
+        # Try multiple selectors for monster images
+        avatar_selectors = [
+            'div.detail-content img',
+            'div.more-info-content img',
+            'div.monster-image img',
+            'img.monster-avatar',
+            'div.primary-content img',
+            'article img'
+        ]
+        
+        for selector in avatar_selectors:
+            img_elem = soup.select_one(selector)
+            if img_elem and img_elem.get('src'):
+                src = img_elem.get('src')
+                # Make sure it's a real image URL (not icons or UI elements)
+                if any(keyword in src.lower() for keyword in ['/avatars/', '/monsters/', 'monster', 'creature', '.jpg', '.jpeg', '.png', '.webp']):
+                    # Ensure it's an absolute URL
+                    if src.startswith('//'):
+                        avatar_url = 'https:' + src
+                    elif src.startswith('/'):
+                        avatar_url = 'https://www.dndbeyond.com' + src
+                    elif src.startswith('http'):
+                        avatar_url = src
+                    
+                    if avatar_url:
+                        # Prefer larger resolution if available
+                        if '?' in avatar_url:
+                            # Remove query parameters that limit size
+                            avatar_url = avatar_url.split('?')[0]
+                        print(f"  Found avatar: {avatar_url}")
+                        break
+        
+        if avatar_url:
+            details['avatarUrl'] = avatar_url
+        
         if not details:
             print("  WARNING: No stats found on page - selectors may need updating")
             # Save a debug file
@@ -1190,6 +1247,38 @@ def spectator():
 @app.route('/api/current-encounter')
 def get_current_encounter():
     """Get the current active encounter state for spectator view"""
+    
+    # Helper function to get avatar URL from cache
+    def get_avatar_from_cache(url, cache_type='monster'):
+        """Get avatar URL from cache file"""
+        if not url:
+            return None
+        
+        if cache_type == 'monster':
+            if '/monsters/' in url:
+                monster_id = url.split('/monsters/')[-1]
+            else:
+                monster_id = url
+            cache_file = MONSTER_DETAILS_DIR / f"{monster_id}.json"
+        else:  # character
+            if '/characters/' in url:
+                char_id = url.split('/characters/')[-1]
+            else:
+                char_id = url
+            cache_file = CACHE_DIR / "characters" / f"{char_id}.json"
+        
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cached = json.load(f)
+                    if cache_type == 'monster':
+                        return cached.get('data', {}).get('avatarUrl')
+                    else:
+                        return cached.get('avatarUrl')
+            except Exception:
+                pass
+        return None
+    
     # Find the most recently modified adventure file
     adventure_files = list(DATA_DIR.glob("*.json"))
     if not adventure_files:
@@ -1243,7 +1332,13 @@ def get_current_encounter():
                 if player:
                     combatant_copy['playerCharacterName'] = player.get('name', f"Player {combatant_id}")
                     combatant_copy['initiativeBonus'] = player.get('initiativeBonus', 0)
-        # For monsters, get initiative modifier from their cached data
+                    # Look up avatar from character cache
+                    char_url = player.get('dndBeyondUrl', '')
+                    avatar = get_avatar_from_cache(char_url, cache_type='character')
+                    if avatar:
+                        combatant_copy['avatarUrl'] = avatar
+        
+        # For monsters, get initiative modifier and avatar from cached data
         if combatant_copy.get('dndBeyondUrl'):
             url = combatant_copy['dndBeyondUrl']
             if '/monsters/' in url:
@@ -1261,6 +1356,12 @@ def get_current_encounter():
                             init_mod = dex.get('modifier', 0)
                         if init_mod is not None:
                             combatant_copy['initiativeBonus'] = init_mod
+                
+                # Look up avatar from monster cache
+                avatar = get_avatar_from_cache(url, cache_type='monster')
+                if avatar:
+                    combatant_copy['avatarUrl'] = avatar
+        
         enriched_combatants.append(combatant_copy)
     
     # Return encounter data
@@ -1313,11 +1414,118 @@ def get_adventure(name):
     
     return jsonify(data)
 
+def calculate_default_encounter_cr(encounter):
+    """Calculate the default CR for an encounter based on its monsters"""
+    # CR to XP mapping
+    CR_TO_XP = {
+        '0': 10, '1/8': 25, '1/4': 50, '1/2': 100,
+        '1': 200, '2': 450, '3': 700, '4': 1100, '5': 1800,
+        '6': 2300, '7': 2900, '8': 3900, '9': 5000, '10': 5900,
+        '11': 7200, '12': 8400, '13': 10000, '14': 11500, '15': 13000,
+        '16': 15000, '17': 18000, '18': 20000, '19': 22000, '20': 25000,
+        '21': 33000, '22': 41000, '23': 50000, '24': 62000, '25': 75000,
+        '26': 90000, '27': 105000, '28': 120000, '29': 135000, '30': 155000
+    }
+    
+    XP_TO_CR = [
+        (10, '0'), (25, '1/8'), (50, '1/4'), (100, '1/2'),
+        (200, '1'), (450, '2'), (700, '3'), (1100, '4'), (1800, '5'),
+        (2300, '6'), (2900, '7'), (3900, '8'), (5000, '9'), (5900, '10'),
+        (7200, '11'), (8400, '12'), (10000, '13'), (11500, '14'), (13000, '15'),
+        (15000, '16'), (18000, '17'), (20000, '18'), (22000, '19'), (25000, '20'),
+        (33000, '21'), (41000, '22'), (50000, '23'), (62000, '24'), (75000, '25'),
+        (90000, '26'), (105000, '27'), (120000, '28'), (135000, '29'), (155000, '30')
+    ]
+    
+    combatants = encounter.get('combatants', [])
+    if not combatants:
+        return '0'
+    
+    # Filter to only monsters (not players)
+    # Players have numeric IDs, monsters have id with dashes or no id
+    monsters = []
+    for combatant in combatants:
+        combatant_id = combatant.get('id', '')
+        # If id is pure digits, it's a player, skip it
+        if combatant_id and combatant_id.isdigit():
+            continue
+        # Otherwise it's a monster
+        monsters.append(combatant)
+    
+    if not monsters:
+        return '0'
+    
+    # Calculate total base XP
+    total_xp = 0
+    for combatant in monsters:
+        cr = ''
+        
+        # Try to get CR from monster cache if we have an ID
+        combatant_id = combatant.get('id', '')
+        if combatant_id and '-' in combatant_id:
+            cache_file = MONSTER_DETAILS_DIR / f"{combatant_id}.json"
+            if cache_file.exists():
+                try:
+                    with open(cache_file, 'r', encoding='utf-8') as f:
+                        cached = json.load(f)
+                        cr = cached.get('data', {}).get('cr', '')
+                except Exception:
+                    pass
+        
+        # Get XP for this CR
+        xp = CR_TO_XP.get(cr, 0)
+        total_xp += xp
+    
+    # Apply multiplier based on number of monsters
+    monster_count = len(monsters)
+    if monster_count == 0:
+        multiplier = 1
+    elif monster_count == 1:
+        multiplier = 1
+    elif monster_count == 2:
+        multiplier = 1.5
+    elif 3 <= monster_count <= 6:
+        multiplier = 2
+    elif 7 <= monster_count <= 10:
+        multiplier = 2.5
+    elif 11 <= monster_count <= 14:
+        multiplier = 3
+    else:
+        multiplier = 4
+    
+    adjusted_xp = round(total_xp * multiplier)
+    
+    # Convert adjusted XP back to CR
+    for xp_threshold, cr_value in reversed(XP_TO_CR):
+        if adjusted_xp >= xp_threshold:
+            return cr_value
+    
+    return '0'
+
 def clean_adventure_for_storage(data):
-    """Remove CR fields, shorten URLs, and strip empty values before saving"""
+    """Remove CR fields, shorten URLs, strip empty values, and remove default HP/AC before saving"""
     import copy
     import re
     data = copy.deepcopy(data)
+    
+    # Helper to get monster defaults from cache
+    def get_monster_defaults(monster_id):
+        """Get default HP and AC for a monster from cache"""
+        if not monster_id or '/' in monster_id:
+            return None, None
+        
+        cache_file = MONSTER_DETAILS_DIR / f"{monster_id}.json"
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cached = json.load(f)
+                    monster_data = cached.get('data', {})
+                    default_hp = monster_data.get('hp')
+                    default_ac = monster_data.get('ac')
+                    return default_hp, default_ac
+            except Exception:
+                pass
+        return None, None
     
     # Helper to recursively remove empty strings, empty lists, empty dicts, None values, and zeros
     def strip_empty(obj):
@@ -1346,11 +1554,21 @@ def clean_adventure_for_storage(data):
     # Clean encounters
     if 'encounters' in data:
         for encounter in data['encounters']:
+            # Check if totalCR matches default - if so, remove it
+            if 'totalCR' in encounter:
+                default_cr = calculate_default_encounter_cr(encounter)
+                if str(encounter['totalCR']) == str(default_cr):
+                    del encounter['totalCR']
+            
             if 'combatants' in encounter:
                 for combatant in encounter['combatants']:
                     # Remove CR field (always look up from monster database)
                     if 'cr' in combatant:
                         del combatant['cr']
+                    
+                    # Remove avatarUrl (always look up from cache)
+                    if 'avatarUrl' in combatant:
+                        del combatant['avatarUrl']
                     
                     # Shorten field names for storage
                     if 'initiative' in combatant:
@@ -1375,11 +1593,30 @@ def clean_adventure_for_storage(data):
                             if 'name' in combatant:
                                 del combatant['name']
                         else:
-                            # It's a monster - shorten URL
+                            # It's a monster - shorten URL and check for default values
                             if url.startswith(monster_prefix):
-                                combatant['id'] = url[len(monster_prefix):]
+                                monster_id = url[len(monster_prefix):]
+                                combatant['id'] = monster_id
+                                
+                                # Get monster defaults and remove if matching
+                                default_hp, default_ac = get_monster_defaults(monster_id)
+                                
+                                if default_hp is not None and combatant.get('maxHp') == default_hp:
+                                    del combatant['maxHp']
+                                
+                                if default_ac is not None and combatant.get('ac') == default_ac:
+                                    del combatant['ac']
+                            else:
+                                # Already shortened, check for defaults
+                                default_hp, default_ac = get_monster_defaults(url)
+                                
+                                if default_hp is not None and combatant.get('maxHp') == default_hp:
+                                    del combatant['maxHp']
+                                
+                                if default_ac is not None and combatant.get('ac') == default_ac:
+                                    del combatant['ac']
                     else:
-                        # No URL means it's a monster - no special handling needed
+                        # No URL means it's a monster without URL - keep maxHp/ac as is
                         pass
     
     # Clean players - extract only character IDs
@@ -1392,12 +1629,31 @@ def clean_adventure_for_storage(data):
     return strip_empty(data)
 
 def restore_adventure_from_storage(data):
-    """Restore full URLs and provide defaults for missing fields after loading"""
+    """Restore full URLs, provide defaults, and fill in monster HP/AC from cache"""
     import copy
     data = copy.deepcopy(data)
     
     monster_prefix = "https://www.dndbeyond.com/monsters/"
     character_prefix = "https://www.dndbeyond.com/characters/"
+    
+    # Helper to get monster defaults from cache
+    def get_monster_defaults(monster_id):
+        """Get default HP and AC for a monster from cache"""
+        if not monster_id or '/' in monster_id:
+            return None, None
+        
+        cache_file = MONSTER_DETAILS_DIR / f"{monster_id}.json"
+        if cache_file.exists():
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    cached = json.load(f)
+                    monster_data = cached.get('data', {})
+                    default_hp = monster_data.get('hp')
+                    default_ac = monster_data.get('ac')
+                    return default_hp, default_ac
+            except Exception:
+                pass
+        return None, None
     
     # Helper to ensure default values for missing fields
     def ensure_defaults(obj, defaults):
@@ -1472,10 +1728,10 @@ def restore_adventure_from_storage(data):
                         # Keep 'id' for player combatant lookup
                     
                     # Provide combatant-level defaults
+                    # Note: maxHp is handled separately for monsters (filled from cache)
                     ensure_defaults(combatant, {
                         'initiative': 0,
                         'hp': 0,
-                        'maxHp': 0,
                         'dmg': 0,
                         'heal': 0,
                         'notes': '',
@@ -1496,8 +1752,21 @@ def restore_adventure_from_storage(data):
                                 del combatant['name']
                         else:
                             # It's a monster - restore monster URL and ensure name exists
+                            monster_id = url
                             if not url.startswith('http'):
                                 combatant['dndBeyondUrl'] = monster_prefix + url
+                            else:
+                                # Extract ID from full URL
+                                monster_id = url.split('/')[-1]
+                            
+                            # Fill in default HP and AC from monster cache if missing
+                            default_hp, default_ac = get_monster_defaults(monster_id)
+                            
+                            if 'maxHp' not in combatant and default_hp is not None:
+                                combatant['maxHp'] = default_hp
+                            
+                            if 'ac' not in combatant and default_ac is not None:
+                                combatant['ac'] = default_ac
                             
                             # Ensure name exists for monsters (presence of 'name' indicates monster)
                             if 'name' not in combatant:
@@ -1505,6 +1774,10 @@ def restore_adventure_from_storage(data):
                     elif 'name' not in combatant:
                         # No URL and no name - set empty name to indicate monster
                         combatant['name'] = ''
+                    
+                    # Final fallback for maxHp if still missing (e.g., for players or if cache lookup failed)
+                    if 'maxHp' not in combatant:
+                        combatant['maxHp'] = 0
     
     # Provide top-level defaults
     ensure_defaults(data, {

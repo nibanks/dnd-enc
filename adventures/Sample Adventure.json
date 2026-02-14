@@ -653,7 +653,6 @@
           "dmg": 10,
           "hp": 23,
           "id": "16836-cult-fanatic",
-          "maxHp": 33,
           "name": "Cult Fanatic 1",
           "notes": "Casting spells",
           "init": 16
@@ -662,7 +661,6 @@
           "dmg": 12,
           "hp": 21,
           "id": "16836-cult-fanatic",
-          "maxHp": 33,
           "name": "Cult Fanatic 2",
           "notes": "Wounded",
           "init": 15
@@ -791,14 +789,12 @@
         {
           "hp": 33,
           "id": "16836-cult-fanatic",
-          "maxHp": 33,
           "name": "Cult Fanatic 1",
           "init": 15
         },
         {
           "hp": 33,
           "id": "16836-cult-fanatic",
-          "maxHp": 33,
           "name": "Cult Fanatic 2",
           "init": 13
         },
@@ -854,21 +850,18 @@
         {
           "hp": 16,
           "id": "17470-dragonclaw",
-          "maxHp": 16,
           "name": "Dragonclaw 1",
           "init": 15
         },
         {
           "hp": 16,
           "id": "17470-dragonclaw",
-          "maxHp": 16,
           "name": "Dragonclaw 2",
           "init": 14
         },
         {
           "hp": 33,
           "id": "21899-dragonwing",
-          "maxHp": 33,
           "name": "Dragonwing",
           "notes": "Flying spellcaster",
           "init": 17
@@ -913,7 +906,6 @@
         {
           "hp": 123,
           "id": "5195287-young-white-dragon",
-          "maxHp": 123,
           "name": "Young White Dragon",
           "notes": "Breath weapon ready",
           "init": 12
@@ -921,7 +913,6 @@
         {
           "hp": 16,
           "id": "17470-dragonclaw",
-          "maxHp": 16,
           "name": "Dragonclaw Champion",
           "notes": "Elite bodyguard",
           "init": 14
@@ -929,7 +920,6 @@
         {
           "hp": 33,
           "id": "16836-cult-fanatic",
-          "maxHp": 33,
           "name": "Cult Fanatic",
           "notes": "High Priest",
           "init": 11

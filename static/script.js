@@ -12,6 +12,7 @@ let initiativeChart = null; // Chart instance for initiative distribution
 let crChart = null; // Chart instance for CR over time
 let damageChart = null; // Chart instance for damage dealt per encounter
 let cachedSpectatorUrl = null; // Cached spectator URL to prevent flashing
+let crFetchStatus = {}; // Track CR fetch status to prevent duplicate fetches: {encounterIndex_combatantIndex: true}
 
 // D&D 5e/2024 Classes
 const DND_CLASSES = [
@@ -442,7 +443,7 @@ function renderCRChart() {
     const encounterData = [];
     
     currentAdventure.encounters.forEach((encounter, index) => {
-        const crString = calculateEncounterCR(encounter);
+        const crString = getEncounterCR(encounter);
         let crValue = 0;
         
         // Convert CR string to numeric value for chart
@@ -1247,6 +1248,9 @@ async function handleAdventureChange(e) {
     const response = await fetch(`/api/adventure/${name}`);
     currentAdventure = await response.json();
     
+    // Clear CR fetch status when loading new adventure
+    crFetchStatus = {};
+    
     // Update header to show adventure title
     document.getElementById('adventureSelectionHeader').style.display = 'none';
     document.getElementById('adventureHeader').style.display = 'flex';
@@ -1334,6 +1338,9 @@ async function deleteCurrentAdventure() {
     await loadAdventuresList();
     document.getElementById('adventureSelect').value = '';
     document.getElementById('adventureContent').style.display = 'none';
+    
+    // Clear state
+    crFetchStatus = {};
     
     // Clear URL parameters
     const url = new URL(window.location);
@@ -1958,6 +1965,49 @@ function renderEncounters() {
         if (encounter.minimized === undefined) {
             encounter.minimized = encounter.state !== 'started';
         }
+        
+        // Sort started encounters by initiative on page load
+        if (encounter.state === 'started') {
+            // Populate initiativeBonus if missing and sort
+            encounter.combatants.forEach(combatant => {
+                if (combatant.initiativeBonus === undefined || combatant.initiativeBonus === null) {
+                    if (isPlayerCombatant(combatant) && combatant.id) {
+                        // Look up from players list
+                        const player = currentAdventure.players.find(p => p.dndBeyondUrl === combatant.id);
+                        if (player && player.initiativeBonus !== undefined) {
+                            combatant.initiativeBonus = player.initiativeBonus;
+                        }
+                    }
+                }
+            });
+            
+            encounter.combatants.sort((a, b) => {
+                const initA = a.initiative || 0;
+                const initB = b.initiative || 0;
+                
+                // If initiative is the same, use initiative bonus as tiebreaker
+                if (initA === initB) {
+                    const bonusA = a.initiativeBonus || 0;
+                    const bonusB = b.initiativeBonus || 0;
+                    return bonusB - bonusA;
+                }
+                
+                return initB - initA;
+            });
+            
+            // Check if any monsters are missing initiativeBonus
+            const monstersNeedRefresh = encounter.combatants.some(c => 
+                !isPlayerCombatant(c) && 
+                c.dndBeyondUrl && 
+                (c.initiativeBonus === undefined || c.initiativeBonus === null)
+            );
+            
+            // Auto-refresh monster stats on page load if needed (silently)
+            if (monstersNeedRefresh) {
+                setTimeout(() => refreshMonsterStats(index, false), 100);
+            }
+        }
+        
         const card = createEncounterCard(encounter, index);
         
         // Set background color for completed encounters
@@ -1978,6 +2028,13 @@ function renderEncounters() {
 function calculateEncounterXP(encounter) {
     if (!encounter.combatants) return 0;
     
+    // If custom CR is set, convert it to XP
+    if (encounter.totalCR !== undefined && encounter.totalCR !== null && encounter.totalCR !== '') {
+        const xp = CR_TO_XP[encounter.totalCR] || 0;
+        return xp.toLocaleString();
+    }
+    
+    // Otherwise calculate from monsters
     const monsters = encounter.combatants.filter(combatant => !isPlayerCombatant(combatant));
     
     const totalXP = monsters.reduce((sum, combatant) => {
@@ -2024,7 +2081,8 @@ function calculateEncounterXP(encounter) {
     return adjustedXP.toLocaleString();
 }
 
-function calculateEncounterCR(encounter) {
+// Calculate the default CR based on monsters in encounter
+function calculateDefaultEncounterCR(encounter) {
     if (!encounter.combatants) return '0';
     
     const monsters = encounter.combatants.filter(combatant => !isPlayerCombatant(combatant));
@@ -2089,6 +2147,38 @@ function calculateEncounterCR(encounter) {
     return '0';
 }
 
+// Get the CR to display (custom if set, otherwise calculated)
+function getEncounterCR(encounter) {
+    // If custom totalCR is set, use it
+    if (encounter.totalCR !== undefined && encounter.totalCR !== null && encounter.totalCR !== '') {
+        return encounter.totalCR;
+    }
+    // Otherwise, calculate it
+    return calculateDefaultEncounterCR(encounter);
+}
+
+// Update encounter CR
+function updateEncounterCR(encounterIndex, newCR) {
+    const encounter = currentAdventure.encounters[encounterIndex];
+    
+    // Clean the input
+    newCR = newCR.trim();
+    
+    // Calculate default CR
+    const defaultCR = calculateDefaultEncounterCR(encounter);
+    
+    // If empty or matches default, remove custom CR
+    if (newCR === '' || newCR === defaultCR) {
+        delete encounter.totalCR;
+    } else {
+        // Set custom CR
+        encounter.totalCR = newCR;
+    }
+    
+    saveAdventure();
+    renderEncounters();
+}
+
 // Create encounter card
 function createEncounterCard(encounter, encounterIndex) {
     const card = document.createElement('div');
@@ -2145,7 +2235,17 @@ function createEncounterCard(encounter, encounterIndex) {
                     ` : `
                         <span class="encounter-title" style="font-size: 20px; font-weight: 600; width: 280px; max-width: 280px;">${encounter.name || 'New Encounter'}</span>
                     `}
-                    <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap; margin-left: 10px;">CR: ${calculateEncounterCR(encounter)} | XP: ${calculateEncounterXP(encounter)}</span>
+                    ${encounterEditMode[encounterIndex] ? `
+                        <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap; margin-left: 10px;">CR:</span>
+                        <input type="text" class="cr-input" value="${getEncounterCR(encounter)}" 
+                               onchange="updateEncounterCR(${encounterIndex}, this.value)" 
+                               placeholder="${calculateDefaultEncounterCR(encounter)}"
+                               title="${encounter.totalCR ? 'Custom CR (default: ' + calculateDefaultEncounterCR(encounter) + ')' : 'Auto-calculated CR'}"
+                               style="border: 1px solid ${encounter.totalCR ? '#f39c12' : '#ddd'}; padding: 5px; width: 60px; text-align: center;">
+                        <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap;">| XP: ${calculateEncounterXP(encounter)}</span>
+                    ` : `
+                        <span style="color: #666; font-size: 14px; font-weight: 500; white-space: nowrap; margin-left: 10px;">CR: ${getEncounterCR(encounter)} | XP: ${calculateEncounterXP(encounter)}</span>
+                    `}
                     ${encounter.state === 'started' ? `
                         <span id="spectatorUrlContainer-${encounterIndex}" style="${cachedSpectatorUrl ? '' : 'display: none;'} color: #2e7d32; font-size: 14px; white-space: nowrap; margin-left: 25px;">
                             📺 <span id="spectatorUrl-${encounterIndex}" style="font-family: monospace; color: #1976d2; user-select: all; cursor: pointer;" onclick="copySpectatorUrl(${encounterIndex})" title="Click to copy">${cachedSpectatorUrl || ''}</span>
@@ -2158,7 +2258,8 @@ function createEncounterCard(encounter, encounterIndex) {
                     ` : ''}
                     ${showControls ? `
                         <button class="btn-small" onclick="addMonsterFromLibrary(${encounterIndex})" style="background: #27ae60;" title="Add a monster to this encounter">+</button>
-                        <button class="btn-small" onclick="refreshPlayers(${encounterIndex})" style="background: #3498db;" title="Refresh player stats from Players section">↻</button>
+                        <button class="btn-small" onclick="refreshPlayers(${encounterIndex})" style="background: #3498db;" title="Refresh player stats from Players section">↻ Players</button>
+                        <button class="btn-small" onclick="refreshMonsterStats(${encounterIndex})" style="background: #e67e22;" title="Refresh monster stats from D&D Beyond cache">↻ Monsters</button>
                     ` : ''}
                     ${showControls ? `
                         <button class="btn-small" onclick="removeEncounter(${encounterIndex})" style="background: #e74c3c;" title="Delete this encounter">×</button>
@@ -2262,7 +2363,11 @@ function createEncounterCard(encounter, encounterIndex) {
             // If still no CR but we have a D&D Beyond URL/ID, try to fetch from cached details
             if (!cr && (combatant.dndBeyondUrl || combatant.id)) {
                 const monsterUrl = combatant.dndBeyondUrl || combatant.id;
-                if (monsterUrl && monsterUrl.includes('dndbeyond.com')) {
+                const fetchKey = `${encounterIndex}_${combatantIndex}`;
+                // Only fetch if we haven't already fetched or aren't currently fetching
+                if (monsterUrl && monsterUrl.includes('dndbeyond.com') && !crFetchStatus[fetchKey]) {
+                    // Mark as fetching to prevent duplicate requests
+                    crFetchStatus[fetchKey] = true;
                     // Try to get CR from server-side cache asynchronously
                     fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex);
                 }
@@ -2297,6 +2402,11 @@ function createEncounterCard(encounter, encounterIndex) {
                     onmouseenter="showMonsterTooltip('${escapedName}', '${playerUrl}', event)"
                     onmouseleave="hideMonsterTooltip()">${combatantName || ''}</span>`;
             }
+        } else if (encounterEditMode[encounterIndex]) {
+            // Edit mode: show editable input for monster names
+            nameHTML = `<input type="text" value="${(combatant.name || '').replace(/"/g, '&quot;')}" 
+                style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 3px; font-weight: 500;"
+                onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'name', this.value)">`;
         } else if (dndBeyondUrl) {
             // NPCs/Monsters with URL: Make name a clickable link with tooltip
             const escapedUrl = dndBeyondUrl.replace(/'/g, "\\'");
@@ -2367,13 +2477,37 @@ function createEncounterCard(encounter, encounterIndex) {
                 </div>`;
         }
         
+        // Populate initiativeBonus if missing
+        if (combatant.initiativeBonus === undefined || combatant.initiativeBonus === null) {
+            if (isPlayer && combatant.id) {
+                // Look up from players list
+                const player = currentAdventure.players.find(p => p.dndBeyondUrl === combatant.id);
+                if (player && player.initiativeBonus !== undefined) {
+                    combatant.initiativeBonus = player.initiativeBonus;
+                }
+            }
+            // For monsters, initiativeBonus should come from fetchMonsterDetails
+            // If still missing, it won't display the decimal
+        }
+        
+        // Format initiative display with dex modifier
+        let initiativeDisplay;
+        const init = combatant.initiative || 0;
+        const initBonus = combatant.initiativeBonus;
+        if (initBonus !== undefined && initBonus !== null) {
+            const modifier = initBonus < 0 ? 0 : initBonus;
+            initiativeDisplay = `${init}<span style="font-size: 0.8em;">.${modifier}</span>`;
+        } else {
+            initiativeDisplay = init;
+        }
+        
         row.innerHTML = `
             <td style="text-align: center;">${(encounter.state === 'started' && encounter.activeCombatant === combatantName) ? '▶' : ''}</td>
             <td>${nameHTML}${deathSavesCell}</td>
             <td style="text-align: center;">${isPlayer ? '<span style="color: #999;">-</span>' : `<span style="color: #666; font-weight: 500;">${cr}</span>`}</td>
-            <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.initiative || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'initiative', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.initiative || 0}</span>`}</td>
+            <td style="text-align: center;">${!encounter.state || encounterEditMode[encounterIndex] ? `<input type="number" value="${combatant.initiative || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'initiative', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${initiativeDisplay}</span>`}</td>
             <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${ac}</span></td>
-            <td style="text-align: center;">${!encounter.state ? `<input type="number" value="${combatant.maxHp || 0}" style="text-align: center; width: 100%;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'maxHp', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.maxHp || 0}</span>`}</td>
+            <td style="text-align: center;">${!encounter.state || encounterEditMode[encounterIndex] ? `<input type="number" value="${combatant.maxHp || 0}" style="text-align: center; width: 100%;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'maxHp', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.maxHp || 0}</span>`}</td>
             <td style="text-align: center;">${encounterEditMode[encounterIndex] ? `<input type="number" class="hp-input" value="${combatant.hp || 0}" style="width: 100%; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;"
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'hp', parseInt(this.value))">` : `<span style="color: ${(combatant.hp || 0) <= 0 ? '#e74c3c' : '#666'}; font-weight: 500;">${combatant.hp || 0}</span>`}</td>
             <td style="text-align: center;">${tempHpCell}</td>
@@ -2733,6 +2867,14 @@ async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterName) {
                 if (details.cr) {
                     combatant.cr = details.cr;
                 }
+                // Store initiative bonus for proper sorting
+                if (details.initiativeModifier !== undefined) {
+                    combatant.initiativeBonus = details.initiativeModifier;
+                }
+                // Store avatar URL if available
+                if (details.avatarUrl) {
+                    combatant.avatarUrl = details.avatarUrl;
+                }
                 updated++;
             }
         });
@@ -2789,13 +2931,18 @@ async function fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex) {
         const data = await response.json();
         
         if (data.success && data.details && data.details.cr) {
-            // Update the combatant's CR
+            // Update the combatant's CR only if it changed
             const encounter = currentAdventure.encounters[encounterIndex];
             if (encounter && encounter.combatants[combatantIndex]) {
-                encounter.combatants[combatantIndex].cr = data.details.cr;
-                // Only re-render and save if we actually updated something
-                renderEncounters();
-                autoSave();
+                const combatant = encounter.combatants[combatantIndex];
+                const newCR = data.details.cr;
+                
+                // Only update and re-render if the CR actually changed
+                if (combatant.cr !== newCR) {
+                    combatant.cr = newCR;
+                    renderEncounters();
+                    autoSave();
+                }
             }
         }
     } catch (error) {
@@ -2867,7 +3014,33 @@ function removeCombatant(encounterIndex, combatantIndex) {
 // Sort by initiative
 function sortInitiative(encounterIndex) {
     const encounter = currentAdventure.encounters[encounterIndex];
-    encounter.combatants.sort((a, b) => (b.initiative || 0) - (a.initiative || 0));
+    
+    // Populate initiativeBonus if missing
+    encounter.combatants.forEach(combatant => {
+        if (combatant.initiativeBonus === undefined || combatant.initiativeBonus === null) {
+            if (isPlayerCombatant(combatant) && combatant.id) {
+                // Look up from players list
+                const player = currentAdventure.players.find(p => p.dndBeyondUrl === combatant.id);
+                if (player && player.initiativeBonus !== undefined) {
+                    combatant.initiativeBonus = player.initiativeBonus;
+                }
+            }
+        }
+    });
+    
+    encounter.combatants.sort((a, b) => {
+        const initA = a.initiative || 0;
+        const initB = b.initiative || 0;
+        
+        // If initiative is the same, use initiative bonus as tiebreaker
+        if (initA === initB) {
+            const bonusA = a.initiativeBonus || 0;
+            const bonusB = b.initiativeBonus || 0;
+            return bonusB - bonusA;
+        }
+        
+        return initB - initA;
+    });
     renderEncounters();
     autoSave();
 }
@@ -2884,6 +3057,7 @@ function refreshPlayers(encounterIndex) {
         encounter.combatants.push({
             id: player.dndBeyondUrl, // Store player ID for lookup
             initiative: 0,
+            initiativeBonus: player.initiativeBonus || 0,
             hp: player.maxHp || 0,
             maxHp: player.maxHp || 0,
             ac: player.ac || 10,
@@ -2898,6 +3072,66 @@ function refreshPlayers(encounterIndex) {
     encounter.currentRound = 0;
     encounter.activeCombatant = null;
     
+    renderEncounters();
+    autoSave();
+}
+
+// Refresh monster stats (including initiativeBonus) from cache
+async function refreshMonsterStats(encounterIndex, showNotification = true) {
+    const encounter = currentAdventure.encounters[encounterIndex];
+    if (!encounter || !encounter.combatants) return;
+    
+    const monsters = encounter.combatants.filter(c => !isPlayerCombatant(c) && c.dndBeyondUrl);
+    
+    if (monsters.length === 0) {
+        if (showNotification) showToast('No monsters to refresh', 'info');
+        return;
+    }
+    
+    if (showNotification) showToast(`Refreshing ${monsters.length} monster(s)...`, 'info');
+    
+    // Group by URL to avoid duplicate fetches
+    const urlToMonsters = {};
+    monsters.forEach(m => {
+        if (m.dndBeyondUrl) {
+            if (!urlToMonsters[m.dndBeyondUrl]) {
+                urlToMonsters[m.dndBeyondUrl] = [];
+            }
+            urlToMonsters[m.dndBeyondUrl].push(m);
+        }
+    });
+    
+    // Fetch each unique monster
+    for (const url of Object.keys(urlToMonsters)) {
+        try {
+            const encodedUrl = encodeURIComponent(url);
+            const response = await fetch(`/api/dndbeyond/monster/${encodedUrl}`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.details) {
+                    const details = data.details;
+                    // Update all monsters with this URL
+                    urlToMonsters[url].forEach(monster => {
+                        if (details.initiativeModifier !== undefined) {
+                            monster.initiativeBonus = details.initiativeModifier;
+                        }
+                        if (details.ac) monster.ac = details.ac;
+                        if (details.hp) {
+                            monster.maxHp = details.hp;
+                            if (monster.hp === 0) monster.hp = details.hp;
+                        }
+                        if (details.cr) monster.cr = details.cr;
+                        if (details.avatarUrl) monster.avatarUrl = details.avatarUrl;
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error refreshing monster:', error);
+        }
+    }
+    
+    if (showNotification) showToast('Monster stats refreshed!', 'success', 2000);
     renderEncounters();
     autoSave();
 }
@@ -3412,8 +3646,15 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
     
     let html = '';
     
-    // Header
+    // Header with avatar
     html += '<div class="monster-tooltip-header">';
+    
+    // Add avatar if available
+    if (details.avatarUrl) {
+        html += `<img src="${details.avatarUrl}" alt="${entityName}" class="monster-tooltip-avatar" onerror="this.style.display='none'">`;
+    }
+    
+    html += '<div class="monster-tooltip-header-text">';
     html += `<div class="monster-tooltip-title">${entityName}</div>`;
     
     // Meta information
@@ -3447,7 +3688,8 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
     if (meta.length > 0) {
         html += `<div class="monster-tooltip-meta">${meta.join(', ')}</div>`;
     }
-    html += '</div>';
+    html += '</div>'; // Close monster-tooltip-header-text
+    html += '</div>'; // Close monster-tooltip-header
     
     // Basic Stats
     html += '<div class="monster-tooltip-stats">';

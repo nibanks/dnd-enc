@@ -59,6 +59,12 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
   - Automatic initiative rolling (d20 + modifier)
   - Smart caching with per-monster cache files
 - ⭐ **XP Calculator** - Automatic XP calculation based on CR values
+- 🎚️ **CR Customization** - Override auto-calculated encounter CR:
+  - Edit CR directly in encounter header (edit mode)
+  - Visual indicators (orange border = custom, gray = calculated)
+  - Non-default values only saved to JSON
+  - Useful for partial defeats, story adjustments, environmental factors
+  - See [CR_CUSTOMIZATION.md](CR_CUSTOMIZATION.md) for details
 - ⌨️ **Keyboard Shortcuts**:
   - Ctrl+D: Open damage tracking modal
   - Ctrl+H: Open healing tracking modal

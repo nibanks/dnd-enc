@@ -261,6 +261,20 @@ input[type="number"]:focus {
     color: #333;
 }
 
+.cr-input {
+    border-radius: 6px;
+    font-family: 'Segoe UI', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    background: white;
+}
+
+.cr-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
+}
+
 .encounter-controls {
     display: flex;
     gap: 10px;
@@ -486,6 +500,18 @@ input[type="number"]:focus {
     border-bottom: 2px solid #667eea;
     padding-bottom: 10px;
     margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.monster-tooltip-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 2px solid #667eea;
+    flex-shrink: 0;
 }
 
 .monster-tooltip-title {
@@ -652,4 +678,9 @@ input[type="number"]:focus {
 
 .death-save-box.failure.checked {
     background: #e74c3c;
+}
+/* Tooltip Header Text Wrapper */
+.monster-tooltip-header-text {
+    flex: 1;
+    min-width: 0;
 }
