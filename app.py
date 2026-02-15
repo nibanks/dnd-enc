@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 import json
 import os
 from pathlib import Path
@@ -8,8 +8,11 @@ import time
 from bs4 import BeautifulSoup
 import re
 import logging
+import secrets
 
 app = Flask(__name__)
+# Generate a secret key for sessions (regenerates on restart)
+app.secret_key = secrets.token_hex(32)
 
 # Suppress Flask auto-refresh logging for spectator view
 log = logging.getLogger('werkzeug')
@@ -1246,7 +1249,7 @@ def spectator():
 
 @app.route('/api/current-encounter')
 def get_current_encounter():
-    """Get the current active encounter state for spectator view"""
+    """Get the current active encounter state for spectator view - NO PIN REQUIRED"""
     
     # Helper function to get avatar URL from cache
     def get_avatar_from_cache(url, cache_type='monster'):
@@ -1399,6 +1402,66 @@ def list_adventures():
     adventures = [f.stem for f in DATA_DIR.glob("*.json")]
     return jsonify(adventures)
 
+@app.route('/api/adventure/<name>/verify-pin', methods=['POST'])
+def verify_adventure_pin(name):
+    """Verify PIN for a protected adventure"""
+    filepath = DATA_DIR / f"{name}.json"
+    if not filepath.exists():
+        return jsonify({"error": "Adventure not found"}), 404
+    
+    with open(filepath, 'r') as f:
+        data = json.load(f)
+    
+    adventure_pin = data.get('pin')
+    if not adventure_pin:
+        # No PIN required
+        return jsonify({"success": True, "message": "No PIN required"})
+    
+    # Check provided PIN
+    provided_pin = request.json.get('pin', '')
+    if str(provided_pin) == str(adventure_pin):
+        # Store verified adventure with PIN version in session
+        if 'verified_adventures' not in session:
+            session['verified_adventures'] = {}
+        
+        pin_version = data.get('pinVersion', 0)
+        session['verified_adventures'][name] = pin_version
+        session.modified = True
+        return jsonify({"success": True, "message": "PIN verified"})
+    else:
+        return jsonify({"success": False, "error": "Incorrect PIN"}), 401
+
+@app.route('/api/adventure/<name>/check-pin', methods=['GET'])
+def check_adventure_pin_status(name):
+    """Check if an adventure requires PIN and if it's been verified"""
+    filepath = DATA_DIR / f"{name}.json"
+    if not filepath.exists():
+        return jsonify({"error": "Adventure not found"}), 404
+    
+    with open(filepath, 'r') as f:
+        data = json.load(f)
+    
+    has_pin = 'pin' in data and data['pin']
+    verified_adventures = session.get('verified_adventures', {})
+    current_pin_version = data.get('pinVersion', 0)
+    is_verified = name in verified_adventures and verified_adventures.get(name) == current_pin_version
+    
+    return jsonify({
+        "requiresPin": has_pin,
+        "isVerified": is_verified
+    })
+
+@app.route('/api/adventure/<name>/invalidate-sessions', methods=['POST'])
+def invalidate_adventure_sessions(name):
+    """Clear current session for this adventure (called when PIN changes)"""
+    # Remove from current session's verified list
+    if 'verified_adventures' in session:
+        if name in session['verified_adventures']:
+            del session['verified_adventures'][name]
+        session.modified = True
+    
+    return jsonify({"success": True, "message": "Session cleared"})
+
 @app.route('/api/adventure/<name>', methods=['GET'])
 def get_adventure(name):
     """Load an adventure file"""
@@ -1409,8 +1472,27 @@ def get_adventure(name):
     with open(filepath, 'r') as f:
         data = json.load(f)
     
+    # Check if adventure has PIN protection
+    adventure_pin = data.get('pin')
+    if adventure_pin:
+        # Check if this adventure has been verified in this session with current PIN version
+        verified_adventures = session.get('verified_adventures', {})
+        current_pin_version = data.get('pinVersion', 0)
+        
+        # Check if adventure is verified AND has matching PIN version
+        if name not in verified_adventures or verified_adventures.get(name) != current_pin_version:
+            return jsonify({
+                "error": "PIN required",
+                "requiresPin": True,
+                "adventureName": name
+            }), 403
+    
     # Restore full URLs after loading
     data = restore_adventure_from_storage(data)
+    
+    # Keep both pin and pinVersion for the DM interface
+    # (They need to see/edit the PIN in settings)
+    # Security is handled by the session-based verification on initial load
     
     return jsonify(data)
 
@@ -1528,10 +1610,21 @@ def clean_adventure_for_storage(data):
         return None, None
     
     # Helper to recursively remove empty strings, empty lists, empty dicts, None values, and zeros
-    def strip_empty(obj):
+    # BUT preserve important fields like 'pin' and 'pinVersion'
+    def strip_empty(obj, parent_key=None):
+        # Fields to preserve even if they have "empty" values
+        preserve_fields = {'pin', 'pinVersion'}
+        
         if isinstance(obj, dict):
-            return {k: strip_empty(v) for k, v in obj.items() 
-                   if v not in (None, "", [], {}, 0, 0.0)}
+            result = {}
+            for k, v in obj.items():
+                # Always preserve pin and pinVersion
+                if k in preserve_fields:
+                    result[k] = v
+                # Strip empty values for other fields
+                elif v not in (None, "", [], {}, 0, 0.0):
+                    result[k] = strip_empty(v, k)
+            return result
         elif isinstance(obj, list):
             return [strip_empty(item) for item in obj]
         else:
@@ -1794,6 +1887,24 @@ def restore_adventure_from_storage(data):
 def save_adventure(name):
     """Save an adventure file (auto-save)"""
     filepath = DATA_DIR / f"{name}.json"
+    
+    # Check if the adventure requires PIN and if this session is validated
+    if filepath.exists():
+        with open(filepath, 'r') as f:
+            existing_data = json.load(f)
+            adventure_pin = existing_data.get('pin')
+            
+            if adventure_pin:
+                # Verify this session has been validated with current PIN version
+                verified_adventures = session.get('verified_adventures', {})
+                current_pin_version = existing_data.get('pinVersion', 0)
+                
+                if name not in verified_adventures or verified_adventures.get(name) != current_pin_version:
+                    return jsonify({
+                        "error": "Unauthorized: PIN verification required",
+                        "requiresPin": True
+                    }), 403
+    
     data = request.json
     
     # Clean data before saving
@@ -1886,8 +1997,13 @@ if __name__ == '__main__':
     try:
         from ddns_upnp import setup_external_access
         if https_enabled:
-            # HTTPS: external port 443 -> internal port 8443
-            setup_external_access(internal_port=8443, external_port=443)
+            # HTTPS: Try external port 443 -> internal port 8443 first
+            upnp_success, dns_success = setup_external_access(internal_port=8443, external_port=443)
+            
+            # If UPnP failed on port 443, try 8443 -> 8443 as fallback
+            if not upnp_success:
+                print("⚠️  Port 443 UPnP failed, trying 8443 -> 8443 as fallback...")
+                setup_external_access(internal_port=8443, external_port=8443)
         else:
             # HTTP: external port 5000 -> internal port 5000
             setup_external_access(internal_port=5000, external_port=5000)

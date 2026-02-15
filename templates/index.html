@@ -30,6 +30,7 @@
                     <span id="adventureTitleText">Adventure Name</span>
                 </h1>
                 <div class="header-controls">
+                    <button id="adventureSettingsBtn" style="background: #3498db;" title="Adventure Settings (PIN protection)">🔒</button>
                     <button id="deleteAdventureBtn" style="background: #e74c3c;" title="Delete current adventure">×</button>
                     <button id="settingsBtn" style="background: #9b59b6;" title="Open settings">⚙️</button>
                 </div>
@@ -256,6 +257,43 @@
                 </div>
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">
                     <button onclick="confirmHeal()" class="btn-small" style="background: #2ecc71;">Apply Healing</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adventure Settings Modal -->
+    <div id="adventureSettingsModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>🔒 Adventure Settings</h2>
+                <button class="close-btn" onclick="closeAdventureSettingsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3 style="margin-top: 0;">DM Interface PIN Protection</h3>
+                <p style="color: #666; margin-bottom: 15px;">Set a 4-digit PIN to prevent others from accessing the DM interface and viewing the full adventure details. Leave empty for no protection.</p>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">PIN (4 digits):</label>
+                    <input type="text" id="adventurePinInput" placeholder="Enter 4-digit PIN or leave empty" maxlength="4" pattern="[0-9]*" inputmode="numeric" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px; font-size: 16px; letter-spacing: 0.3em; text-align: center;">
+                    <div style="margin-top: 8px; font-size: 13px; color: #666;">
+                        <span id="pinStatusText">No PIN set</span>
+                    </div>
+                </div>
+
+                <div style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                    <strong>ℹ️ How it works:</strong>
+                    <ul style="margin: 10px 0 0 0; padding-left: 20px; line-height: 1.6;">
+                        <li>Users trying to load this adventure in the DM interface will be prompted for the PIN</li>
+                        <li>PIN is required once per browser session</li>
+                        <li>Spectator view remains accessible to everyone (no PIN required)</li>
+                        <li>To remove protection, clear the PIN and save</li>
+                    </ul>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button onclick="closeAdventureSettingsModal()" style="background: #95a5a6;">Cancel</button>
+                    <button onclick="saveAdventurePin()" style="background: #3498db;">Save PIN</button>
                 </div>
             </div>
         </div>

@@ -9,6 +9,8 @@
     "Chapter 2: The Journey",
     "Chapter 3: The Finale"
   ],
+  "pin": "1234",
+  "pinVersion": 0,
   "encounters": [
     {
       "chapter": "Chapter 1: The Beginning",

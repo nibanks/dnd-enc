@@ -274,6 +274,12 @@
                 if (initA === initB) {
                     const bonusA = a.initiativeBonus || 0;
                     const bonusB = b.initiativeBonus || 0;
+                    if (bonusA === bonusB) {
+                        // Final tiebreaker: use combatant name/id for stable sort
+                        const nameA = getCombatantName(a) || a.id || '';
+                        const nameB = getCombatantName(b) || b.id || '';
+                        return nameA.localeCompare(nameB);
+                    }
                     return bonusB - bonusA;
                 }
                 

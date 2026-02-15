@@ -194,6 +194,7 @@ function setupEventListeners() {
     document.getElementById('chapterNotes').addEventListener('input', handleChapterNotesChange);
     document.getElementById('addPlayerBtn').addEventListener('click', addPlayer);
     document.getElementById('addEncounterBtn').addEventListener('click', addEncounter);
+    document.getElementById('adventureSettingsBtn').addEventListener('click', openAdventureSettingsModal);
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
     document.getElementById('settingsBtnSelection').addEventListener('click', openSettingsModal);
     
@@ -214,10 +215,35 @@ function setupEventListeners() {
             return false;
         }
         
+        // Keyboard shortcut for next turn (Ctrl+N)
+        if (e.ctrlKey && (e.key === 'n' || e.key === 'N')) {
+            e.preventDefault();
+            e.stopPropagation();
+            // Find the active encounter
+            const activeEncounterIndex = currentAdventure?.encounters?.findIndex(e => e.state === 'started');
+            if (activeEncounterIndex !== undefined && activeEncounterIndex >= 0) {
+                nextTurn(activeEncounterIndex);
+            }
+            return false;
+        }
+        
+        // Keyboard shortcut for previous turn (Ctrl+P)
+        if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
+            e.preventDefault();
+            e.stopPropagation();
+            // Find the active encounter
+            const activeEncounterIndex = currentAdventure?.encounters?.findIndex(e => e.state === 'started');
+            if (activeEncounterIndex !== undefined && activeEncounterIndex >= 0) {
+                previousTurn(activeEncounterIndex);
+            }
+            return false;
+        }
+        
         // ESC key closes any open modal
         if (e.key === 'Escape') {
             const monsterModal = document.getElementById('monsterModal');
             const settingsModal = document.getElementById('settingsModal');
+            const adventureSettingsModal = document.getElementById('adventureSettingsModal');
             const damageModal = document.getElementById('damageModal');
             const healModal = document.getElementById('healModal');
             const conditionsModal = document.getElementById('conditionsModal');
@@ -226,6 +252,8 @@ function setupEventListeners() {
                 closeMonsterModal();
             } else if (settingsModal && settingsModal.style.display === 'flex') {
                 closeSettingsModal();
+            } else if (adventureSettingsModal && adventureSettingsModal.style.display === 'flex') {
+                closeAdventureSettingsModal();
             } else if (damageModal && damageModal.style.display === 'flex') {
                 closeDamageModal();
             } else if (healModal && healModal.style.display === 'flex') {
@@ -753,6 +781,105 @@ function closeSettingsModal() {
     modal.style.display = 'none';
 }
 
+// Adventure Settings Modal
+function openAdventureSettingsModal() {
+    const modal = document.getElementById('adventureSettingsModal');
+    const pinInput = document.getElementById('adventurePinInput');
+    const pinStatusText = document.getElementById('pinStatusText');
+    
+    // Load current PIN if it exists
+    const currentPin = currentAdventure.pin || '';
+    pinInput.value = currentPin;
+    
+    // Update status text
+    if (currentPin) {
+        pinStatusText.textContent = `Current PIN: ${currentPin}`;
+        pinStatusText.style.color = '#27ae60';
+    } else {
+        pinStatusText.textContent = 'No PIN set';
+        pinStatusText.style.color = '#666';
+    }
+    
+    modal.style.display = 'flex';
+    setTimeout(() => pinInput.focus(), 100);
+}
+
+function closeAdventureSettingsModal() {
+    const modal = document.getElementById('adventureSettingsModal');
+    modal.style.display = 'none';
+}
+
+async function saveAdventurePin() {
+    const pinInput = document.getElementById('adventurePinInput');
+    const pin = pinInput.value.trim();
+    
+    // Validate PIN (must be empty or 4 digits)
+    if (pin && (pin.length !== 4 || !/^\d{4}$/.test(pin))) {
+        alert('PIN must be exactly 4 digits or empty');
+        pinInput.focus();
+        return;
+    }
+    
+    // Get current adventure name
+    const adventureName = currentAdventure.name;
+    
+    // Check if PIN is actually changing
+    const oldPin = currentAdventure.pin || '';
+    const pinChanged = oldPin !== pin;
+    
+    // Update adventure with new PIN (or remove if empty)
+    if (pin) {
+        currentAdventure.pin = pin;
+        // Increment PIN version to invalidate all existing sessions
+        if (pinChanged) {
+            currentAdventure.pinVersion = (currentAdventure.pinVersion || 0) + 1;
+        }
+    } else {
+        delete currentAdventure.pin;
+        // Increment version even when removing PIN to invalidate sessions
+        if (pinChanged) {
+            currentAdventure.pinVersion = (currentAdventure.pinVersion || 0) + 1;
+        }
+    }
+    
+    // Save adventure with new PIN and version
+    const saveResponse = await fetch(`/api/adventure/${adventureName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentAdventure)
+    });
+    
+    if (saveResponse.status === 403) {
+        alert('Your session is not valid. Please reload the page and re-enter your PIN.');
+        return;
+    }
+    
+    if (!saveResponse.ok) {
+        alert('Failed to save PIN. Please try again.');
+        return;
+    }
+    
+    // Clear current session if PIN changed
+    if (pinChanged) {
+        try {
+            await fetch(`/api/adventure/${adventureName}/invalidate-sessions`, {
+                method: 'POST'
+            });
+        } catch (error) {
+            console.error('Error clearing session:', error);
+        }
+    }
+    
+    // Close modal and show confirmation
+    closeAdventureSettingsModal();
+    
+    if (pin) {
+        alert(`✓ DM Interface PIN set to: ${pin}\n\nUsers loading this adventure will need to enter this PIN.\nSpectator view remains accessible without PIN.\n\nAll existing sessions have been invalidated.`);
+    } else {
+        alert('✓ PIN protection removed\n\nAnyone can now load this adventure in the DM interface.');
+    }
+}
+
 // Damage Modal
 function openDamageModal() {
     // Find an active encounter (started or just any encounter with combatants)
@@ -1246,7 +1373,63 @@ async function handleAdventureChange(e) {
     }
     
     const response = await fetch(`/api/adventure/${name}`);
-    currentAdventure = await response.json();
+    
+    // Check if PIN is required
+    if (response.status === 403) {
+        const errorData = await response.json();
+        if (errorData.requiresPin) {
+            // Prompt for PIN
+            const pin = prompt(`Adventure "${name}" is protected.\n\nEnter the 4-digit PIN:`);
+            if (!pin) {
+                // User canceled - reset everything
+                e.target.value = ''; // Reset selection
+                currentAdventure = null;
+                document.getElementById('adventureContent').style.display = 'none';
+                document.getElementById('adventureSelectionHeader').style.display = 'flex';
+                document.getElementById('adventureHeader').style.display = 'none';
+                // Clear URL parameters
+                const url = new URL(window.location);
+                url.searchParams.delete('adventure');
+                url.searchParams.delete('chapter');
+                window.history.pushState({}, '', url);
+                return;
+            }
+            
+            // Verify PIN
+            const verifyResponse = await fetch(`/api/adventure/${name}/verify-pin`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pin })
+            });
+            
+            if (!verifyResponse.ok) {
+                alert('Incorrect PIN');
+                // Wrong PIN - reset everything
+                e.target.value = ''; // Reset selection
+                currentAdventure = null;
+                document.getElementById('adventureContent').style.display = 'none';
+                document.getElementById('adventureSelectionHeader').style.display = 'flex';
+                document.getElementById('adventureHeader').style.display = 'none';
+                // Clear URL parameters
+                const url = new URL(window.location);
+                url.searchParams.delete('adventure');
+                url.searchParams.delete('chapter');
+                window.history.pushState({}, '', url);
+                return;
+            }
+            
+            // PIN verified, load again
+            const retryResponse = await fetch(`/api/adventure/${name}`);
+            currentAdventure = await retryResponse.json();
+        } else {
+            alert('Error loading adventure: ' + errorData.error);
+            e.target.value = '';
+            currentAdventure = null;
+            return;
+        }
+    } else {
+        currentAdventure = await response.json();
+    }
     
     // Clear CR fetch status when loading new adventure
     crFetchStatus = {};
@@ -1989,6 +2172,12 @@ function renderEncounters() {
                 if (initA === initB) {
                     const bonusA = a.initiativeBonus || 0;
                     const bonusB = b.initiativeBonus || 0;
+                    if (bonusA === bonusB) {
+                        // Final tiebreaker: use combatant name/id for stable sort
+                        const nameA = getCombatantName(a) || a.id || '';
+                        const nameB = getCombatantName(b) || b.id || '';
+                        return nameA.localeCompare(nameB);
+                    }
                     return bonusB - bonusA;
                 }
                 
@@ -3036,6 +3225,12 @@ function sortInitiative(encounterIndex) {
         if (initA === initB) {
             const bonusA = a.initiativeBonus || 0;
             const bonusB = b.initiativeBonus || 0;
+            if (bonusA === bonusB) {
+                // Final tiebreaker: use combatant name/id for stable sort
+                const nameA = getCombatantName(a) || a.id || '';
+                const nameB = getCombatantName(b) || b.id || '';
+                return nameA.localeCompare(nameB);
+            }
             return bonusB - bonusA;
         }
         
@@ -3054,8 +3249,11 @@ function refreshPlayers(encounterIndex) {
     
     // Add all players from the Players section
     currentAdventure.players.forEach(player => {
+        // Extract just the ID from dndBeyondUrl (handles both full URLs and bare IDs)
+        const playerId = player.dndBeyondUrl ? player.dndBeyondUrl.split('/').pop() : '';
+        
         encounter.combatants.push({
-            id: player.dndBeyondUrl, // Store player ID for lookup
+            id: playerId, // Store player ID for lookup
             initiative: 0,
             initiativeBonus: player.initiativeBonus || 0,
             hp: player.maxHp || 0,
@@ -3115,6 +3313,9 @@ async function refreshMonsterStats(encounterIndex, showNotification = true) {
                     urlToMonsters[url].forEach(monster => {
                         if (details.initiativeModifier !== undefined) {
                             monster.initiativeBonus = details.initiativeModifier;
+                            // Roll new initiative with the updated bonus
+                            const d20 = Math.floor(Math.random() * 20) + 1;
+                            monster.initiative = d20 + details.initiativeModifier;
                         }
                         if (details.ac) monster.ac = details.ac;
                         if (details.hp) {
@@ -3433,6 +3634,12 @@ function startEncounter(encounterIndex) {
         if (initA === initB) {
             const bonusA = a.initiativeBonus || 0;
             const bonusB = b.initiativeBonus || 0;
+            if (bonusA === bonusB) {
+                // Final tiebreaker: use combatant name/id for stable sort
+                const nameA = getCombatantName(a) || a.id || '';
+                const nameB = getCombatantName(b) || b.id || '';
+                return nameA.localeCompare(nameB);
+            }
             return bonusB - bonusA;
         }
         
@@ -3549,6 +3756,29 @@ function nextTurn(encounterIndex) {
     autoSave();
 }
 
+function previousTurn(encounterIndex) {
+    const encounter = currentAdventure.encounters[encounterIndex];
+    const combatants = encounter.combatants;
+    
+    // Only go back if encounter is started
+    if (encounter.state !== 'started' || combatants.length === 0) return;
+    
+    // Find previous
+    let currentIndex = encounter.currentTurn || 0;
+    currentIndex = (currentIndex - 1 + combatants.length) % combatants.length;
+    
+    // Decrement round when we wrap back to the last combatant
+    if (currentIndex === combatants.length - 1) {
+        encounter.currentRound = Math.max(1, (encounter.currentRound || 1) - 1);
+    }
+    
+    encounter.activeCombatant = getCombatantName(combatants[currentIndex]);
+    encounter.currentTurn = currentIndex;
+    
+    renderEncounters();
+    autoSave();
+}
+
 // Auto-save
 function autoSave() {
     clearTimeout(autoSaveTimeout);
@@ -3556,13 +3786,30 @@ function autoSave() {
         const name = document.getElementById('adventureSelect').value;
         if (!name) return;
         
-        await fetch(`/api/adventure/${name}`, {
+        // Safety check: only save if currentAdventure is loaded and matches the selected adventure
+        if (!currentAdventure || currentAdventure.name !== name) {
+            console.warn('AutoSave blocked: currentAdventure does not match selected adventure');
+            return;
+        }
+        
+        const response = await fetch(`/api/adventure/${name}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(currentAdventure)
         });
         
-        showSaveIndicator();
+        if (response.status === 403) {
+            // Session expired or invalid - clear state and prompt for reload
+            alert('Your session has expired. Please reload the page and re-enter your PIN.');
+            currentAdventure = null;
+            document.getElementById('adventureSelect').value = '';
+            document.getElementById('adventureContent').style.display = 'none';
+            return;
+        }
+        
+        if (response.ok) {
+            showSaveIndicator();
+        }
     }, 500);
 }
 
