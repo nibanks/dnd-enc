@@ -68,6 +68,8 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
 - ⌨️ **Keyboard Shortcuts**:
   - Ctrl+D: Open damage tracking modal
   - Ctrl+H: Open healing tracking modal
+  - Ctrl+Right Arrow: Next turn (during active encounter)
+  - Ctrl+Left Arrow: Previous turn (during active encounter)
   - ESC: Close any open modal
 - 🔗 **URL Routing** - Direct links to specific adventures and chapters
 - 📍 **Scroll Persistence** - Automatically restores scroll position on page refresh
@@ -167,7 +169,8 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
    - Edit controls (+, ↻, ×) hidden
 3. **During Combat**:
    - Active combatant highlighted with ▶ arrow
-   - Click "Next Turn" to advance
+   - Click "Next" or "Prev" buttons to navigate turns
+   - Use Ctrl+Right Arrow / Ctrl+Left Arrow for quick turn navigation
    - Track HP changes (red name when HP ≤ 0)
    - Track damage dealt (DMG column)
    - Track healing (Heal column)
@@ -264,6 +267,8 @@ Adventures are stored in the `adventures/` directory as JSON files. The format i
 - **Keyboard Shortcuts**: 
   - Ctrl+D for damage tracking (quick damage assignment between combatants)
   - Ctrl+H for healing tracking (track healing done)
+  - Ctrl+Right Arrow for next turn (during active encounter)
+  - Ctrl+Left Arrow for previous turn (during active encounter)
   - ESC to close any modal
 - **Statistics Charts**: View campaign analytics on the main page showing initiative distributions, CR progression, and damage analysis
 - **Damage Tracking**: The damage chart shows per-player contributions with an "Other" bar for environmental/untracked damage when totals don't match

@@ -1242,6 +1242,11 @@ def get_monster_details(monster_url):
 def index():
     return render_template('index.html')
 
+@app.route('/statistics')
+def statistics():
+    """Statistics view for viewing aggregated campaign data"""
+    return render_template('statistics.html')
+
 @app.route('/spectator')
 def spectator():
     """Spectator view for players to watch combat"""
@@ -1472,9 +1477,12 @@ def get_adventure(name):
     with open(filepath, 'r') as f:
         data = json.load(f)
     
-    # Check if adventure has PIN protection
+    # Check if this is a read-only request (e.g., for statistics page)
+    readonly = request.args.get('readonly', 'false').lower() == 'true'
+    
+    # Check if adventure has PIN protection (skip for read-only requests)
     adventure_pin = data.get('pin')
-    if adventure_pin:
+    if adventure_pin and not readonly:
         # Check if this adventure has been verified in this session with current PIN version
         verified_adventures = session.get('verified_adventures', {})
         current_pin_version = data.get('pinVersion', 0)
@@ -1490,7 +1498,12 @@ def get_adventure(name):
     # Restore full URLs after loading
     data = restore_adventure_from_storage(data)
     
-    # Keep both pin and pinVersion for the DM interface
+    # For read-only requests, remove sensitive data like PIN
+    if readonly:
+        data.pop('pin', None)
+        data.pop('pinVersion', None)
+    
+    # Keep both pin and pinVersion for the DM interface (non-readonly)
     # (They need to see/edit the PIN in settings)
     # Security is handled by the session-based verification on initial load
     

@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D Statistics</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px;">
+                <h1 style="margin: 0;">
+                    <a href="/" style="text-decoration: none; cursor: pointer;" title="Return to main page">🎲</a>
+                    <span>D&D Campaign Statistics</span>
+                </h1>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="adventureSelect" style="flex: 1; max-width: 400px; padding: 8px 12px;">
+                        <option value="">-- Select Adventure --</option>
+                    </select>
+                    <button id="backToEncountersBtn" onclick="goBackToEncounters()" style="background: #3498db; padding: 8px 16px; white-space: nowrap;" title="Return to adventure encounters">Back to Encounters</button>
+                </div>
+            </div>
+        </header>
+
+        <div id="statisticsContent" style="display: none;">
+            <!-- Statistics Section -->
+            <section class="section">
+                <div style="margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 10px;">Initiative Distribution by Player</h3>
+                    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <canvas id="initiativeChart"></canvas>
+                    </div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 10px;">Encounter Challenge Rating Over Time</h3>
+                    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <canvas id="crChart"></canvas>
+                    </div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 10px;">Damage Dealt Per Encounter</h3>
+                    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <canvas id="damageChart"></canvas>
+                    </div>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 10px;">Total Damage by Player</h3>
+                    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <canvas id="damagePieChart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div id="noAdventureSelected" style="text-align: center; padding: 50px; color: #666;">
+            <p style="font-size: 18px;">Select an adventure to view statistics</p>
+            <p style="font-size: 14px; color: #999;">Check browser console (F12) for debugging information</p>
+        </div>
+    </div>
+
+    <script>
+        // Constants from main script (needed for calculations)
+        const CR_TO_XP = {
+            '0': 10, '1/8': 25, '1/4': 50, '1/2': 100,
+            '1': 200, '2': 450, '3': 700, '4': 1100, '5': 1800,
+            '6': 2300, '7': 2900, '8': 3900, '9': 5000, '10': 5900,
+            '11': 7200, '12': 8400, '13': 10000, '14': 11500, '15': 13000,
+            '16': 15000, '17': 18000, '18': 20000, '19': 22000, '20': 25000,
+            '21': 33000, '22': 41000, '23': 50000, '24': 62000, '25': 75000,
+            '26': 90000, '27': 105000, '28': 120000, '29': 135000, '30': 155000
+        };
+
+        // D&D 5e XP thresholds for leveling
+        const LEVEL_THRESHOLDS = [
+            { level: 1, xp: 0, color: '#ecf0f120' },
+            { level: 2, xp: 300, color: '#d5e8d420' },
+            { level: 3, xp: 900, color: '#d4edda20' },
+            { level: 4, xp: 2700, color: '#cfe2ff20' },
+            { level: 5, xp: 6500, color: '#e2e3e520' },
+            { level: 6, xp: 14000, color: '#fff3cd20' },
+            { level: 7, xp: 23000, color: '#ffe69c20' },
+            { level: 8, xp: 34000, color: '#f8d7da20' },
+            { level: 9, xp: 48000, color: '#f5c2c720' },
+            { level: 10, xp: 64000, color: '#d1e7dd20' },
+            { level: 11, xp: 85000, color: '#cff4fc20' },
+            { level: 12, xp: 100000, color: '#e7e7e720' },
+            { level: 13, xp: 120000, color: '#e0cffc20' },
+            { level: 14, xp: 140000, color: '#ffd6cc20' },
+            { level: 15, xp: 165000, color: '#d0f0c020' },
+            { level: 16, xp: 195000, color: '#ffeaa720' },
+            { level: 17, xp: 225000, color: '#ffe5d020' },
+            { level: 18, xp: 265000, color: '#f7d6e620' },
+            { level: 19, xp: 305000, color: '#d6eaf820' },
+            { level: 20, xp: 355000, color: '#ffd70020' }
+        ];
+
+        let DND_MONSTERS = {}; // Will be populated from API
+
+        // Load monsters data
+        async function loadMonsters() {
+            try {
+                const response = await fetch('/api/dndbeyond/monsters');
+                if (response.ok) {
+                    const data = await response.json();
+                    DND_MONSTERS = data.monsters || {};
+                }
+            } catch (error) {
+                console.warn('Could not load monsters:', error);
+            }
+        }
+
+        // Helper functions
+        function isPlayerCombatant(combatant) {
+            return !combatant.hasOwnProperty('name');
+        }
+
+        function getCombatantName(combatant) {
+            if (combatant.hasOwnProperty('name')) {
+                return combatant.name;
+            }
+            if (combatant.dndBeyondUrl) {
+                const player = currentAdventure.players?.find(p => p.dndBeyondUrl === combatant.dndBeyondUrl);
+                return player?.name || 'Unknown';
+            }
+            return 'Unknown';
+        }
+
+        function getEncounterCR(encounter) {
+            if (encounter.totalCR !== undefined && encounter.totalCR !== null && encounter.totalCR !== '') {
+                return encounter.totalCR;
+            }
+            return calculateDefaultEncounterCR(encounter);
+        }
+
+        function calculateDefaultEncounterCR(encounter) {
+            if (!encounter.combatants) return '0';
+            
+            const monsters = encounter.combatants.filter(combatant => !isPlayerCombatant(combatant));
+            const totalXP = monsters.reduce((sum, combatant) => {
+                let cr = combatant.cr || '';
+                
+                // If no CR on combatant, try looking up in monster database
+                if (!cr && combatant.name) {
+                    const baseName = combatant.name.replace(/\s+\d+$/, '');
+                    const monster = DND_MONSTERS[baseName];
+                    cr = monster?.cr || '';
+                }
+                
+                const xp = CR_TO_XP[cr] || 0;
+                return sum + xp;
+            }, 0);
+            
+            const monsterCount = monsters.length;
+            let multiplier = 1;
+            if (monsterCount === 0) multiplier = 1;
+            else if (monsterCount === 1) multiplier = 1;
+            else if (monsterCount === 2) multiplier = 1.5;
+            else if (monsterCount >= 3 && monsterCount <= 6) multiplier = 2;
+            else if (monsterCount >= 7 && monsterCount <= 10) multiplier = 2.5;
+            else if (monsterCount >= 11 && monsterCount <= 14) multiplier = 3;
+            else multiplier = 4;
+            
+            const adjustedXP = Math.round(totalXP * multiplier);
+            
+            const xpToCR = [
+                [10, '0'], [25, '1/8'], [50, '1/4'], [100, '1/2'],
+                [200, '1'], [450, '2'], [700, '3'], [1100, '4'], [1800, '5'],
+                [2300, '6'], [2900, '7'], [3900, '8'], [5000, '9'], [5900, '10'],
+                [7200, '11'], [8400, '12'], [10000, '13'], [11500, '14'], [13000, '15'],
+                [15000, '16'], [18000, '17'], [20000, '18'], [22000, '19'], [25000, '20'],
+                [33000, '21'], [41000, '22'], [50000, '23'], [62000, '24'], [75000, '25'],
+                [90000, '26'], [105000, '27'], [120000, '28'], [135000, '29'], [155000, '30']
+            ];
+            
+            for (let i = xpToCR.length - 1; i >= 0; i--) {
+                if (adjustedXP >= xpToCR[i][0]) {
+                    return xpToCR[i][1];
+                }
+            }
+            
+            return '0';
+        }
+
+        // Initialize statistics page
+        let currentAdventure = null;
+        let initiativeChart = null;
+        let crChart = null;
+        let damageChart = null;
+        let damagePieChart = null;
+
+        // Load adventures
+        async function loadAdventures() {
+            try {
+                const response = await fetch('/api/adventures');
+                const adventures = await response.json();
+                const select = document.getElementById('adventureSelect');
+                select.innerHTML = '<option value="">-- Select Adventure --</option>';
+                adventures.forEach(adv => {
+                    const option = document.createElement('option');
+                    option.value = adv;
+                    option.textContent = adv;
+                    select.appendChild(option);
+                });
+                
+                // Check for adventure parameter in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const adventureName = urlParams.get('adventure');
+                if (adventureName) {
+                    select.value = adventureName;
+                    loadAdventure(adventureName);
+                }
+            } catch (error) {
+                console.error('Error loading adventures:', error);
+            }
+        }
+
+        // Load adventure data
+        async function loadAdventure(name) {
+            if (!name) {
+                document.getElementById('statisticsContent').style.display = 'none';
+                document.getElementById('noAdventureSelected').style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/adventure/${encodeURIComponent(name)}?readonly=true`);
+                if (!response.ok) {
+                    throw new Error('Adventure not found');
+                }
+                currentAdventure = await response.json();
+                document.getElementById('statisticsContent').style.display = 'block';
+                document.getElementById('noAdventureSelected').style.display = 'none';
+                
+                // Ensure monsters are loaded before rendering charts
+                await loadMonsters();
+                
+                // Render all charts with combined data
+                renderAllChartsAcrossAllChapters();
+            } catch (error) {
+                console.error('Error loading adventure:', error);
+                alert('Error loading adventure: ' + error.message);
+            }
+        }
+
+        // Render all charts with data from ALL chapters
+        function renderAllChartsAcrossAllChapters() {
+            renderInitiativeChartAllChapters();
+            renderCRChartAllChapters();
+            renderDamageChartAllChapters();
+            renderPlayerDamagePieChart();
+        }
+
+        // Render initiative chart with ALL chapters
+        function renderInitiativeChartAllChapters() {
+            const ctx = document.getElementById('initiativeChart');
+            if (!ctx) return;
+            
+            const playerInitiatives = {};
+            
+            // Initialize for each player
+            if (currentAdventure.players) {
+                currentAdventure.players.forEach(player => {
+                    playerInitiatives[player.name] = [];
+                });
+            }
+            
+            // Collect all initiative rolls from ALL encounters (no chapter filter)
+            if (currentAdventure.encounters) {
+                currentAdventure.encounters.forEach(encounter => {
+                    if (encounter.state === 'started' || encounter.state === 'complete') {
+                        if (encounter.combatants) {
+                            encounter.combatants.forEach(combatant => {
+                                if (isPlayerCombatant(combatant)) {
+                                    const playerName = getCombatantName(combatant);
+                                    if (playerInitiatives[playerName] !== undefined) {
+                                        playerInitiatives[playerName].push(combatant.initiative || 0);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            
+            // Find min and max initiative
+            let minInit = Infinity;
+            let maxInit = -Infinity;
+            Object.values(playerInitiatives).forEach(initiatives => {
+                if (initiatives.length > 0) {
+                    minInit = Math.min(minInit, ...initiatives);
+                    maxInit = Math.max(maxInit, ...initiatives);
+                }
+            });
+            
+            if (minInit === Infinity || maxInit === -Infinity) {
+                return;
+            }
+            
+            // Create datasets
+            const datasets = [];
+            const colors = [
+                '#e74c3c', '#3498db', '#2ecc71', '#f39c12', 
+                '#9b59b6', '#e91e63', '#00bcd4', '#ff5722'
+            ];
+            
+            let colorIndex = 0;
+            Object.entries(playerInitiatives).forEach(([playerName, initiatives]) => {
+                if (initiatives.length === 0) return;
+                
+                const frequency = {};
+                initiatives.forEach(init => {
+                    frequency[init] = (frequency[init] || 0) + 1;
+                });
+                
+                const data = [];
+                for (let i = minInit; i <= maxInit; i++) {
+                    data.push({ x: i, y: frequency[i] || 0 });
+                }
+                
+                const color = colors[colorIndex % colors.length];
+                datasets.push({
+                    label: playerName,
+                    data: data,
+                    backgroundColor: color,
+                    borderColor: color,
+                    borderWidth: 1
+                });
+                colorIndex++;
+            });
+            
+            if (initiativeChart) {
+                initiativeChart.destroy();
+            }
+            
+            initiativeChart = new Chart(ctx, {
+                type: 'bar',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.5,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        title: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y + ' time(s) at initiative ' + context.parsed.x;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Initiative Score' },
+                            ticks: { stepSize: 1 },
+                            stacked: true
+                        },
+                        y: {
+                            type: 'linear',
+                            title: { display: true, text: 'Count' },
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, precision: 0 },
+                            stacked: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render CR chart with ALL chapters
+        function renderCRChartAllChapters() {
+            const canvas = document.getElementById('crChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const encounterData = [];
+            const xpData = [];
+            
+            // Use ALL encounters (no chapter filter)
+            const allEncounters = currentAdventure.encounters || [];
+            const numPlayers = currentAdventure.players?.length || 1;
+            let cumulativeXP = 0;
+            
+            allEncounters.forEach((encounter, index) => {
+                const crString = getEncounterCR(encounter);
+                let crValue = 0;
+                
+                if (crString.includes('/')) {
+                    const parts = crString.split('/');
+                    crValue = parseInt(parts[0]) / parseInt(parts[1]);
+                } else {
+                    crValue = parseFloat(crString) || 0;
+                }
+                
+                // Calculate XP for this encounter
+                let encounterXP = 0;
+                if (encounter.totalCR !== undefined && encounter.totalCR !== null && encounter.totalCR !== '') {
+                    encounterXP = CR_TO_XP[encounter.totalCR] || 0;
+                } else if (encounter.combatants) {
+                    const monsters = encounter.combatants.filter(combatant => !isPlayerCombatant(combatant));
+                    const totalXP = monsters.reduce((sum, combatant) => {
+                        let cr = combatant.cr || '';
+                        if (!cr && combatant.name) {
+                            const baseName = combatant.name.replace(/\s+\d+$/, '');
+                            const monster = DND_MONSTERS[baseName];
+                            cr = monster?.cr || '';
+                        }
+                        const xp = CR_TO_XP[cr] || 0;
+                        return sum + xp;
+                    }, 0);
+                    
+                    // Apply multiplier
+                    const monsterCount = monsters.length;
+                    let multiplier = 1;
+                    if (monsterCount === 0) multiplier = 1;
+                    else if (monsterCount === 1) multiplier = 1;
+                    else if (monsterCount === 2) multiplier = 1.5;
+                    else if (monsterCount >= 3 && monsterCount <= 6) multiplier = 2;
+                    else if (monsterCount >= 7 && monsterCount <= 10) multiplier = 2.5;
+                    else if (monsterCount >= 11 && monsterCount <= 14) multiplier = 3;
+                    else multiplier = 4;
+                    
+                    encounterXP = Math.round(totalXP * multiplier);
+                }
+                
+                cumulativeXP += encounterXP;
+                const xpPerPlayer = cumulativeXP / numPlayers;
+                
+                encounterData.push({
+                    x: index + 1,
+                    y: crValue,
+                    label: encounter.name || `Encounter ${index + 1}`,
+                    state: encounter.state,
+                    chapter: encounter.chapter || 'Unknown',
+                    xp: encounterXP
+                });
+                
+                xpData.push({
+                    x: index + 1,
+                    y: xpPerPlayer,
+                    label: encounter.name || `Encounter ${index + 1}`,
+                    state: encounter.state,
+                    chapter: encounter.chapter || 'Unknown'
+                });
+            });
+            
+            if (crChart) {
+                crChart.destroy();
+            }
+            
+            // Calculate level colors for each data point
+            const levelColors = [
+        '#8B0000', // Level 1 - DarkRed
+        '#FF4500', // Level 2 - OrangeRed
+        '#FFA500', // Level 3 - Orange
+        '#FFD700', // Level 4 - Gold
+        '#FFFF00', // Level 5 - Yellow
+        '#9ACD32', // Level 6 - YellowGreen
+        '#32CD32', // Level 7 - LimeGreen
+        '#00FF00', // Level 8 - Lime
+        '#00CED1', // Level 9 - DarkTurquoise
+        '#00BFFF', // Level 10 - DeepSkyBlue
+        '#1E90FF', // Level 11 - DodgerBlue
+        '#0000FF', // Level 12 - Blue
+        '#4B0082', // Level 13 - Indigo
+        '#8B00FF', // Level 14 - Violet
+        '#9932CC', // Level 15 - DarkOrchid
+        '#FF00FF', // Level 16 - Magenta
+        '#FF1493', // Level 17 - DeepPink
+        '#C71585', // Level 18 - MediumVioletRed
+        '#DC143C', // Level 19 - Crimson
+        '#000000'  // Level 20 - Black
+    ];
+    
+    function getPlayerLevel(xp) {
+        let level = 1;
+        for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+            if (xp >= LEVEL_THRESHOLDS[i].xp) {
+                level = LEVEL_THRESHOLDS[i].level;
+                break;
+            }
+        }
+        return level;
+    }
+    
+    // Assign colors to each XP data point based on level
+    const xpPointColors = xpData.map(d => {
+        const level = getPlayerLevel(d.y);
+        return levelColors[level - 1] || '#27ae60';
+    });
+    
+    crChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: 'Total Encounter CR',
+                data: encounterData,
+                borderColor: '#e74c3c',
+                backgroundColor: '#e74c3c20',
+                borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: encounterData.map(d => d.state === 'complete' ? '#e74c3c' : '#3498db'),
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Cumulative XP per Player',
+                        data: xpData,
+                        borderColor: '#666',
+                        borderWidth: 2,
+                        tension: 0.4,
+                        fill: false,
+                        pointRadius: 8,
+                        pointHoverRadius: 10,
+                        pointBackgroundColor: xpPointColors,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointHoverBorderWidth: 3,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.5,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        title: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    const data = context[0].dataset.data[context[0].dataIndex];
+                                    return data.label + ' (Chapter: ' + data.chapter + ')';
+                                },
+                                label: function(context) {
+                                    if (context.dataset.label === 'Total Encounter CR') {
+                                        const dataPoint = context.dataset.data[context.dataIndex];
+                                        const xp = dataPoint.xp || 0;
+                                        return 'Total CR: ' + context.parsed.y.toFixed(2) + ' | XP: ' + xp.toLocaleString();
+                                    } else {
+                                        const xpValue = context.parsed.y;
+                                        // Find current level
+                                        let currentLevel = 1;
+                                        for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+                                            if (xpValue >= LEVEL_THRESHOLDS[i].xp) {
+                                                currentLevel = LEVEL_THRESHOLDS[i].level;
+                                                break;
+                                            }
+                                        }
+                                        return 'Cumulative XP/Player: ' + Math.round(context.parsed.y).toLocaleString() + ' (Level ' + currentLevel + ')';
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Encounter Number' },
+                            ticks: { stepSize: 1, precision: 0 }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'Challenge Rating' },
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(1);
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { display: true, text: 'XP per Player' },
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render damage chart with ALL chapters
+        function renderDamageChartAllChapters() {
+            const canvas = document.getElementById('damageChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const playerNames = currentAdventure.players?.map(p => p.name) || [];
+            const colors = [
+                '#e74c3c', '#3498db', '#2ecc71', '#f39c12',
+                '#9b59b6', '#e91e63', '#00bcd4', '#ff5722'
+            ];
+            
+            const datasets = [];
+            
+            // Use ALL encounters (no chapter filter)
+            const allEncounters = currentAdventure.encounters || [];
+            
+            // Total enemy damage
+            const totalEnemyDamageData = [];
+            allEncounters.forEach((encounter, index) => {
+                if (!encounter.combatants) {
+                    totalEnemyDamageData.push({ x: index + 1, y: 0 });
+                    return;
+                }
+                
+                let totalEnemyDamage = 0;
+                encounter.combatants.forEach(combatant => {
+                    if (!isPlayerCombatant(combatant)) {
+                        totalEnemyDamage += combatant.dmg || 0;
+                    }
+                });
+                
+                totalEnemyDamageData.push({ x: index + 1, y: totalEnemyDamage });
+            });
+            
+            datasets.push({
+                label: 'Enemy Damage',
+                data: totalEnemyDamageData,
+                backgroundColor: '#e7474780',
+                borderColor: '#c0392b',
+                borderWidth: 2,
+                stack: 'taken'
+            });
+            
+            // Player datasets
+            playerNames.forEach((playerName, idx) => {
+                const color = colors[idx % colors.length];
+                const playerData = [];
+                
+                allEncounters.forEach((encounter, index) => {
+                    if (!encounter.combatants) {
+                        playerData.push({ x: index + 1, y: 0 });
+                        return;
+                    }
+                    
+                    let playerDamage = 0;
+                    encounter.combatants.forEach(combatant => {
+                        if (isPlayerCombatant(combatant)) {
+                            const combatantName = getCombatantName(combatant);
+                            if (combatantName === playerName) {
+                                playerDamage += combatant.dmg || 0;
+                            }
+                        }
+                    });
+                    
+                    playerData.push({ x: index + 1, y: playerDamage });
+                });
+                
+                datasets.push({
+                    label: playerName,
+                    data: playerData,
+                    backgroundColor: color,
+                    borderColor: color,
+                    borderWidth: 1,
+                    stack: 'players'
+                });
+            });
+            
+            // "Other" dataset
+            const otherData = [];
+            allEncounters.forEach((encounter, index) => {
+                if (!encounter.combatants) {
+                    otherData.push({ x: index + 1, y: 0 });
+                    return;
+                }
+                
+                let totalDamage = 0;
+                encounter.combatants.forEach(combatant => {
+                    if (!isPlayerCombatant(combatant)) {
+                        const maxHp = combatant.maxHp || 0;
+                        const currentHp = combatant.hp || 0;
+                        const damageTaken = Math.max(0, maxHp - currentHp);
+                        totalDamage += damageTaken;
+                    }
+                });
+                
+                let trackedDamage = 0;
+                encounter.combatants.forEach(combatant => {
+                    if (isPlayerCombatant(combatant)) {
+                        trackedDamage += combatant.dmg || 0;
+                    }
+                });
+                
+                const otherDamage = Math.max(0, totalDamage - trackedDamage);
+                otherData.push({ x: index + 1, y: otherDamage });
+            });
+            
+            const hasOtherDamage = otherData.some(d => d.y > 0);
+            if (hasOtherDamage) {
+                datasets.push({
+                    label: 'Other',
+                    data: otherData,
+                    backgroundColor: '#95a5a6',
+                    borderColor: '#7f8c8d',
+                    borderWidth: 1,
+                    stack: 'players'
+                });
+            }
+            
+            if (damageChart) {
+                damageChart.destroy();
+            }
+            
+            damageChart = new Chart(ctx, {
+                type: 'bar',
+                data: { datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.5,
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        title: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                title: function(context) {
+                                    const encounterIndex = context[0].parsed.x - 1;
+                                    const encounter = allEncounters[encounterIndex];
+                                    return (encounter?.name || `Encounter ${context[0].parsed.x}`) + 
+                                           ' (Chapter: ' + (encounter?.chapter || 'Unknown') + ')';
+                                },
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y + ' damage';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: { display: true, text: 'Encounter Number' },
+                            ticks: { stepSize: 1, precision: 0 }
+                        },
+                        y: {
+                            type: 'linear',
+                            title: { display: true, text: 'Damage' },
+                            beginAtZero: true,
+                            stacked: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render pie chart showing total damage by player across all chapters
+        function renderPlayerDamagePieChart() {
+            const canvas = document.getElementById('damagePieChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const playerNames = currentAdventure.players?.map(p => p.name) || [];
+            const allEncounters = currentAdventure.encounters || [];
+            
+            // Calculate total damage for each player across all encounters
+            const playerTotalDamage = {};
+            playerNames.forEach(name => {
+                playerTotalDamage[name] = 0;
+            });
+            
+            allEncounters.forEach(encounter => {
+                if (!encounter.combatants) return;
+                
+                // Sum player damage
+                encounter.combatants.forEach(combatant => {
+                    if (isPlayerCombatant(combatant)) {
+                        const combatantName = getCombatantName(combatant);
+                        if (playerTotalDamage.hasOwnProperty(combatantName)) {
+                            playerTotalDamage[combatantName] += combatant.dmg || 0;
+                        }
+                    }
+                });
+            });
+            
+            // Prepare chart data
+            const labels = [];
+            const data = [];
+            const backgroundColor = [];
+            
+            const colors = [
+                '#e74c3c', '#3498db', '#2ecc71', '#f39c12',
+                '#9b59b6', '#e91e63', '#00bcd4', '#ff5722'
+            ];
+            
+            playerNames.forEach((name, idx) => {
+                if (playerTotalDamage[name] > 0) {
+                    labels.push(name);
+                    data.push(playerTotalDamage[name]);
+                    backgroundColor.push(colors[idx % colors.length]);
+                }
+            });
+            
+            // Destroy existing chart
+            if (damagePieChart) {
+                damagePieChart.destroy();
+            }
+            
+            // Create pie chart
+            damagePieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColor,
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.5,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'right'
+                        },
+                        title: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return label + ': ' + value.toLocaleString() + ' damage (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Navigate back to the encounter page for current adventure
+        function goBackToEncounters() {
+            const adventureName = document.getElementById('adventureSelect').value;
+            if (adventureName) {
+                window.location.href = '/?adventure=' + encodeURIComponent(adventureName);
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        // Event listeners
+        document.getElementById('adventureSelect').addEventListener('change', (e) => {
+            loadAdventure(e.target.value);
+        });
+
+        // Initialize when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadAdventures);
+        } else {
+            loadAdventures();
+        }
+    </script>
+</body>
+</html>

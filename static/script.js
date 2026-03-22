@@ -8,9 +8,6 @@ let hasCookies = false; // Track cookie authentication status
 let playersExpanded = true; // Track players section state
 let playersEditMode = false; // Track players edit mode
 let encounterEditMode = {}; // Track edit mode for completed encounters by index
-let initiativeChart = null; // Chart instance for initiative distribution
-let crChart = null; // Chart instance for CR over time
-let damageChart = null; // Chart instance for damage dealt per encounter
 let cachedSpectatorUrl = null; // Cached spectator URL to prevent flashing
 let crFetchStatus = {}; // Track CR fetch status to prevent duplicate fetches: {encounterIndex_combatantIndex: true}
 
@@ -65,6 +62,30 @@ const CR_TO_XP = {
     '29': 135000,
     '30': 155000
 };
+
+// D&D 5e XP thresholds for leveling
+const LEVEL_THRESHOLDS = [
+    { level: 1, xp: 0, color: '#ecf0f120' },
+    { level: 2, xp: 300, color: '#d5e8d420' },
+    { level: 3, xp: 900, color: '#d4edda20' },
+    { level: 4, xp: 2700, color: '#cfe2ff20' },
+    { level: 5, xp: 6500, color: '#e2e3e520' },
+    { level: 6, xp: 14000, color: '#fff3cd20' },
+    { level: 7, xp: 23000, color: '#ffe69c20' },
+    { level: 8, xp: 34000, color: '#f8d7da20' },
+    { level: 9, xp: 48000, color: '#f5c2c720' },
+    { level: 10, xp: 64000, color: '#d1e7dd20' },
+    { level: 11, xp: 85000, color: '#cff4fc20' },
+    { level: 12, xp: 100000, color: '#e7e7e720' },
+    { level: 13, xp: 120000, color: '#e0cffc20' },
+    { level: 14, xp: 140000, color: '#ffd6cc20' },
+    { level: 15, xp: 165000, color: '#d0f0c020' },
+    { level: 16, xp: 195000, color: '#ffeaa720' },
+    { level: 17, xp: 225000, color: '#ffe5d020' },
+    { level: 18, xp: 265000, color: '#f7d6e620' },
+    { level: 19, xp: 305000, color: '#d6eaf820' },
+    { level: 20, xp: 355000, color: '#ffd70020' }
+];
 
 // Common D&D conditions
 const DND_CONDITIONS = [
@@ -215,8 +236,8 @@ function setupEventListeners() {
             return false;
         }
         
-        // Keyboard shortcut for next turn (Ctrl+N)
-        if (e.ctrlKey && (e.key === 'n' || e.key === 'N')) {
+        // Keyboard shortcut for next turn (Ctrl+Right Arrow)
+        if (e.ctrlKey && e.key === 'ArrowRight') {
             e.preventDefault();
             e.stopPropagation();
             // Find the active encounter
@@ -227,8 +248,8 @@ function setupEventListeners() {
             return false;
         }
         
-        // Keyboard shortcut for previous turn (Ctrl+P)
-        if (e.ctrlKey && (e.key === 'p' || e.key === 'P')) {
+        // Keyboard shortcut for previous turn (Ctrl+Left Arrow)
+        if (e.ctrlKey && e.key === 'ArrowLeft') {
             e.preventDefault();
             e.stopPropagation();
             // Find the active encounter
@@ -283,491 +304,13 @@ function togglePlayersSection() {
     }
 }
 
-// Toggle statistics section
-let statsExpanded = false;
-
-function toggleStatsSection() {
-    statsExpanded = !statsExpanded;
-    const container = document.getElementById('statsContainer');
-    const btn = document.getElementById('toggleStatsBtn');
-    
-    if (statsExpanded) {
-        container.style.display = 'block';
-        btn.textContent = '▼';
-        renderStatistics();
+// Navigate to statistics page with current adventure
+function goToStatistics() {
+    if (currentAdventure && currentAdventure.name) {
+        window.location.href = '/statistics?adventure=' + encodeURIComponent(currentAdventure.name);
     } else {
-        container.style.display = 'none';
-        btn.textContent = '▶';
+        window.location.href = '/statistics';
     }
-}
-
-function renderStatistics() {
-    if (!currentAdventure || !currentAdventure.players || !currentAdventure.encounters) {
-        return;
-    }
-    
-    renderInitiativeChart();
-    renderCRChart();
-    renderDamageChart();
-}
-
-function renderInitiativeChart() {
-    const ctx = document.getElementById('initiativeChart');
-    if (!ctx) return;
-    
-    // Collect initiative data for each player
-    const playerInitiatives = {};
-    
-    // Initialize for each player
-    currentAdventure.players.forEach(player => {
-        playerInitiatives[player.name] = [];
-    });
-    
-    // Collect all initiative rolls from encounters that have been started
-    currentAdventure.encounters.forEach(encounter => {
-        // Only include encounters that have been started or completed
-        if (encounter.state === 'started' || encounter.state === 'complete') {
-            if (encounter.combatants) {
-                encounter.combatants.forEach(combatant => {
-                    if (isPlayerCombatant(combatant)) {
-                        const playerName = getCombatantName(combatant);
-                        if (playerInitiatives[playerName] !== undefined) {
-                            playerInitiatives[playerName].push(combatant.initiative || 0);
-                        }
-                    }
-                });
-            }
-        }
-    });
-    
-    // Find min and max initiative across all players
-    let minInit = Infinity;
-    let maxInit = -Infinity;
-    Object.values(playerInitiatives).forEach(initiatives => {
-        if (initiatives.length > 0) {
-            minInit = Math.min(minInit, ...initiatives);
-            maxInit = Math.max(maxInit, ...initiatives);
-        }
-    });
-    
-    // If no data, return early
-    if (minInit === Infinity || maxInit === -Infinity) {
-        return;
-    }
-    
-    // Count frequency of each initiative value for each player
-    const datasets = [];
-    const colors = [
-        '#e74c3c',  // Red
-        '#3498db',  // Blue
-        '#2ecc71',  // Green
-        '#f39c12',  // Orange
-        '#9b59b6',  // Purple
-        '#e91e63',  // Pink
-        '#00bcd4',  // Cyan
-        '#ff5722'   // Deep Orange
-    ];
-    
-    let colorIndex = 0;
-    Object.entries(playerInitiatives).forEach(([playerName, initiatives]) => {
-        if (initiatives.length === 0) return;
-        
-        // Count frequency
-        const frequency = {};
-        initiatives.forEach(init => {
-            frequency[init] = (frequency[init] || 0) + 1;
-        });
-        
-        // Create data points for all initiative values from min to max
-        const data = [];
-        for (let i = minInit; i <= maxInit; i++) {
-            data.push({
-                x: i,
-                y: frequency[i] || 0
-            });
-        }
-        
-        const color = colors[colorIndex % colors.length];
-        datasets.push({
-            label: playerName,
-            data: data,
-            borderColor: color,
-            backgroundColor: color + '20',
-            borderWidth: 2,
-            tension: 0.4,
-            fill: false,
-            pointRadius: 4,
-            pointHoverRadius: 6
-        });
-        
-        colorIndex++;
-    });
-    
-    // Destroy existing chart if it exists
-    if (initiativeChart) {
-        initiativeChart.destroy();
-    }
-    
-    // Create new chart
-    initiativeChart = new Chart(ctx, {
-        type: 'bar',
-        data: { datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: 2.5,
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top'
-                },
-                title: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y + ' time(s) at initiative ' + context.parsed.x;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: 'Initiative Score'
-                    },
-                    ticks: {
-                        stepSize: 1
-                    },
-                    stacked: true
-                },
-                y: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: 'Count'
-                    },
-                    ticks: {
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    beginAtZero: true,
-                    stacked: true
-                }
-            }
-        }
-    });
-}
-
-function renderCRChart() {
-    const canvas = document.getElementById('crChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    
-    // Calculate total CR for each encounter using the proper calculation
-    const encounterData = [];
-    
-    currentAdventure.encounters.forEach((encounter, index) => {
-        const crString = getEncounterCR(encounter);
-        let crValue = 0;
-        
-        // Convert CR string to numeric value for chart
-        if (crString.includes('/')) {
-            const parts = crString.split('/');
-            crValue = parseInt(parts[0]) / parseInt(parts[1]);
-        } else {
-            crValue = parseFloat(crString) || 0;
-        }
-        
-        encounterData.push({
-            x: index + 1,
-            y: crValue,
-            label: encounter.name || `Encounter ${index + 1}`,
-            state: encounter.state
-        });
-    });
-    
-    // Destroy existing chart if it exists
-    if (crChart) {
-        crChart.destroy();
-    }
-    
-    // Create new chart
-    crChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            datasets: [{
-                label: 'Total Encounter CR',
-                data: encounterData,
-                borderColor: '#e74c3c',
-                backgroundColor: '#e74c3c20',
-                borderWidth: 3,
-                tension: 0.4,
-                fill: true,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                pointBackgroundColor: encounterData.map(d => d.state === 'complete' ? '#e74c3c' : '#3498db'),
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                segment: {
-                    borderColor: ctx => {
-                        const curr = ctx.p1DataIndex;
-                        return encounterData[curr]?.state === 'complete' ? '#e74c3c' : '#3498db';
-                    }
-                }
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: 2.5,
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top'
-                },
-                title: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        title: function(context) {
-                            return encounterData[context[0].dataIndex].label;
-                        },
-                        label: function(context) {
-                            return 'Total CR: ' + context.parsed.y.toFixed(2);
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: 'Encounter Number'
-                    },
-                    ticks: {
-                        stepSize: 1,
-                        precision: 0
-                    }
-                },
-                y: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: 'Challenge Rating'
-                    },
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return value.toFixed(1);
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-function renderDamageChart() {
-    const canvas = document.getElementById('damageChart');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    
-    // Collect all player names
-    const playerNames = currentAdventure.players?.map(p => p.name) || [];
-    
-    // Colors for players (matching initiative chart)
-    const colors = [
-        '#e74c3c',  // Red
-        '#3498db',  // Blue
-        '#2ecc71',  // Green
-        '#f39c12',  // Orange
-        '#9b59b6',  // Purple
-        '#e91e63',  // Pink
-        '#00bcd4',  // Cyan
-        '#ff5722'   // Deep Orange
-    ];
-    
-    // Build datasets for each player + "Other"
-    const datasets = [];
-    
-    // First, create total enemy damage dealt dataset (separate stack)
-    const totalEnemyDamageData = [];
-    currentAdventure.encounters.forEach((encounter, index) => {
-        if (!encounter.combatants) {
-            totalEnemyDamageData.push({ x: index + 1, y: 0 });
-            return;
-        }
-        
-        // Calculate total damage dealt by enemies (sum of dmg field for monsters/NPCs)
-        let totalEnemyDamage = 0;
-        encounter.combatants.forEach(combatant => {
-            if (!isPlayerCombatant(combatant)) {
-                totalEnemyDamage += combatant.dmg || 0;
-            }
-        });
-        
-        totalEnemyDamageData.push({ x: index + 1, y: totalEnemyDamage });
-    });
-    
-    datasets.push({
-        label: 'Enemy Damage',
-        data: totalEnemyDamageData,
-        backgroundColor: '#e7474780',
-        borderColor: '#c0392b',
-        borderWidth: 2,
-        stack: 'taken'
-    });
-    
-    // Create a dataset for each player
-    playerNames.forEach((playerName, idx) => {
-        const color = colors[idx % colors.length];
-        const playerData = [];
-        
-        currentAdventure.encounters.forEach((encounter, index) => {
-            if (!encounter.combatants) {
-                playerData.push({ x: index + 1, y: 0 });
-                return;
-            }
-            
-            // Sum damage for this player in this encounter
-            let playerDamage = 0;
-            encounter.combatants.forEach(combatant => {
-                if (isPlayerCombatant(combatant)) {
-                    const combatantName = getCombatantName(combatant);
-                    if (combatantName === playerName) {
-                        playerDamage += combatant.dmg || 0;
-                    }
-                }
-            });
-            
-            playerData.push({ x: index + 1, y: playerDamage });
-        });
-        
-        datasets.push({
-            label: playerName,
-            data: playerData,
-            backgroundColor: color,
-            borderColor: color,
-            borderWidth: 1,
-            stack: 'players'
-        });
-    });
-    
-    // Create "Other" dataset for unattributed damage
-    const otherData = [];
-    currentAdventure.encounters.forEach((encounter, index) => {
-        if (!encounter.combatants) {
-            otherData.push({ x: index + 1, y: 0 });
-            return;
-        }
-        
-        // Calculate total actual damage (maxHp - currentHp for all monsters)
-        let totalDamage = 0;
-        encounter.combatants.forEach(combatant => {
-            if (!isPlayerCombatant(combatant)) {
-                const maxHp = combatant.maxHp || 0;
-                const currentHp = combatant.hp || 0;
-                const damageTaken = Math.max(0, maxHp - currentHp);
-                totalDamage += damageTaken;
-            }
-        });
-        
-        // Calculate total tracked player damage
-        let trackedDamage = 0;
-        encounter.combatants.forEach(combatant => {
-            if (isPlayerCombatant(combatant)) {
-                trackedDamage += combatant.dmg || 0;
-            }
-        });
-        
-        // Difference is "Other" damage
-        const otherDamage = Math.max(0, totalDamage - trackedDamage);
-        otherData.push({ x: index + 1, y: otherDamage });
-    });
-    
-    // Only add "Other" if there's any unattributed damage
-    const hasOtherDamage = otherData.some(d => d.y > 0);
-    if (hasOtherDamage) {
-        datasets.push({
-            label: 'Other',
-            data: otherData,
-            backgroundColor: '#95a5a6',
-            borderColor: '#7f8c8d',
-            borderWidth: 1,
-            stack: 'players'
-        });
-    }
-    
-    // Destroy existing chart if it exists
-    if (damageChart) {
-        damageChart.destroy();
-    }
-    
-    // Create new stacked bar chart
-    damageChart = new Chart(ctx, {
-        type: 'bar',
-        data: { datasets },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: 2.5,
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top'
-                },
-                title: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        title: function(context) {
-                            const encounterIndex = context[0].parsed.x - 1;
-                            const encounter = currentAdventure.encounters[encounterIndex];
-                            return encounter?.name || `Encounter ${encounterIndex + 1}`;
-                        },
-                        label: function(context) {
-                            return context.dataset.label + ': ' + context.parsed.y + ' HP';
-                        },
-                        footer: function(context) {
-                            const total = context.reduce((sum, item) => sum + item.parsed.y, 0);
-                            return 'Total: ' + total + ' HP';
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: 'Encounter Number'
-                    },
-                    ticks: {
-                        stepSize: 1,
-                        precision: 0
-                    }
-                },
-                y: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: 'Total Damage (HP)'
-                    },
-                    beginAtZero: true,
-                    ticks: {
-                        precision: 0
-                    }
-                }
-            }
-        }
-    });
 }
 
 // Settings Modal
@@ -2062,6 +1605,30 @@ function getCombatantName(combatant) {
     return combatant.name || '';
 }
 
+// Get DEX score for sorting tiebreaker
+function getDexScore(combatant) {
+    if (isPlayerCombatant(combatant)) {
+        // Look up player's DEX score
+        if (combatant.id) {
+            const player = currentAdventure?.players?.find(p => {
+                const playerId = p.dndBeyondUrl?.split('/').pop() || p.dndBeyondUrl;
+                return playerId === combatant.id;
+            });
+            if (player && player.abilityScores) {
+                return player.abilityScores.dex || 10;
+            }
+        }
+        return 10; // Default DEX
+    }
+    // For monsters, use stored dexScore or fall back to calculating from initiativeBonus
+    if (combatant.dexScore !== undefined) {
+        return combatant.dexScore;
+    }
+    // Fallback: estimate from initiative bonus (bonus = (dex - 10) / 2)
+    const bonus = combatant.initiativeBonus || 0;
+    return 10 + (bonus * 2);
+}
+
 // Render encounters
 // Drag and drop state
 let draggedEncounterIndex = null;
@@ -2168,17 +1735,17 @@ function renderEncounters() {
                 const initA = a.initiative || 0;
                 const initB = b.initiative || 0;
                 
-                // If initiative is the same, use initiative bonus as tiebreaker
+                // If initiative is the same, use full DEX score as tiebreaker
                 if (initA === initB) {
-                    const bonusA = a.initiativeBonus || 0;
-                    const bonusB = b.initiativeBonus || 0;
-                    if (bonusA === bonusB) {
+                    const dexA = getDexScore(a);
+                    const dexB = getDexScore(b);
+                    if (dexA === dexB) {
                         // Final tiebreaker: use combatant name/id for stable sort
                         const nameA = getCombatantName(a) || a.id || '';
                         const nameB = getCombatantName(b) || b.id || '';
                         return nameA.localeCompare(nameB);
                     }
-                    return bonusB - bonusA;
+                    return dexB - dexA;
                 }
                 
                 return initB - initA;
@@ -2391,9 +1958,10 @@ function createEncounterCard(encounter, encounterIndex) {
     // Determine which buttons to show based on encounter state
     let encounterButtons = '';
     if (encounter.state === 'started') {
-        // Encounter is active - show Next Turn and End
+        // Encounter is active - show Previous Turn, Next Turn and End
         encounterButtons = `
-            <button class="btn-small" onclick="nextTurn(${encounterIndex})" title="Advance to next turn">Next Turn</button>
+            <button class="btn-small" onclick="previousTurn(${encounterIndex})" title="Go back to previous turn (Ctrl+Left Arrow)">⮜ Prev</button>
+            <button class="btn-small" onclick="nextTurn(${encounterIndex})" title="Advance to next turn (Ctrl+Right Arrow)">Next ⮞</button>
             <button class="btn-small" onclick="endEncounter(${encounterIndex})" style="background: #e74c3c;" title="End encounter">End</button>
         `;
     } else if (encounter.state === 'complete') {
@@ -2679,13 +2247,13 @@ function createEncounterCard(encounter, encounterIndex) {
             // If still missing, it won't display the decimal
         }
         
-        // Format initiative display with dex modifier
+        // Format initiative display with DEX score tiebreaker
         let initiativeDisplay;
         const init = combatant.initiative || 0;
-        const initBonus = combatant.initiativeBonus;
-        if (initBonus !== undefined && initBonus !== null) {
-            const modifier = initBonus < 0 ? 0 : initBonus;
-            initiativeDisplay = `${init}<span style="font-size: 0.8em;">.${modifier}</span>`;
+        // Show DEX score if we have actual data (not just estimated from bonus)
+        if (isPlayer || combatant.dexScore !== undefined) {
+            const dexScore = getDexScore(combatant);
+            initiativeDisplay = `${init}<span style="font-size: 0.8em;">.${dexScore}</span>`;
         } else {
             initiativeDisplay = init;
         }
@@ -3060,6 +2628,10 @@ async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterName) {
                 if (details.initiativeModifier !== undefined) {
                     combatant.initiativeBonus = details.initiativeModifier;
                 }
+                // Store DEX score for tiebreaker sorting
+                if (details.abilities && details.abilities.dex) {
+                    combatant.dexScore = details.abilities.dex.score;
+                }
                 // Store avatar URL if available
                 if (details.avatarUrl) {
                     combatant.avatarUrl = details.avatarUrl;
@@ -3221,17 +2793,17 @@ function sortInitiative(encounterIndex) {
         const initA = a.initiative || 0;
         const initB = b.initiative || 0;
         
-        // If initiative is the same, use initiative bonus as tiebreaker
+        // If initiative is the same, use full DEX score as tiebreaker
         if (initA === initB) {
-            const bonusA = a.initiativeBonus || 0;
-            const bonusB = b.initiativeBonus || 0;
-            if (bonusA === bonusB) {
+            const dexA = getDexScore(a);
+            const dexB = getDexScore(b);
+            if (dexA === dexB) {
                 // Final tiebreaker: use combatant name/id for stable sort
                 const nameA = getCombatantName(a) || a.id || '';
                 const nameB = getCombatantName(b) || b.id || '';
                 return nameA.localeCompare(nameB);
             }
-            return bonusB - bonusA;
+            return dexB - dexA;
         }
         
         return initB - initA;
@@ -3316,6 +2888,10 @@ async function refreshMonsterStats(encounterIndex, showNotification = true) {
                             // Roll new initiative with the updated bonus
                             const d20 = Math.floor(Math.random() * 20) + 1;
                             monster.initiative = d20 + details.initiativeModifier;
+                        }
+                        // Store DEX score for tiebreaker sorting
+                        if (details.abilities && details.abilities.dex) {
+                            monster.dexScore = details.abilities.dex.score;
                         }
                         if (details.ac) monster.ac = details.ac;
                         if (details.hp) {
@@ -3630,17 +3206,17 @@ function startEncounter(encounterIndex) {
         const initA = a.initiative || 0;
         const initB = b.initiative || 0;
         
-        // If initiative is the same, use initiative bonus as tiebreaker
+        // If initiative is the same, use full DEX score as tiebreaker
         if (initA === initB) {
-            const bonusA = a.initiativeBonus || 0;
-            const bonusB = b.initiativeBonus || 0;
-            if (bonusA === bonusB) {
+            const dexA = getDexScore(a);
+            const dexB = getDexScore(b);
+            if (dexA === dexB) {
                 // Final tiebreaker: use combatant name/id for stable sort
                 const nameA = getCombatantName(a) || a.id || '';
                 const nameB = getCombatantName(b) || b.id || '';
                 return nameA.localeCompare(nameB);
             }
-            return bonusB - bonusA;
+            return dexB - dexA;
         }
         
         return initB - initA;

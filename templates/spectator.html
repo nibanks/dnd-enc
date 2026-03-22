@@ -265,22 +265,22 @@
             document.getElementById('adventureName').textContent = data.adventureName;
             document.getElementById('roundIndicator').textContent = `Round ${data.round}`;
 
-            // Check if combatants are sorted by initiative (with dex modifier as tiebreaker)
+            // Check if combatants are sorted by initiative (with DEX score as tiebreaker)
             const combatants = [...data.combatants].sort((a, b) => {
                 const initA = a.initiative || a.init || 0;
                 const initB = b.initiative || b.init || 0;
                 
-                // If initiative is the same, use initiative bonus as tiebreaker
+                // If initiative is the same, use full DEX score as tiebreaker
                 if (initA === initB) {
-                    const bonusA = a.initiativeBonus || 0;
-                    const bonusB = b.initiativeBonus || 0;
-                    if (bonusA === bonusB) {
+                    const dexA = a.dexScore || (a.initiativeBonus !== undefined ? 10 + (a.initiativeBonus * 2) : 10);
+                    const dexB = b.dexScore || (b.initiativeBonus !== undefined ? 10 + (b.initiativeBonus * 2) : 10);
+                    if (dexA === dexB) {
                         // Final tiebreaker: use combatant name/id for stable sort
                         const nameA = getCombatantName(a) || a.id || '';
                         const nameB = getCombatantName(b) || b.id || '';
                         return nameA.localeCompare(nameB);
                     }
-                    return bonusB - bonusA;
+                    return dexB - dexA;
                 }
                 
                 return initB - initA;
@@ -317,11 +317,12 @@
                 
                 const name = getCombatantName(combatant);
                 const init = combatant.initiative || combatant.init || 0;
-                const initBonus = combatant.initiativeBonus;
+                // Show DEX score if we have actual data
+                const isPlayer = isPlayerCombatant(combatant);
                 let displayInit;
-                if (initBonus !== undefined && initBonus !== null) {
-                    const modifier = initBonus < 0 ? 0 : initBonus;
-                    displayInit = `${init}<span style="font-size: 0.6em;">.${modifier}</span>`;
+                if (isPlayer || combatant.dexScore !== undefined) {
+                    const dexScore = combatant.dexScore || (combatant.initiativeBonus !== undefined ? 10 + (combatant.initiativeBonus * 2) : 10);
+                    displayInit = `${init}<span style="font-size: 0.6em;">.${dexScore}</span>`;
                 } else {
                     displayInit = init;
                 }

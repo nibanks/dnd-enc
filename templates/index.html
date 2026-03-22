@@ -18,6 +18,7 @@
                     <option value="">-- Select Adventure --</option>
                 </select>
                 <div style="display: flex; gap: 10px;">
+                    <button onclick="window.location.href='/statistics'" style="background: #16a085;" title="View Campaign Statistics">📊</button>
                     <button id="newAdventureBtn" style="background: #27ae60;" title="Create a new adventure">+</button>
                     <button id="settingsBtnSelection" style="background: #9b59b6;" title="Open settings">⚙️</button>
                 </div>
@@ -30,6 +31,7 @@
                     <span id="adventureTitleText">Adventure Name</span>
                 </h1>
                 <div class="header-controls">
+                    <button id="statisticsBtn" onclick="goToStatistics()" style="background: #16a085;" title="View Campaign Statistics">📊</button>
                     <button id="adventureSettingsBtn" style="background: #3498db;" title="Adventure Settings (PIN protection)">🔒</button>
                     <button id="deleteAdventureBtn" style="background: #e74c3c;" title="Delete current adventure">×</button>
                     <button id="settingsBtn" style="background: #9b59b6;" title="Open settings">⚙️</button>
@@ -109,35 +111,7 @@
                 <div id="encountersContainer"></div>
             </section>
 
-            <!-- Statistics Section -->
-            <section class="section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <button id="toggleStatsBtn" class="btn-small" onclick="toggleStatsSection()" style="background: #95a5a6; padding: 4px 8px; font-size: 14px;" title="Collapse/Expand statistics section">▶</button>
-                        <h2 style="margin: 0;">Statistics</h2>
-                    </div>
-                </div>
-                <div id="statsContainer" style="display: none;">
-                    <div style="margin-bottom: 20px;">
-                        <h3 style="margin-bottom: 10px;">Initiative Distribution by Player</h3>
-                        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <canvas id="initiativeChart"></canvas>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 20px;">
-                        <h3 style="margin-bottom: 10px;">Encounter Challenge Rating Over Time</h3>
-                        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <canvas id="crChart"></canvas>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 20px;">
-                        <h3 style="margin-bottom: 10px;">Damage Dealt Per Encounter</h3>
-                        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <canvas id="damageChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </section>
+
         </div>
     </div>
 
