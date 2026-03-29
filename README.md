@@ -91,6 +91,16 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
    ```bash
    python app.py
    ```
+   
+   **Command Line Options:**
+   - `--enable-upnp` or `--enable-external`: Enable UPnP port forwarding and dynamic DNS updates (off by default)
+     ```bash
+     python app.py --enable-upnp
+     ```
+   - Alternatively, if using PowerShell:
+     ```powershell
+     .\start.ps1 -EnableUpnp
+     ```
 
 4. **Open in browser**:
    Navigate to `http://localhost:5000`

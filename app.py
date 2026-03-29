@@ -1963,8 +1963,18 @@ def create_adventure():
 if __name__ == '__main__':
     # Allow custom port via environment variable
     import os
+    import sys
+    import argparse
     import threading
     from werkzeug.serving import make_server
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='D&D Encounter Tracker Server')
+    parser.add_argument('--enable-upnp', '--enable-external', 
+                        action='store_true',
+                        dest='enable_upnp',
+                        help='Enable UPnP port forwarding and dynamic DNS updates (off by default)')
+    args = parser.parse_args()
     
     print("="*50)
     print("D&D Encounter Tracker Server")
@@ -2006,22 +2016,26 @@ if __name__ == '__main__':
     
     print()
     
-    # Setup external access (DDNS + UPnP) - suppress errors for cleaner output
-    try:
-        from ddns_upnp import setup_external_access
-        if https_enabled:
-            # HTTPS: Try external port 443 -> internal port 8443 first
-            upnp_success, dns_success = setup_external_access(internal_port=8443, external_port=443)
-            
-            # If UPnP failed on port 443, try 8443 -> 8443 as fallback
-            if not upnp_success:
-                print("⚠️  Port 443 UPnP failed, trying 8443 -> 8443 as fallback...")
-                setup_external_access(internal_port=8443, external_port=8443)
-        else:
-            # HTTP: external port 5000 -> internal port 5000
-            setup_external_access(internal_port=5000, external_port=5000)
-    except Exception:
-        pass  # Silently continue if external access setup fails
+    # Setup external access (DDNS + UPnP) - only if enabled via command line flag
+    if args.enable_upnp:
+        try:
+            from ddns_upnp import setup_external_access
+            if https_enabled:
+                # HTTPS: Try external port 443 -> internal port 8443 first
+                upnp_success, dns_success = setup_external_access(internal_port=8443, external_port=443)
+                
+                # If UPnP failed on port 443, try 8443 -> 8443 as fallback
+                if not upnp_success:
+                    print("⚠️  Port 443 UPnP failed, trying 8443 -> 8443 as fallback...")
+                    setup_external_access(internal_port=8443, external_port=8443)
+            else:
+                # HTTP: external port 5000 -> internal port 5000
+                setup_external_access(internal_port=5000, external_port=5000)
+        except Exception:
+            pass  # Silently continue if external access setup fails
+    else:
+        print("ℹ️  UPnP and dynamic DNS disabled (use --enable-upnp to enable)")
+        print()
     
     # Display access URLs
     print("Access URLs:")

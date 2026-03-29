@@ -1,4 +1,9 @@
 # D&D Encounter Tracker - Server Startup Script
+# Usage: .\start.ps1 [-EnableUpnp]
+param(
+    [switch]$EnableUpnp = $false
+)
+
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
 # Check for firewall rule
@@ -59,4 +64,12 @@ Write-Host ""
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
 Write-Host ""
 
-python app.py
+# Build python command with optional flag
+$pythonCmd = "python app.py"
+if ($EnableUpnp) {
+    Write-Host "ℹ️  UPnP and Dynamic DNS enabled" -ForegroundColor Cyan
+    Write-Host ""
+    $pythonCmd += " --enable-upnp"
+}
+
+Invoke-Expression $pythonCmd
