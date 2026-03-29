@@ -18,7 +18,8 @@
                     <option value="">-- Select Adventure --</option>
                 </select>
                 <div style="display: flex; gap: 10px;">
-                    <button onclick="window.location.href='/statistics'" style="background: #16a085;" title="View Campaign Statistics">📊</button>
+                    <button onclick="openStatisticsInNewWindow()" style="background: #16a085;" title="View Campaign Statistics">📊</button>
+                    <button onclick="window.open('/spectator', '_blank')" style="background: #2980b9;" title="Open Spectator Mode">👁️</button>
                     <button id="newAdventureBtn" style="background: #27ae60;" title="Create a new adventure">+</button>
                     <button id="settingsBtnSelection" style="background: #9b59b6;" title="Open settings">⚙️</button>
                 </div>
@@ -31,7 +32,8 @@
                     <span id="adventureTitleText">Adventure Name</span>
                 </h1>
                 <div class="header-controls">
-                    <button id="statisticsBtn" onclick="goToStatistics()" style="background: #16a085;" title="View Campaign Statistics">📊</button>
+                    <button id="statisticsBtn" onclick="openStatisticsInNewWindow()" style="background: #16a085;" title="View Campaign Statistics">📊</button>
+                    <button id="spectatorBtn" onclick="window.open('/spectator', '_blank')" style="background: #2980b9;" title="Open Spectator Mode">👁️</button>
                     <button id="adventureSettingsBtn" style="background: #3498db;" title="Adventure Settings (PIN protection)">🔒</button>
                     <button id="deleteAdventureBtn" style="background: #e74c3c;" title="Delete current adventure">×</button>
                     <button id="settingsBtn" style="background: #9b59b6;" title="Open settings">⚙️</button>
@@ -182,20 +184,19 @@
                 <button class="close-btn" onclick="closeDamageModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px;">
-                    <div style="flex: 0.55;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">From:</label>
-                        <select id="damageFromSelect" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
-                        </select>
+                <div style="display: flex; flex-direction: column; gap: 18px; margin-bottom: 10px;">
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <label for="damageFromSelect" style="flex: 0 0 60px; font-weight: 600; font-size: 14px;">From:</label>
+                        <select id="damageFromSelect" style="flex: 1; padding: 8px; border: 1.5px solid #bbb; border-radius: 6px; font-size: 15px;"></select>
                     </div>
-                    <div style="flex: 0.55;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">To:</label>
-                        <select id="damageToSelect" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
-                        </select>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <label for="damageToSelect" style="flex: 0 0 60px; font-weight: 600; font-size: 14px;">To:</label>
+                        <select id="damageToSelect" style="flex: 1; padding: 8px; border: 1.5px solid #bbb; border-radius: 6px; font-size: 15px;"></select>
                     </div>
-                    <div style="flex: 0 0 50px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 600; font-size: 14px;">DMG:</label>
-                        <input type="number" id="damageAmount" class="dmg-input" min="0" value="0" style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; text-align: center; box-sizing: border-box; padding-left: 12px; padding-right: 0;">
+                    <div id="damageTargetAC" style="margin: 0 0 0 72px; font-weight: bold; font-size: 15px; color: #2c3e50; min-height: 22px;"></div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <label for="damageAmount" style="flex: 0 0 60px; font-weight: 600; font-size: 14px;">DMG:</label>
+                        <input type="number" id="damageAmount" class="dmg-input" min="0" value="0" style="flex: 1; padding: 8px; border: 1.5px solid #bbb; border-radius: 6px; font-size: 15px; text-align: center;">
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px; justify-content: flex-end;">

@@ -304,13 +304,13 @@ function togglePlayersSection() {
     }
 }
 
-// Navigate to statistics page with current adventure
-function goToStatistics() {
+// Open statistics page in a new window with current adventure
+function openStatisticsInNewWindow() {
+    let url = '/statistics';
     if (currentAdventure && currentAdventure.name) {
-        window.location.href = '/statistics?adventure=' + encodeURIComponent(currentAdventure.name);
-    } else {
-        window.location.href = '/statistics';
+        url += '?adventure=' + encodeURIComponent(currentAdventure.name);
     }
+    window.open(url, '_blank');
 }
 
 // Settings Modal
@@ -427,51 +427,104 @@ async function saveAdventurePin() {
 function openDamageModal() {
     // Find an active encounter (started or just any encounter with combatants)
     let activeEncounter = currentAdventure.encounters?.find(e => e.state === 'started');
-    
+
     // If no started encounter, try to find any encounter with combatants
     if (!activeEncounter) {
         activeEncounter = currentAdventure.encounters?.find(e => e.combatants && e.combatants.length > 0);
     }
-    
+
     if (!activeEncounter || !activeEncounter.combatants || activeEncounter.combatants.length === 0) {
         return; // Only works if there are combatants
     }
-    
+
     const modal = document.getElementById('damageModal');
     if (!modal) {
         return;
     }
-    
+
     const fromSelect = document.getElementById('damageFromSelect');
     const toSelect = document.getElementById('damageToSelect');
     const amountInput = document.getElementById('damageAmount');
-    
+    let acDisplay = document.getElementById('damageTargetAC');
+    if (!acDisplay) {
+        // Add AC display if not present
+        const acDiv = document.createElement('div');
+        acDiv.id = 'damageTargetAC';
+        acDiv.style.margin = '10px 0 0 0';
+        acDiv.style.fontWeight = 'bold';
+        acDiv.style.fontSize = '15px';
+        acDiv.style.textAlign = 'right';
+        toSelect.parentElement.appendChild(acDiv);
+        acDisplay = acDiv;
+    }
+
     // Clear and populate dropdowns
     fromSelect.innerHTML = '';
     toSelect.innerHTML = '';
-    
-    activeEncounter.combatants.forEach((combatant, index) => {
-        const combatantName = getCombatantName(combatant);
-        
-        const optionFrom = document.createElement('option');
-        optionFrom.value = index;
-        optionFrom.textContent = combatantName;
-        fromSelect.appendChild(optionFrom);
-        
-        const optionTo = document.createElement('option');
-        optionTo.value = index;
-        optionTo.textContent = combatantName;
-        toSelect.appendChild(optionTo);
-    });
-    
+
+    // Helper to get enemy status
+    function isEnemy(attacker, target) {
+        return isPlayerCombatant(attacker) !== isPlayerCombatant(target);
+    }
+
     // Set default "from" to active combatant
     const activeCombatantIndex = activeEncounter.combatants.findIndex(
         c => getCombatantName(c) === activeEncounter.activeCombatant
     );
-    if (activeCombatantIndex >= 0) {
-        fromSelect.value = activeCombatantIndex;
+    let fromIndex = activeCombatantIndex >= 0 ? activeCombatantIndex : 0;
+
+    // Populate "from" select
+    activeEncounter.combatants.forEach((combatant, index) => {
+        const optionFrom = document.createElement('option');
+        optionFrom.value = index;
+        optionFrom.textContent = getCombatantName(combatant);
+        fromSelect.appendChild(optionFrom);
+    });
+    fromSelect.value = fromIndex;
+
+    // Sort "to" list: enemies first, then alphabetical
+    const attacker = activeEncounter.combatants[fromIndex];
+    const sortedTargets = activeEncounter.combatants
+        .map((combatant, idx) => ({ combatant, idx }))
+        .sort((a, b) => {
+            const aEnemy = isEnemy(attacker, a.combatant);
+            const bEnemy = isEnemy(attacker, b.combatant);
+            if (aEnemy !== bEnemy) return bEnemy - aEnemy; // enemies first
+            const aName = getCombatantName(a.combatant).toLowerCase();
+            const bName = getCombatantName(b.combatant).toLowerCase();
+            return aName.localeCompare(bName);
+        });
+
+    sortedTargets.forEach(({ combatant, idx }) => {
+        const optionTo = document.createElement('option');
+        optionTo.value = idx;
+        optionTo.textContent = getCombatantName(combatant);
+        toSelect.appendChild(optionTo);
+    });
+    toSelect.value = sortedTargets[0]?.idx ?? 0;
+
+    // Function to update AC display
+    function updateACDisplay() {
+        const targetIdx = parseInt(toSelect.value);
+        const target = activeEncounter.combatants[targetIdx];
+        let ac = '';
+        if (target) {
+            if (isPlayerCombatant(target)) {
+                // Look up player AC
+                const player = currentAdventure?.players?.find(p => {
+                    const playerId = p.dndBeyondUrl?.split('/').pop() || p.dndBeyondUrl;
+                    return playerId === target.id;
+                });
+                ac = player?.ac ?? target.ac ?? '?';
+            } else {
+                ac = target.ac ?? '?';
+            }
+        }
+        acDisplay.textContent = `AC: ${ac}`;
     }
-    
+    updateACDisplay();
+    toSelect.addEventListener('change', updateACDisplay);
+
     amountInput.value = 0;
     modal.style.display = 'flex';
     setTimeout(() => amountInput.focus(), 100);

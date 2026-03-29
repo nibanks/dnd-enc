@@ -25,6 +25,24 @@
             </div>
         </header>
 
+        <!-- PIN Modal Popup -->
+        <div id="pinModal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 350px;">
+                <div class="modal-header">
+                    <h2 style="margin: 0;">Enter PIN</h2>
+                    <button class="close-btn" onclick="closePinModal()" style="font-size: 22px; background: none; border: none; cursor: pointer;">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 20px 0 0 0; text-align: center;">
+                    <p style="margin-bottom: 18px; color: #333;">This adventure is PIN protected.</p>
+                    <input id="pinInput" type="password" placeholder="Enter PIN" maxlength="4" style="padding: 8px; font-size: 16px; width: 80%; text-align: center; letter-spacing: 0.2em;" autofocus />
+                    <button id="submitPinBtn" style="padding: 8px 16px; font-size: 16px; margin-left: 10px;">Submit</button>
+                    <div id="pinError" style="color: red; margin-top: 10px; min-height: 18px;"></div>
+                </div>
+            </div>
+        </div>
+        <div style="text-align: right; margin: 10px 0;">
+            <button id="showUncompletedBtn" style="padding: 8px 16px; font-size: 15px; display: none;">Show Uncompleted Encounters</button>
+        </div>
         <div id="statisticsContent" style="display: none;">
             <!-- Statistics Section -->
             <section class="section">
@@ -204,39 +222,119 @@
                     option.textContent = adv;
                     select.appendChild(option);
                 });
-                
                 // Check for adventure parameter in URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const adventureName = urlParams.get('adventure');
                 if (adventureName) {
                     select.value = adventureName;
-                    loadAdventure(adventureName);
+                    checkPinAndLoadAdventure(adventureName);
                 }
             } catch (error) {
                 console.error('Error loading adventures:', error);
             }
         }
 
-        // Load adventure data
+        // PIN-protected logic
+        let pinVerified = false;
+        let requiresPin = false;
+        let pendingAdventureName = null;
+        let showUncompleted = false;
+
+        async function checkPinAndLoadAdventure(name) {
+            if (!name) {
+                document.getElementById('statisticsContent').style.display = 'none';
+                document.getElementById('noAdventureSelected').style.display = 'block';
+                closePinModal();
+                return;
+            }
+            // Check if PIN is required and verified
+            try {
+                const resp = await fetch(`/api/adventure/${encodeURIComponent(name)}/check-pin`);
+                const pinStatus = await resp.json();
+                requiresPin = pinStatus.requiresPin;
+                pinVerified = pinStatus.isVerified;
+            } catch (e) {
+                requiresPin = false;
+                pinVerified = false;
+            }
+            // Always start with showUncompleted = false
+            showUncompleted = false;
+            document.getElementById('showUncompletedBtn').style.display = requiresPin ? 'inline-block' : 'none';
+            if (requiresPin && !pinVerified && showUncompleted) {
+                openPinModal(name);
+            } else {
+                closePinModal();
+                loadAdventure(name);
+            }
+        }
+
+
+        function openPinModal(adventureName) {
+            pendingAdventureName = adventureName;
+            document.getElementById('pinModal').style.display = 'flex';
+            document.getElementById('pinInput').value = '';
+            document.getElementById('pinError').textContent = '';
+            setTimeout(() => {
+                document.getElementById('pinInput').focus();
+            }, 100);
+        }
+
+        function closePinModal() {
+            document.getElementById('pinModal').style.display = 'none';
+            document.getElementById('pinInput').value = '';
+            document.getElementById('pinError').textContent = '';
+        }
+
+        async function submitPin() {
+            const pin = document.getElementById('pinInput').value;
+            if (!pendingAdventureName) return;
+            try {
+                const resp = await fetch(`/api/adventure/${encodeURIComponent(pendingAdventureName)}/verify-pin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin })
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    pinVerified = true;
+                    document.getElementById('pinError').textContent = '';
+                    closePinModal();
+                    showUncompleted = true;
+                    loadAdventure(pendingAdventureName);
+                } else {
+                    document.getElementById('pinError').textContent = result.error || 'Incorrect PIN';
+                }
+            } catch (e) {
+                document.getElementById('pinError').textContent = 'PIN verification failed';
+            }
+        }
+
+        document.getElementById('submitPinBtn').addEventListener('click', submitPin);
+        document.getElementById('pinInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') submitPin();
+        });
+
+        // Load adventure data (with filtering)
         async function loadAdventure(name) {
             if (!name) {
                 document.getElementById('statisticsContent').style.display = 'none';
                 document.getElementById('noAdventureSelected').style.display = 'block';
                 return;
             }
-
             try {
                 const response = await fetch(`/api/adventure/${encodeURIComponent(name)}?readonly=true`);
                 if (!response.ok) {
                     throw new Error('Adventure not found');
                 }
                 currentAdventure = await response.json();
+                // If not pinVerified or not showUncompleted, filter out non-completed encounters
+                if (requiresPin && (!pinVerified || !showUncompleted) && currentAdventure.encounters) {
+                    currentAdventure.encounters = currentAdventure.encounters.filter(e => e.state === 'complete');
+                }
                 document.getElementById('statisticsContent').style.display = 'block';
                 document.getElementById('noAdventureSelected').style.display = 'none';
-                
                 // Ensure monsters are loaded before rendering charts
                 await loadMonsters();
-                
                 // Render all charts with combined data
                 renderAllChartsAcrossAllChapters();
             } catch (error) {
@@ -866,7 +964,19 @@
 
         // Event listeners
         document.getElementById('adventureSelect').addEventListener('change', (e) => {
-            loadAdventure(e.target.value);
+            checkPinAndLoadAdventure(e.target.value);
+        });
+
+        document.getElementById('showUncompletedBtn').addEventListener('click', function() {
+            if (requiresPin && !pinVerified) {
+                showUncompleted = true;
+                openPinModal(document.getElementById('adventureSelect').value);
+                document.getElementById('statisticsContent').style.display = 'none';
+                document.getElementById('noAdventureSelected').style.display = 'none';
+            } else {
+                showUncompleted = true;
+                loadAdventure(document.getElementById('adventureSelect').value);
+            }
         });
 
         // Initialize when page loads
@@ -875,6 +985,8 @@
         } else {
             loadAdventures();
         }
+
+        // No override needed; logic is now in loadAdventures
     </script>
 </body>
 </html>
