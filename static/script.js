@@ -152,6 +152,331 @@ async function loadMonsters() {
     }
 }
 
+// ==================== ATTACK ROLL MODAL (DM ONLY) ====================
+
+// Show the attack result modal with attack rolls and damage
+function openAttackResultModal(html) {
+    const modal = document.getElementById('attackResultModal');
+    const content = document.getElementById('attackResultContent');
+    
+    if (modal && content) {
+        // Build player selector HTML
+        let playerOptions = '<option value="">-- Select player (optional) --</option>';
+        if (currentAdventure && Array.isArray(currentAdventure.players) && currentAdventure.players.length > 0) {
+            currentAdventure.players.forEach((p, idx) => {
+                const label = p.name ? `${p.name}${p.playerName ? ' (' + p.playerName + ')' : ''}` : `Player ${idx+1}`;
+                playerOptions += `<option value="${idx}">${label}</option>`;
+            });
+        }
+        
+        const selectorHtml = `<div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center;">
+            <select id="attackPlayerSelect" style="flex:1; padding: 4px 8px; font-size: 15px;">
+                ${playerOptions}
+            </select>
+        </div>
+        <div id="acDisplay" style="margin-bottom: 8px; font-size:15px; color:#888;"></div>`;
+        
+        const damageBtnHtml = `<div style="margin-top: 18px; display: flex; justify-content: flex-end;">
+            <button id="attackApplyBtn" style="padding: 4px 16px; font-size: 15px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; opacity:0.6;" disabled>Damage</button>
+        </div>`;
+        
+        content.innerHTML = selectorHtml + html + damageBtnHtml;
+        modal.style.display = 'flex';
+        modal.style.opacity = '1';
+        modal.style.zIndex = '10001';
+        
+        // Extract attack roll and DC from html for button enablement logic
+        let attackRoll = null, dcSave = null, d20 = null;
+        const attackRollMatch = html.match(/Attack Roll:[^=]*d20 \((\d+)\)[^=]*=\s*<b>(\d+)<\/b>/);
+        if (attackRollMatch) {
+            d20 = parseInt(attackRollMatch[1]);
+            attackRoll = parseInt(attackRollMatch[2]);
+        }
+        const dcMatch = html.match(/DC (\d+) ([A-Za-z]+) saving throw/);
+        if (dcMatch) dcSave = parseInt(dcMatch[1]);
+        
+        const applyBtn = document.getElementById('attackApplyBtn');
+        const select = document.getElementById('attackPlayerSelect');
+        const acDisplay = document.getElementById('acDisplay');
+        
+        function updateACandButton() {
+            if (!select || !applyBtn) return;
+            const idx = select.value !== '' ? parseInt(select.value) : null;
+            let ac = null;
+            if (currentAdventure && idx !== null && currentAdventure.players[idx]) {
+                ac = currentAdventure.players[idx].ac;
+            }
+            if (acDisplay) {
+                acDisplay.textContent = ac ? `Player AC: ${ac}` : '';
+            }
+            // Enable Damage button if DC save (always), or if attackRoll >= AC (with crit handling)
+            if (applyBtn) {
+                let enable = false;
+                if (dcSave) {
+                    enable = true;
+                } else if (d20 !== null && ac) {
+                    if (d20 === 1) {
+                        enable = false; // Critical miss
+                    } else if (d20 === 20) {
+                        enable = true; // Critical hit
+                    } else {
+                        enable = attackRoll >= ac;
+                    }
+                }
+                applyBtn.disabled = !enable;
+                applyBtn.style.opacity = enable ? '1' : '0.6';
+            }
+        }
+        
+        if (select) {
+            select.addEventListener('change', updateACandButton);
+            setTimeout(updateACandButton, 0);
+        }
+        if (applyBtn) {
+            applyBtn.onclick = function() {
+                const idx = select && select.value !== '' ? parseInt(select.value) : null;
+                applyAttackResultToPlayer(idx, html);
+            };
+        }
+    }
+}
+
+// Close the attack result modal
+function closeAttackResultModal() {
+    const modal = document.getElementById('attackResultModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.style.opacity = '0';
+    }
+}
+
+// Apply damage from attack result to selected player
+function applyAttackResultToPlayer(playerIdx, resultHtml) {
+    if (playerIdx === null || playerIdx === undefined || isNaN(playerIdx)) {
+        return;
+    }
+    
+    // Get the current encounter
+    const idxToUse = Number(window.currentEncounterIndex);
+    if (
+        typeof currentAdventure !== 'object' ||
+        !Array.isArray(currentAdventure.encounters) ||
+        typeof idxToUse !== 'number' ||
+        isNaN(idxToUse) ||
+        !currentAdventure.encounters[idxToUse]
+    ) {
+        console.warn('[DMG] Invalid currentEncounterIndex, not updating any encounter.');
+        return;
+    }
+    
+    const encounter = currentAdventure.encounters[idxToUse];
+    const combatants = encounter.combatants;
+    const player = currentAdventure.players[playerIdx];
+    
+    // Find player combatant in this encounter
+    let playerCombatant = null;
+    if (combatants && player) {
+        const playerId = player.dndBeyondUrl ? (player.dndBeyondUrl.split('/').pop() || player.dndBeyondUrl) : player.id;
+        playerCombatant = combatants.find(c => {
+            const cid = c.dndBeyondUrl ? (c.dndBeyondUrl.split('/').pop() || c.dndBeyondUrl) : c.id;
+            return cid && playerId && cid == playerId;
+        });
+        if (!playerCombatant) {
+            playerCombatant = combatants.find(c => c.name === player.name);
+        }
+    }
+    
+    // Parse damage from resultHtml
+    let damage = 0;
+    const critFail = /Critical Failure/.test(resultHtml);
+    if (!critFail) {
+        const dmgMatch = resultHtml.match(/<b>Damage:<\/b>\s*([^<]+)/i);
+        if (dmgMatch) {
+            const nums = dmgMatch[1].match(/-?\d+/g);
+            if (nums) {
+                damage = nums.map(Number).reduce((a, b) => a + b, 0);
+            }
+        }
+    }
+    
+    // Apply damage to player HP
+    if (damage > 0) {
+        if (playerCombatant && typeof playerCombatant.hp === 'number') {
+            playerCombatant.hp = Math.max(0, playerCombatant.hp - damage);
+        } else if (player && typeof player.hp === 'number') {
+            player.hp = Math.max(0, player.hp - damage);
+        }
+    }
+    
+    // Increment NPC DMG
+    if (combatants) {
+        const npc = combatants.find(c => typeof c.dmg === 'number' && (!c.id || !currentAdventure.players.some(p => p.id === c.id)));
+        if (npc) {
+            npc.dmg = (npc.dmg || 0) + damage;
+        }
+    }
+    
+    // Re-render and save
+    if (typeof renderEncounters === 'function') renderEncounters();
+    autoSave();
+    closeAttackResultModal();
+}
+
+// Returns a CSS class for a given damage type (for color-coding)
+function getDamageTypeClass(type) {
+    if (!type) return '';
+    const t = type.toLowerCase();
+    if (t.includes('fire')) return 'damage-fire';
+    if (t.includes('cold')) return 'damage-cold';
+    if (t.includes('acid')) return 'damage-acid';
+    if (t.includes('poison')) return 'damage-poison';
+    if (t.includes('psychic')) return 'damage-psychic';
+    if (t.includes('necrotic')) return 'damage-necrotic';
+    if (t.includes('radiant')) return 'damage-radiant';
+    if (t.includes('force')) return 'damage-force';
+    if (t.includes('lightning')) return 'damage-lightning';
+    if (t.includes('thunder')) return 'damage-thunder';
+    if (t.includes('bludgeoning')) return 'damage-bludgeoning';
+    if (t.includes('piercing')) return 'damage-piercing';
+    if (t.includes('slashing')) return 'damage-slashing';
+    return '';
+}
+
+// Event listener for [roll] button clicks
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.classList.contains('roll-attack-btn')) {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        // Hide the tooltip so it doesn't block the modal
+        hideMonsterTooltip();
+        
+        // Get encounter index and action index
+        const tooltipDiv = e.target.closest('.monster-tooltip-section');
+        const encounterIndex = tooltipDiv ? parseInt(tooltipDiv.getAttribute('data-encounter-index')) : null;
+        const actionIdx = parseInt(e.target.getAttribute('data-action-idx'));
+        const entityName = e.target.getAttribute('data-entity-name');
+        const monsterId = e.target.getAttribute('data-monster-id');
+        
+        if (encounterIndex !== null) {
+            window.currentEncounterIndex = encounterIndex;
+        }
+        
+        // Get monster details
+        let monsterDetails = null;
+        if (monsterId && DND_MONSTERS && DND_MONSTERS[monsterId]) {
+            monsterDetails = DND_MONSTERS[monsterId];
+        }
+        
+        function handleRollWithDetails(details) {
+            if (!details || !details.actions || !details.actions[actionIdx]) {
+               openAttackResultModal('<span style="color:#e74c3c;">Action not found.</span>');
+                return;
+            }
+            
+            const action = details.actions[actionIdx];
+            const actionName = action.name;
+            const actionDesc = action.description;
+            
+            // Detect saving throw
+            const saveMatch = actionDesc.match(/DC (\d+) ([A-Za-z]+) saving throw/i);
+            
+            // Parse damage expressions (handle formats like "5(1d6 + 2)piercing" or "5 (1d6 + 2) piercing")
+            const damageParts = [];
+            const diceDamageRegex = /([0-9]+)\s*\(([^)]+)\)\s*([A-Za-z]+)\s*damage/g;
+            let match;
+            while ((match = diceDamageRegex.exec(actionDesc)) !== null) {
+                damageParts.push({
+                    dice: match[2].replace(/\s+/g, ''),
+                    type: match[3]
+                });
+            }
+            
+            // Roll damage
+            function rollDiceExpression(expr) {
+                const diceMatch = expr.match(/([0-9]+)d([0-9]+)(?:\+([0-9]+))?/);
+                if (!diceMatch) return null;
+                const num = parseInt(diceMatch[1]);
+                const sides = parseInt(diceMatch[2]);
+                const bonus = diceMatch[3] ? parseInt(diceMatch[3]) : 0;
+                let total = 0;
+                for (let i = 0; i < num; i++) {
+                    total += Math.floor(Math.random() * sides) + 1;
+                }
+                return total + bonus;
+            }
+            
+            const damageRolls = damageParts.map(part => {
+                const rolled = rollDiceExpression(part.dice);
+                return { rolled, type: part.type, dice: part.dice };
+            });
+            
+            const totalDamage = damageRolls.reduce((sum, r) => sum + (r.rolled || 0), 0);
+            
+            // Format damage output with color-coding
+            const damageHtml = damageRolls.map(r => {
+                const typeClass = getDamageTypeClass(r.type);
+                const typeSpan = `<span class="${typeClass}" style="font-weight:bold;">${r.type}</span>`;
+                return `${r.rolled} ${typeSpan} (${r.dice})`;
+            }).join(', ');
+            
+            // Build result HTML
+            let resultHtml = '';
+            if (saveMatch) {
+                const dc = saveMatch[1];
+                const saveType = saveMatch[2];
+                resultHtml = `<div><b>Each target must make a DC ${dc} ${saveType} saving throw.</b></div>`;
+                resultHtml += `<div style="margin-top:8px;"><b>Damage:</b> ${damageHtml}</div>`;
+            } else {
+                // Parse attack bonus (handle formats like "+4to hit" or "+4 to hit")
+                let attackBonus = 0;
+                const attackMatch = actionDesc.match(/\+?([0-9]+)\s*to\s*hit/);
+                if (attackMatch) {
+                    attackBonus = parseInt(attackMatch[1]);
+                }
+                
+                // Roll attack
+                const d20 = Math.floor(Math.random() * 20) + 1;
+                const attackTotal = d20 + attackBonus;
+                
+                let critMsg = '';
+                if (d20 === 1) critMsg = '<span style="color:#e74c3c;">Critical Failure!</span>';
+                if (d20 === 20) critMsg = '<span style="color:#2ecc71;">Critical Success!</span>';
+                
+                resultHtml = `<div><b>Attack Roll:</b> d20 (${d20}) + ${attackBonus} = <b>${attackTotal}</b></div>`;
+                if (critMsg) resultHtml += `<div style="margin-top:4px;">${critMsg}</div>`;
+                resultHtml += `<div style="margin-top:8px;"><b>Damage:</b> ${damageHtml}</div>`;
+            }
+            
+            openAttackResultModal(resultHtml);
+        }
+        
+        // Use cached details or fetch from API
+        if (monsterDetails && monsterDetails.actions && monsterDetails.actions.length > actionIdx) {
+            handleRollWithDetails(monsterDetails);
+        } else if (monsterId) {
+            fetch(`/api/dndbeyond/monster/${encodeURIComponent(monsterId)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const details = data.details || data.data || data;
+                    if (details && details.actions) {
+                        handleRollWithDetails(details);
+                    } else {
+                        openAttackResultModal('<span style="color:#e74c3c;">Action not found (API).</span>');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching monster details:', error);
+                    openAttackResultModal('<span style="color:#e74c3c;">Failed to fetch monster details.</span>');
+                });
+        } else {
+            openAttackResultModal('<span style="color:#e74c3c;">Monster details not found.</span>');
+        }
+    }
+});
+
+// ==================== END ATTACK ROLL MODAL ====================
+
 // Update auth button appearance
 function updateAuthButton(authenticated) {
     const btn = document.getElementById('authDndBeyondBtn');
@@ -2204,12 +2529,12 @@ function createEncounterCard(encounter, encounterIndex) {
             if (dndBeyondUrl) {
                 nameHTML = `<a href="${dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
                     class="monster-name-hover" 
-                    onmouseenter="showMonsterTooltip('${escapedName}', '${playerUrl}', event)"
+                    onmouseenter="showMonsterTooltip('${escapedName}', '${playerUrl}', event, ${encounterIndex})"
                     onmouseleave="hideMonsterTooltip()">${combatantName || ''}</a>`;
             } else {
                 nameHTML = `<span style="font-weight: 500; color: ${inheritColor}; cursor: help;" 
                     class="monster-name-hover"
-                    onmouseenter="showMonsterTooltip('${escapedName}', '${playerUrl}', event)"
+                    onmouseenter="showMonsterTooltip('${escapedName}', '${playerUrl}', event, ${encounterIndex})"
                     onmouseleave="hideMonsterTooltip()">${combatantName || ''}</span>`;
             }
         } else if (encounterEditMode[encounterIndex]) {
@@ -2222,7 +2547,7 @@ function createEncounterCard(encounter, encounterIndex) {
             const escapedUrl = dndBeyondUrl.replace(/'/g, "\\'");
             nameHTML = `<a href="${dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
                 class="monster-name-hover" 
-                onmouseenter="showMonsterTooltip('${combatantName.replace(/'/g, "\\'")}', '${escapedUrl}', event)"
+                onmouseenter="showMonsterTooltip('${combatantName.replace(/'/g, "\\'")}', '${escapedUrl}', event, ${encounterIndex})"
                 onmouseleave="hideMonsterTooltip()">${combatantName || ''}</a>`;
         } else {
             // Monsters without URLs
@@ -3514,7 +3839,7 @@ function formatActionDescription(text) {
 }
 
 // Render tooltip content from entity details
-function renderTooltipContent(tooltip, entityName, details, isCharacter = false) {
+function renderTooltipContent(tooltip, entityName, details, isCharacter = false, encounterIndex = null, entityUrl = null) {
     if (!details) {
         tooltip.innerHTML = '<div class="monster-tooltip-loading">No details available</div>';
         return;
@@ -3782,11 +4107,27 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false)
     
     // Actions (for monsters)
     if (!isCharacter && details.actions && details.actions.length > 0) {
-        html += '<div class="monster-tooltip-section">';
+        html += `<div class="monster-tooltip-section" data-encounter-index="${encounterIndex !== null ? encounterIndex : ''}">`;
         html += '<div class="monster-tooltip-section-title">Actions</div>';
-        details.actions.forEach(action => {
+        details.actions.forEach((action, actionIdx) => {
             html += `<div class="monster-tooltip-action">`;
-            html += `<div class="monster-tooltip-action-name">${action.name}</div>`;
+            html += `<div class="monster-tooltip-action-name">${action.name}`;
+            
+            // Add [roll] button for DM only (if action has dice rolls)
+            const hasDiceRolls = action.description && (/\d+d\d+|to hit|DC \d+/i.test(action.description));
+            if (hasDiceRolls && currentAdventure) {
+                // Extract monster slug from entityUrl (e.g., "https://www.dndbeyond.com/monsters/5174957-scout" -> "scout")
+                let monsterIdForBtn = details.slug || details.id || details.name;
+                if (!monsterIdForBtn && entityUrl) {
+                    const urlMatch = entityUrl.match(/\/monsters\/(\d+-)?([^/?#]+)/);
+                    if (urlMatch) {
+                        monsterIdForBtn = urlMatch[2]; // Extract just the slug without ID prefix
+                    }
+                }
+                html += ` <button class="roll-attack-btn" data-action-idx="${actionIdx}" data-entity-name="${entityName}" data-monster-id="${monsterIdForBtn}" style="margin-left:8px; padding:2px 6px; font-size:11px; background:#3498db; color:white; border:none; border-radius:3px; cursor:pointer;">[roll]</button>`;
+            }
+            
+            html += `</div>`;
             html += `<div class="monster-tooltip-action-desc">${formatActionDescription(action.description)}</div>`;
             html += `</div>`;
         });
@@ -3830,7 +4171,7 @@ function isCharacterUrl(url) {
     return url && (url.includes('/profile/') || url.includes('/characters/'));
 }
 
-function showMonsterTooltip(entityName, entityUrl, event) {
+function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null) {
     console.log('showMonsterTooltip called:', entityName, entityUrl);
     clearTimeout(tooltipTimeout);
     
@@ -3930,7 +4271,7 @@ function showMonsterTooltip(entityName, entityUrl, event) {
         console.log('Using cached details:', cachedDetails);
         tooltip.style.display = 'block';
         positionTooltip(event);
-        renderTooltipContent(tooltip, entityName, cachedDetails, isCharacter);
+        renderTooltipContent(tooltip, entityName, cachedDetails, isCharacter, encounterIndex, entityUrl);
         return;
     }
     
@@ -3985,7 +4326,7 @@ function showMonsterTooltip(entityName, entityUrl, event) {
                     if (currentAdventure && currentAdventure.players) {
                         for (const player of currentAdventure.players) {
                             if (player.name === entityName || (player.dndBeyondUrl && player.dndBeyondUrl === entityUrl)) {
-                                renderTooltipContent(tooltip, entityName, player, true);
+                                renderTooltipContent(tooltip, entityName, player, true, encounterIndex, entityUrl);
                                 return;
                             }
                         }
@@ -4012,7 +4353,7 @@ function showMonsterTooltip(entityName, entityUrl, event) {
             console.log('Extracted details:', details);
             console.log('Details has abilities?', details.abilities ? 'yes' : 'no');
             console.log('Details has hp?', details.hp !== undefined ? 'yes' : 'no');
-            renderTooltipContent(tooltip, entityName, details, isCharacter);
+            renderTooltipContent(tooltip, entityName, details, isCharacter, encounterIndex, entityUrl);
             
             // Reposition after content is loaded in case size changed
             positionTooltip(event);

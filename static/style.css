@@ -684,3 +684,18 @@ input[type="number"]:focus {
     flex: 1;
     min-width: 0;
 }
+
+/* Damage type colors for attack result modal */
+.damage-fire { color: #e25822; font-weight: bold; }
+.damage-cold { color: #00bfff; font-weight: bold; }
+.damage-acid { color: #7cfc00; font-weight: bold; }
+.damage-lightning { color: #ffd700; font-weight: bold; }
+.damage-poison { color: #8fbc8f; font-weight: bold; }
+.damage-necrotic { color: #a020f0; font-weight: bold; }
+.damage-radiant { color: #fffacd; font-weight: bold; }
+.damage-psychic { color: #ff69b4; font-weight: bold; }
+.damage-force { color: #6495ed; font-weight: bold; }
+.damage-thunder { color: #b0c4de; font-weight: bold; }
+.damage-bludgeoning { color: #deb887; font-weight: bold; }
+.damage-piercing { color: #708090; font-weight: bold; }
+.damage-slashing { color: #b22222; font-weight: bold; }
