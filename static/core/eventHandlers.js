@@ -775,6 +775,25 @@ export function createEventHandlers(deps) {
         amountInput.value = 0;
         modal.style.display = 'flex';
         setTimeout(() => amountInput.focus(), 100);
+        
+        // Add ESC key handler to close modal
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeDamageModal();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+        
+        // Add click outside to close
+        const backdropHandler = (e) => {
+            if (e.target === modal) {
+                closeDamageModal();
+                document.removeEventListener('keydown', escHandler);
+                modal.removeEventListener('click', backdropHandler);
+            }
+        };
+        modal.addEventListener('click', backdropHandler);
     }
 
     function closeDamageModal() {
@@ -913,6 +932,25 @@ export function createEventHandlers(deps) {
         amountInput.value = 0;
         modal.style.display = 'flex';
         setTimeout(() => amountInput.focus(), 100);
+        
+        // Add ESC key handler to close modal
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                closeHealModal();
+                document.removeEventListener('keydown', escHandler);
+            }
+        };
+        document.addEventListener('keydown', escHandler);
+        
+        // Add click outside to close
+        const backdropHandler = (e) => {
+            if (e.target === modal) {
+                closeHealModal();
+                document.removeEventListener('keydown', escHandler);
+                modal.removeEventListener('click', backdropHandler);
+            }
+        };
+        modal.addEventListener('click', backdropHandler);
     }
 
     function closeHealModal() {

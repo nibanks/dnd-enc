@@ -499,7 +499,7 @@ describe('Event Handlers', () => {
                 parentElement: { appendChild: jest.fn() }
             };
             const mockAmountInput = { value: '', focus: jest.fn() };
-            const mockModal = { style: {} };
+            const mockModal = { style: {}, addEventListener: jest.fn(), removeEventListener: jest.fn() };
 
             mockDeps.dom.getElementById.mockImplementation((id) => {
                 if (id === 'damageModal') return mockModal;
@@ -587,6 +587,8 @@ describe('Event Handlers', () => {
                 style: {},
                 textContent: ''
             }));
+            global.document.addEventListener = jest.fn();
+            global.document.removeEventListener = jest.fn();
 
             // Setup state with an encounter
             const mockAdventure = {
@@ -602,7 +604,7 @@ describe('Event Handlers', () => {
             mockDeps.state.get.mockReturnValue(mockAdventure);
 
             // Mock DOM elements
-            const mockModal = { style: {} };
+            const mockModal = { style: {}, addEventListener: jest.fn(), removeEventListener: jest.fn() };
             const mockFromSelect = { innerHTML: '', appendChild: jest.fn(), value: '' };
             const mockToSelect = { 
                 innerHTML: '', 
@@ -640,6 +642,8 @@ describe('Event Handlers', () => {
                 value: '',
                 textContent: ''
             }));
+            global.document.addEventListener = jest.fn();
+            global.document.removeEventListener = jest.fn();
 
             // Setup state with an encounter
             const mockAdventure = {
@@ -655,7 +659,7 @@ describe('Event Handlers', () => {
             mockDeps.state.get.mockReturnValue(mockAdventure);
 
             // Mock DOM elements
-            const mockModal = { style: {} };
+            const mockModal = { style: {}, addEventListener: jest.fn(), removeEventListener: jest.fn() };
             const mockFromSelect = { innerHTML: '', appendChild: jest.fn(), value: '' };
             const mockToSelect = { innerHTML: '', appendChild: jest.fn(), value: '' };
             const mockAmountInput = { value: '', focus: jest.fn() };

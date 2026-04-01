@@ -1046,6 +1046,23 @@ export function openConditionsDialog(encounterIndex, combatantIndex) {
     
     modal.setAttribute('data-encounter', encounterIndex);
     modal.setAttribute('data-combatant', combatantIndex);
+    
+    // Add ESC key handler to close modal
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            closeConditionsModal();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+    
+    // Add click outside to close
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeConditionsModal();
+            document.removeEventListener('keydown', escHandler);
+        }
+    });
 }
 
 export function closeConditionsModal() {

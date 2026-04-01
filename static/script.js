@@ -127,6 +127,10 @@ const CONDITION_ICONS = {
     'Hidden': '🫥'
 };
 
+// Expose globally for encounterRenderer
+window.DND_CONDITIONS = DND_CONDITIONS;
+window.CONDITION_ICONS = CONDITION_ICONS;
+
 // Load monsters from D&D Beyond
 async function loadMonsters() {
     if (monstersLoaded) return true;
@@ -161,103 +165,9 @@ async function loadMonsters() {
     }
 }
 
-// ==================== ATTACK ROLL MODAL (DM ONLY) ====================
+// [MOVED] openAttackResultModal → eventHandlers.js
 
-// Show the attack result modal with attack rolls and damage
-function openAttackResultModal(html) {
-    const modal = document.getElementById('attackResultModal');
-    const content = document.getElementById('attackResultContent');
-    
-    if (modal && content) {
-        // Build player selector HTML
-        let playerOptions = '<option value="">-- Select player (optional) --</option>';
-        if (currentAdventure && Array.isArray(currentAdventure.players) && currentAdventure.players.length > 0) {
-            currentAdventure.players.forEach((p, idx) => {
-                const label = p.name ? `${p.name}${p.playerName ? ' (' + p.playerName + ')' : ''}` : `Player ${idx+1}`;
-                playerOptions += `<option value="${idx}">${label}</option>`;
-            });
-        }
-        
-        const selectorHtml = `<div style="margin-bottom: 12px; display: flex; gap: 8px; align-items: center;">
-            <select id="attackPlayerSelect" style="flex:1; padding: 4px 8px; font-size: 15px;">
-                ${playerOptions}
-            </select>
-        </div>
-        <div id="acDisplay" style="margin-bottom: 8px; font-size:15px; color:#888;"></div>`;
-        
-        const damageBtnHtml = `<div style="margin-top: 18px; display: flex; justify-content: flex-end;">
-            <button id="attackApplyBtn" style="padding: 4px 16px; font-size: 15px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; opacity:0.6;" disabled>Damage</button>
-        </div>`;
-        
-        content.innerHTML = selectorHtml + html + damageBtnHtml;
-        modal.style.display = 'flex';
-        modal.style.opacity = '1';
-        modal.style.zIndex = '10001';
-        
-        // Extract attack roll and DC from html for button enablement logic
-        let attackRoll = null, dcSave = null, d20 = null;
-        const attackRollMatch = html.match(/Attack Roll:[^=]*d20 \((\d+)\)[^=]*=\s*<b>(\d+)<\/b>/);
-        if (attackRollMatch) {
-            d20 = parseInt(attackRollMatch[1]);
-            attackRoll = parseInt(attackRollMatch[2]);
-        }
-        const dcMatch = html.match(/DC (\d+) ([A-Za-z]+) saving throw/);
-        if (dcMatch) dcSave = parseInt(dcMatch[1]);
-        
-        const applyBtn = document.getElementById('attackApplyBtn');
-        const select = document.getElementById('attackPlayerSelect');
-        const acDisplay = document.getElementById('acDisplay');
-        
-        function updateACandButton() {
-            if (!select || !applyBtn) return;
-            const idx = select.value !== '' ? parseInt(select.value) : null;
-            let ac = null;
-            if (currentAdventure && idx !== null && currentAdventure.players[idx]) {
-                ac = currentAdventure.players[idx].ac;
-            }
-            if (acDisplay) {
-                acDisplay.textContent = ac ? `Player AC: ${ac}` : '';
-            }
-            // Enable Damage button if DC save (always), or if attackRoll >= AC (with crit handling)
-            if (applyBtn) {
-                let enable = false;
-                if (dcSave) {
-                    enable = true;
-                } else if (d20 !== null && ac) {
-                    if (d20 === 1) {
-                        enable = false; // Critical miss
-                    } else if (d20 === 20) {
-                        enable = true; // Critical hit
-                    } else {
-                        enable = attackRoll >= ac;
-                    }
-                }
-                applyBtn.disabled = !enable;
-                applyBtn.style.opacity = enable ? '1' : '0.6';
-            }
-        }
-        
-        if (select) {
-            select.addEventListener('change', updateACandButton);
-            setTimeout(updateACandButton, 0);
-        }
-        if (applyBtn) {
-            applyBtn.onclick = function() {
-                const idx = select && select.value !== '' ? parseInt(select.value) : null;
-                applyAttackResultToPlayer(idx, html);
-            };
-        }
-    }
-}
-
-// Close the attack result modal
-function closeAttackResultModal() {
-    const modal = document.getElementById('attackResultModal');
-    if (modal) {
-        modal.style.display = 'none';
-        modal.style.opacity = '0';
-    }
-}
+// [MOVED] closeAttackResultModal → eventHandlers.js
 
 // Apply damage from attack result to selected player
 function applyAttackResultToPlayer(playerIdx, resultHtml) {
@@ -504,68 +414,17 @@ function updateAuthButton(authenticated) {
 // Note: All event handling and initialization now managed by app.js (modular architecture)
 // This script provides rendering functions only
 
-// Toggle players section
-function togglePlayersSection() {
-    playersExpanded = !playersExpanded;
-    const container = document.getElementById('playersTableContainer');
-    const btn = document.getElementById('togglePlayersBtn');
-    
-    if (playersExpanded) {
-        container.style.display = 'block';
-        btn.textContent = '▼';
-    } else {
-        container.style.display = 'none';
-        btn.textContent = '▶';
-    }
-}
+// [MOVED] togglePlayersSection → eventHandlers.js
 
-// Open statistics page in a new window with current adventure
-function openStatisticsInNewWindow() {
-    let url = '/statistics';
-    if (currentAdventure && currentAdventure.name) {
-        url += '?adventure=' + encodeURIComponent(currentAdventure.name);
-    }
-    window.open(url, '_blank');
-}
+// [MOVED] openStatisticsInNewWindow → eventHandlers.js
 
-// Settings Modal
-function openSettingsModal() {
-    const modal = document.getElementById('settingsModal');
-    modal.style.display = 'flex';
-}
+// [MOVED] openSettingsModal → eventHandlers.js
 
-function closeSettingsModal() {
-    const modal = document.getElementById('settingsModal');
-    modal.style.display = 'none';
-}
+// [MOVED] closeSettingsModal → eventHandlers.js
 
-// Adventure Settings Modal
-function openAdventureSettingsModal() {
-    const modal = document.getElementById('adventureSettingsModal');
-    const pinInput = document.getElementById('adventurePinInput');
-    const pinStatusText = document.getElementById('pinStatusText');
-    
-    // Load current PIN if it exists
-    const currentPin = currentAdventure.pin || '';
-    pinInput.value = currentPin;
-    
-    // Update status text
-    if (currentPin) {
-        pinStatusText.textContent = `Current PIN: ${currentPin}`;
-        pinStatusText.style.color = '#27ae60';
-    } else {
-        pinStatusText.textContent = 'No PIN set';
-        pinStatusText.style.color = '#666';
-    }
-    
-    modal.style.display = 'flex';
-    setTimeout(() => pinInput.focus(), 100);
-}
+// [MOVED] openAdventureSettingsModal → eventHandlers.js
 
-function closeAdventureSettingsModal() {
-    const modal = document.getElementById('adventureSettingsModal');
-    modal.style.display = 'none';
-}
+// [MOVED] closeAdventureSettingsModal → eventHandlers.js
 
 async function saveAdventurePin() {
     const pinInput = document.getElementById('adventurePinInput');
@@ -646,71 +505,9 @@ async function saveAdventurePin() {
 
 // [MOVED] confirmHeal → eventHandlers.js
 
-async function saveCookies() {
-    const cookieInput = document.getElementById('cookieInput');
-    const cookieString = cookieInput.value.trim();
-    
-    if (!cookieString) {
-        showCookieStatus('Please paste your cookies first.', 'error');
-        return;
-    }
-    
-    let cookies;
-    
-    // Try to parse as JSON first (EditThisCookie format or key-value object)
-    try {
-        cookies = JSON.parse(cookieString);
-        console.log('Parsed as JSON:', Array.isArray(cookies) ? 'EditThisCookie array format' : 'Key-value object format');
-    } catch (e) {
-        // Not JSON - try to parse as browser cookie string (name1=value1; name2=value2)
-        console.log('Not JSON, parsing as browser cookie string');
-        cookies = {};
-        cookieString.split(';').forEach(cookie => {
-            const [name, ...value] = cookie.trim().split('=');
-            if (name) {
-                cookies[name] = value.join('=');
-            }
-        });
-    }
-    
-    try {
-        // Send cookies to backend (backend will auto-detect format)
-        const response = await fetch('/api/dndbeyond/set-cookies', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cookies })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            showCookieStatus(`✓ Saved ${result.count} cookies! You can now use D&D Beyond features.`, 'success');
-            // Update cookie status and UI
-            await checkCookieStatus();
-        } else {
-            showCookieStatus('Failed to save cookies: ' + result.error, 'error');
-        }
-    } catch (error) {
-        showCookieStatus('Error: ' + error.message, 'error');
-    }
-}
+// [MOVED] saveCookies → eventHandlers.js
 
-function clearCookies() {
-    if (confirm('Clear saved D&D Beyond cookies? This will prevent you from using the app until you reconfigure.')) {
-        fetch('/api/dndbeyond/clear-cookies', { method: 'POST' });
-        document.getElementById('cookieInput').value = '';
-        showCookieStatus('Cookies cleared. You must reconfigure to use the app.', 'warning');
-        
-        // Update cookie status and UI
-        hasCookies = false;
-        updateUIForCookieStatus();
-        
-        // Reset to fallback
-        monstersLoaded = false;
-        DND_MONSTERS = {};
-        loadMonsters();
-    }
-}
+// [MOVED] clearCookies → eventHandlers.js
 
 function showCookieStatus(message, type) {
     const statusDiv = document.getElementById('cookieStatus');
@@ -773,37 +570,7 @@ function showCookieExpirationWarning(monsterName) {
     }, 15000);
 }
 
-// Show toast notification (for monster fetch feedback)
-function showToast(message, type = 'info', duration = 3000) {
-    const toast = document.createElement('div');
-    toast.style.position = 'fixed';
-    toast.style.bottom = '20px';
-    toast.style.right = '20px';
-    toast.style.padding = '12px 20px';
-    toast.style.borderRadius = '8px';
-    toast.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-    toast.style.zIndex = '10000';
-    toast.style.fontSize = '14px';
-    toast.style.maxWidth = '300px';
-    toast.textContent = message;
-    
-    const colors = {
-        success: { bg: '#d4edda', text: '#155724' },
-        error: { bg: '#f8d7da', text: '#721c24' },
-        warning: { bg: '#fff3cd', text: '#856404' },
-        info: { bg: '#d1ecf1', text: '#0c5460' }
-    };
-    
-    const color = colors[type] || colors.info;
-    toast.style.background = color.bg;
-    toast.style.color = color.text;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, duration);
-}
+// [MOVED] showToast → helpers.js
 
 
 

@@ -9,8 +9,6 @@
     "Chapter 2: The Journey",
     "Chapter 3: The Finale"
   ],
-  "pin": "1234",
-  "pinVersion": 0,
   "encounters": [
     {
       "chapter": "Chapter 1: The Beginning",
@@ -470,7 +468,6 @@
         }
       ],
       "currentRound": 5,
-      "minimized": true,
       "name": "Cave Entrance Guards",
       "state": "complete",
       "treasure": "Coins: 18 GP, 40 SP\nEquipment: longsword, chain mail\nMap: crude drawing of camp layout"
@@ -934,6 +931,8 @@
     }
   ],
   "name": "Sample Adventure",
+  "pin": "1234",
+  "pinVersion": 0,
   "players": [
     {
       "abilityScores": {
