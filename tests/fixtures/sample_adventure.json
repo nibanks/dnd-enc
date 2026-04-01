@@ -1,0 +1,88 @@
+{
+  "name": "Test Adventure",
+  "pin": "",
+  "chapters": [
+    {
+      "name": "Chapter 1: The Beginning",
+      "encounters": [
+        {
+          "name": "Goblin Ambush",
+          "monsters": [
+            {
+              "name": "Goblin",
+              "count": 3,
+              "url": "monsters/17140-goblin"
+            }
+          ],
+          "description": "A group of goblins attack the party on the road."
+        },
+        {
+          "name": "Boss Fight",
+          "monsters": [
+            {
+              "name": "Hobgoblin Captain",
+              "count": 1,
+              "url": "monsters/17154-hobgoblin-captain"
+            },
+            {
+              "name": "Hobgoblin",
+              "count": 2,
+              "url": "monsters/17153-hobgoblin"
+            }
+          ],
+          "description": "The hobgoblin leader and guards."
+        }
+      ]
+    },
+    {
+      "name": "Chapter 2: The Dungeon",
+      "encounters": [
+        {
+          "name": "Undead Guards",
+          "monsters": [
+            {
+              "name": "Skeleton",
+              "count": 4,
+              "url": "monsters/17015-skeleton"
+            }
+          ],
+          "description": "Ancient skeletons guard the entrance."
+        }
+      ]
+    }
+  ],
+  "players": [
+    {
+      "name": "Aragorn",
+      "level": 5,
+      "class": "Fighter",
+      "race": "Human",
+      "maxHp": 45,
+      "currentHp": 45,
+      "armorClass": 18,
+      "initiative": 12
+    },
+    {
+      "name": "Gandalf",
+      "level": 5,
+      "class": "Wizard",
+      "race": "Human",
+      "maxHp": 28,
+      "currentHp": 28,
+      "armorClass": 12,
+      "initiative": 14
+    },
+    {
+      "name": "Legolas",
+      "level": 5,
+      "class": "Ranger",
+      "race": "Elf",
+      "maxHp": 38,
+      "currentHp": 38,
+      "armorClass": 16,
+      "initiative": 18
+    }
+  ],
+  "currentChapter": 0,
+  "currentEncounter": 0
+}

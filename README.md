@@ -352,3 +352,58 @@ The included "Sample Adventure" demonstrates:
 
 Load it to see the full feature set in action!
 
+## Testing
+
+The project includes comprehensive test suites for both backend and frontend code.
+
+### Quick Start
+
+```powershell
+# Run all tests (backend + frontend)
+pytest && npm test
+```
+
+**Current Status:**
+- ✅ **Backend**: 34/34 core tests passing (6 D&D Beyond API tests skip without cookies)
+- ✅ **Frontend**: 52/52 tests passing
+
+### Test Suites
+
+- **Backend Tests (pytest)**: Tests for Flask API endpoints, adventure management, PIN protection, session management, and caching
+- **Frontend Tests (Jest)**: Tests for JavaScript logic, state management, calculations, DOM manipulation, and API integration
+
+### Coverage
+
+- **Backend**: Adventure CRUD, D&D Beyond cookie management, PIN protection, session management, caching, security
+- **Frontend**: State management, XP calculations, HP tracking, modal interactions, API calls, error handling
+
+### Optional: D&D Beyond Integration Tests
+
+To enable the 6 skipped D&D Beyond API integration tests:
+1. Set up cookies in the production app (via Settings)
+2. Or run: `.\setup_cookies.ps1` to configure them manually
+
+### Documentation
+
+See [TESTING.md](TESTING.md) for detailed information on:
+- Test setup and configuration
+- Running specific tests
+- Writing new tests
+- Troubleshooting
+- AI model integration
+
+### For AI Models
+
+Verify code changes don't break functionality:
+
+```powershell
+# Add Node.js to PATH (if needed in current session)
+$env:Path += ';C:\Program Files\nodejs\'
+
+# Run all tests
+pytest && npm test
+```
+
+All tests should pass (except 6 D&D Beyond tests if cookies aren't configured).
+
+

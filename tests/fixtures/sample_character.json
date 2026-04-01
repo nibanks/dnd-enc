@@ -1,0 +1,67 @@
+{
+  "id": 12345678,
+  "name": "Test Character",
+  "url": "characters/12345678",
+  "level": 5,
+  "class": "Fighter",
+  "race": "Human",
+  "stats": {
+    "hp": {
+      "max": 45,
+      "current": 45,
+      "temp": 0
+    },
+    "ac": 18,
+    "initiative": 2,
+    "speed": 30,
+    "proficiencyBonus": 3
+  },
+  "abilities": {
+    "strength": {
+      "score": 16,
+      "modifier": 3
+    },
+    "dexterity": {
+      "score": 14,
+      "modifier": 2
+    },
+    "constitution": {
+      "score": 15,
+      "modifier": 2
+    },
+    "intelligence": {
+      "score": 10,
+      "modifier": 0
+    },
+    "wisdom": {
+      "score": 12,
+      "modifier": 1
+    },
+    "charisma": {
+      "score": 8,
+      "modifier": -1
+    }
+  },
+  "savingThrows": {
+    "strength": 6,
+    "constitution": 5
+  },
+  "skills": {
+    "athletics": 6,
+    "perception": 4
+  },
+  "equipment": [
+    {
+      "name": "Longsword",
+      "type": "weapon",
+      "damage": "1d8",
+      "damageType": "slashing"
+    },
+    {
+      "name": "Plate Armor",
+      "type": "armor",
+      "ac": 18
+    }
+  ],
+  "avatar": "https://www.dndbeyond.com/avatars/12345678/test.jpg"
+}

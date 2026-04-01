@@ -4,3 +4,9 @@ miniupnpc>=2.3.3
 beautifulsoup4
 certbot
 dnslib
+
+# Testing dependencies
+pytest>=7.4.0
+pytest-flask>=1.3.0
+pytest-cov>=4.1.0
+pytest-env>=1.1.0

@@ -1,0 +1,19 @@
+{
+  "name": "Protected Adventure",
+  "pin": "1234",
+  "chapters": [
+    {
+      "name": "Secret Chapter",
+      "encounters": [
+        {
+          "name": "Test Encounter",
+          "monsters": [],
+          "description": "This adventure requires a PIN to access."
+        }
+      ]
+    }
+  ],
+  "players": [],
+  "currentChapter": 0,
+  "currentEncounter": 0
+}

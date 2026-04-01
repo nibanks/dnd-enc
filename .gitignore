@@ -26,3 +26,11 @@ Thumbs.db
 # Adventures (user data - exclude all except Sample)
 adventures/*.json
 !adventures/Sample Adventure.json
+
+# Test environment and coverage
+.env.test
+htmlcov/
+.coverage
+.pytest_cache/
+node_modules/
+coverage/
