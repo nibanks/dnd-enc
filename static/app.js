@@ -11,6 +11,7 @@ import { createAPIClient } from './services/api.js';
 import { createDOMHelpers } from './services/dom.js';
 import { createModalManager } from './components/modalManager.js';
 import { createEventHandlers } from './core/eventHandlers.js';
+import { createAdventureRenderer } from './renderers/adventureRenderer.js';
 import * as helpers from './utils/helpers.js';
 
 /**
@@ -48,19 +49,9 @@ export function initializeApp(config = {}) {
         dom: dom,
     });
 
-    // Renderer functions (these call the legacy script.js functions)
-    // These bridge to the existing rendering code until it's fully refactored
-    const renderers = {
-        renderAdventure: () => {
-            if (typeof win.renderAdventure === 'function') {
-                win.renderAdventure();
-            }
-        },
-        renderChapterSelector: () => {
-            if (typeof win.renderChapterSelector === 'function') {
-                win.renderChapterSelector();
-            }
-        },
+    // Renderer functions - mix of modular renderers and legacy bridges
+    // Legacy script.js renderers (players, encounters) called until fully refactored
+    const legacyRenderers = {
         renderPlayers: () => {
             if (typeof win.renderPlayers === 'function') {
                 win.renderPlayers();
@@ -71,6 +62,27 @@ export function initializeApp(config = {}) {
                 win.renderEncounters();
             }
         },
+    };
+
+    // Initialize adventure renderer (modular)
+    const adventureRenderer = createAdventureRenderer({
+        getElementById: (id) => dom.getElementById(id),
+        getAdventure: () => state.get('currentAdventure'),
+        getChapter: () => state.get('currentChapter'),
+        otherRenderers: legacyRenderers,
+    });
+
+    // Combined renderers object for event handlers
+    const renderers = {
+        // Modular renderers
+        renderAdventure: adventureRenderer.renderAdventure,
+        renderChapterSelector: adventureRenderer.renderChapterSelector,
+        updateChapterNotesDisplay: adventureRenderer.updateChapterNotesDisplay,
+        
+        // Legacy bridges
+        renderPlayers: legacyRenderers.renderPlayers,
+        renderEncounters: legacyRenderers.renderEncounters,
+        
         loadAdventuresList: async () => {
             if (typeof win.loadAdventuresList === 'function') {
                 await win.loadAdventuresList();
@@ -79,11 +91,6 @@ export function initializeApp(config = {}) {
         autoSave: () => {
             if (typeof win.autoSave === 'function') {
                 win.autoSave();
-            }
-        },
-        updateChapterNotesDisplay: () => {
-            if (typeof win.updateChapterNotesDisplay === 'function') {
-                win.updateChapterNotesDisplay();
             }
         },
         checkCookieStatus: async () => {

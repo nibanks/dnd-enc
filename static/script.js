@@ -1171,42 +1171,6 @@ async function loadAdventuresList() {
     });
 }
 
-// Update chapter notes display
-function updateChapterNotesDisplay() {
-    const notesTextarea = document.getElementById('chapterNotes');
-    if (notesTextarea) {
-        if (!currentAdventure) {
-            notesTextarea.value = '';
-            return;
-        }
-        notesTextarea.value = (currentAdventure.chapterNotes && currentAdventure.chapterNotes[currentChapter]) || '';
-    }
-}
-
-// Render adventure
-function renderAdventure() {
-    if (!currentAdventure) {
-        console.warn('renderAdventure called but currentAdventure is null');
-        return;
-    }
-    renderChapterSelector();
-    updateChapterNotesDisplay();
-    renderPlayers();
-    renderEncounters();
-}
-
-// Render chapter selector
-function renderChapterSelector() {
-    if (!currentAdventure || !currentAdventure.chapters) {
-        console.warn('renderChapterSelector called but currentAdventure or chapters is null');
-        return;
-    }
-    const selector = document.getElementById('chapterSelect');
-    selector.innerHTML = currentAdventure.chapters.map(chapter => 
-        `<option value="${chapter}" ${chapter === currentChapter ? 'selected' : ''}>${chapter}</option>`
-    ).join('');
-}
-
 // Render players table
 function sortPlayers(field) {
     if (!currentAdventure.players || currentAdventure.players.length === 0) return;
