@@ -3,6 +3,7 @@ let currentAdventure = null;
 let currentChapter = null;
 let autoSaveTimeout = null;
 let DND_MONSTERS = {}; // Will be populated dynamically or use fallback
+let MONSTER_DETAILS_CACHE = {}; // Client-side cache for full monster details (with abilities, actions, etc.)
 let monstersLoaded = false;
 let hasCookies = false; // Track cookie authentication status
 let playersExpanded = true; // Track players section state
@@ -10,6 +11,7 @@ let playersEditMode = false; // Track players edit mode
 let encounterEditMode = {}; // Track edit mode for completed encounters by index
 let cachedSpectatorUrl = null; // Cached spectator URL to prevent flashing
 let crFetchStatus = {}; // Track CR fetch status to prevent duplicate fetches: {encounterIndex_combatantIndex: true}
+let monsterDetailsFetchStatus = {}; // Track monster details fetch status to prevent duplicate fetches: {entityUrl: true}
 
 // D&D 5e/2024 Classes
 const DND_CLASSES = [
@@ -4172,7 +4174,6 @@ function isCharacterUrl(url) {
 }
 
 function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null) {
-    console.log('showMonsterTooltip called:', entityName, entityUrl);
     clearTimeout(tooltipTimeout);
     
     const tooltip = createTooltipElement();
@@ -4268,11 +4269,25 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
     // For characters, also use local player data even without abilities
     // For local players (player: prefix), always use local data
     if (cachedDetails && (cachedDetails.abilities || (isCharacter && cachedDetails.ac) || isLocalPlayer)) {
-        console.log('Using cached details:', cachedDetails);
         tooltip.style.display = 'block';
         positionTooltip(event);
         renderTooltipContent(tooltip, entityName, cachedDetails, isCharacter, encounterIndex, entityUrl);
         return;
+    }
+    
+    // If we have incomplete cached details (e.g., just HP/AC from encounter), show them immediately
+    // as a preview while we fetch full details in the background
+    if (cachedDetails && !isCharacter) {
+        const previewHtml = `<div class="monster-tooltip-loading">
+            <div style="font-weight: bold; margin-bottom: 8px;">${entityName}</div>
+            ${cachedDetails.hp ? `<div>HP: ${cachedDetails.hp}/${cachedDetails.maxHp || cachedDetails.hp}</div>` : ''}
+            ${cachedDetails.ac ? `<div>AC: ${cachedDetails.ac}</div>` : ''}
+            <div style="margin-top: 8px; font-size: 11px; color: #999;">Loading full details...</div>
+        </div>`;
+        tooltip.innerHTML = previewHtml;
+        tooltip.style.display = 'block';
+        positionTooltip(event);
+        // Continue to fetch full details below
     }
     
     // If this is a local player but no data found, show error
@@ -4288,29 +4303,72 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
         return;
     }
     
-    console.log('No full cached details, fetching from server...');
+    // For monsters, check the MONSTER_DETAILS_CACHE first (client-side cache with full details)
+    if (!isCharacter && MONSTER_DETAILS_CACHE[entityUrl]) {
+        tooltip.style.display = 'block';
+        positionTooltip(event);
+        renderTooltipContent(tooltip, entityName, MONSTER_DETAILS_CACHE[entityUrl], isCharacter, encounterIndex, entityUrl);
+        return;
+    }
     
-    // Otherwise, show loading and fetch from server
-    const loadingText = isCharacter ? 'Loading character details...' : 'Loading monster details...';
-    tooltip.innerHTML = `<div class="monster-tooltip-loading">${loadingText}</div>`;
-    tooltip.style.display = 'block';
-    positionTooltip(event);
+    // For monsters, check the DND_MONSTERS cache before fetching from server
+    // Check even if cachedDetails exists but doesn't have full info (abilities)
+    if (!isCharacter && (!cachedDetails || !cachedDetails.abilities) && DND_MONSTERS) {
+        // Extract monster slug from URL (e.g., "scout" from "https://www.dndbeyond.com/monsters/5174957-scout")
+        const urlMatch = entityUrl.match(/\/monsters\/(\d+-)?([^/?#]+)/);
+        if (urlMatch) {
+            const monsterIdWithSlug = urlMatch[0].replace('/monsters/', ''); // "5174957-scout"
+            const monsterId = urlMatch[1] ? urlMatch[1].replace('-', '') : null; // "5174957"
+            const monsterSlug = urlMatch[2]; // "scout"
+            
+            // Try multiple lookup strategies:
+            // 1. Full ID-slug combo
+            // 2. Just the ID
+            // 3. Capitalized slug (Scout)
+            // 4. Lowercase match by name in values
+            let monsterData = DND_MONSTERS[monsterIdWithSlug] || 
+                             DND_MONSTERS[monsterId] ||
+                             DND_MONSTERS[monsterSlug.charAt(0).toUpperCase() + monsterSlug.slice(1)];
+            
+            if (monsterData && monsterData.abilities) {
+                // Only use cache if it has full details (abilities present)
+                cachedDetails = monsterData;
+                tooltip.style.display = 'block';
+                positionTooltip(event);
+                renderTooltipContent(tooltip, entityName, cachedDetails, isCharacter, encounterIndex, entityUrl);
+                return;
+            }
+        }
+    }
+    
+    // Otherwise, show loading and fetch from server (unless preview already shown)
+    if (!tooltip.innerHTML || tooltip.innerHTML.indexOf('Loading full details') === -1) {
+        const loadingText = isCharacter ? 'Loading character details...' : 'Loading monster details...';
+        tooltip.innerHTML = `<div class="monster-tooltip-loading">${loadingText}</div>`;
+        tooltip.style.display = 'block';
+        positionTooltip(event);
+    }
+    
+    // Check if a fetch is already in progress for this entity
+    if (monsterDetailsFetchStatus[entityUrl]) {
+        return;
+    }
+    
+    // Mark fetch as in progress
+    monsterDetailsFetchStatus[entityUrl] = true;
     
     // Fetch details from appropriate endpoint
     const apiEndpoint = isCharacter ? 
         `/api/dndbeyond/character/${encodeURIComponent(entityUrl)}` :
         `/api/dndbeyond/monster/${encodeURIComponent(entityUrl)}`;
     
-    console.log('Fetching from:', apiEndpoint);
-    
     fetch(apiEndpoint)
-        .then(response => {
-            console.log('Response received:', response.status);
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            console.log('Data received:', data);
-            console.log('Data structure - success:', data.success, 'details:', data.details ? 'exists' : 'missing', 'error:', data.error);
+            
+            // Clear fetch status
+            delete monsterDetailsFetchStatus[entityUrl];
+            
             // Only update if this is still the current tooltip
             if (currentTooltipMonster !== entityName) return;
             
@@ -4350,9 +4408,12 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
             
             // Use the details from the response
             const details = data.details || data.data || data;
-            console.log('Extracted details:', details);
-            console.log('Details has abilities?', details.abilities ? 'yes' : 'no');
-            console.log('Details has hp?', details.hp !== undefined ? 'yes' : 'no');
+            
+            // Cache the full details for future use (only if it has full data)
+            if (!isCharacter && details.abilities) {
+                MONSTER_DETAILS_CACHE[entityUrl] = details;
+            }
+            
             renderTooltipContent(tooltip, entityName, details, isCharacter, encounterIndex, entityUrl);
             
             // Reposition after content is loaded in case size changed
@@ -4360,6 +4421,10 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
         })
         .catch(error => {
             console.error(`Error fetching ${entityType} details:`, error);
+            
+            // Clear fetch status
+            delete monsterDetailsFetchStatus[entityUrl];
+            
             if (currentTooltipMonster === entityName) {
                 tooltip.innerHTML = `<div class="monster-tooltip-loading">Failed to load ${entityType} details</div>`;
             }
