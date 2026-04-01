@@ -25,11 +25,57 @@ export function createEventHandlers(deps) {
 
     // ==================== ADVENTURE MANAGEMENT ====================
 
+    function showAdventureView(adventureName) {
+        // Hide selection header, show adventure header
+        dom.getElementById('adventureSelectionHeader').style.display = 'none';
+        dom.getElementById('adventureHeader').style.display = 'flex';
+        
+        // Update adventure title
+        const titleElement = dom.getElementById('adventureTitleText');
+        if (titleElement) {
+            titleElement.textContent = adventureName;
+        }
+        
+        // Show adventure content
+        dom.getElementById('adventureContent').style.display = 'block';
+    }
+
+    function showSelectionView() {
+        // Show selection header, hide adventure header
+        dom.getElementById('adventureSelectionHeader').style.display = 'flex';
+        dom.getElementById('adventureHeader').style.display = 'none';
+        
+        // Hide adventure content
+        dom.getElementById('adventureContent').style.display = 'none';
+    }
+
+    function goHome() {
+        // Clear adventure selection
+        const adventureSelect = dom.getElementById('adventureSelect');
+        if (adventureSelect) {
+            adventureSelect.value = '';
+        }
+        
+        // Clear state
+        state.setState({ currentAdventure: null, currentChapter: null });
+        if (typeof window !== 'undefined') {
+            window.currentAdventure = null;
+            window.currentChapter = null;
+        }
+        
+        // Clear URL parameters
+        helpers.setURLParameter('adventure', null);
+        helpers.setURLParameter('chapter', null);
+        
+        // Show selection view
+        showSelectionView();
+    }
+
     async function handleAdventureChange(event) {
         const adventureName = event.target.value;
         
         if (!adventureName) {
-            dom.getElementById('adventureContent').style.display = 'none';
+            showSelectionView();
             return;
         }
 
@@ -96,8 +142,8 @@ export function createEventHandlers(deps) {
                 helpers.setURLParameter('chapter', currentChapter);
             }
 
-            // Show adventure content
-            dom.getElementById('adventureContent').style.display = 'block';
+            // Switch to adventure view
+            showAdventureView(adventureName);
 
             // Render everything
             if (renderers.renderAdventure) {
@@ -168,9 +214,9 @@ export function createEventHandlers(deps) {
                 await renderers.loadAdventuresList();
             }
 
-            // Clear selection and hide content
+            // Clear selection and show selection view
             adventureSelect.value = '';
-            dom.getElementById('adventureContent').style.display = 'none';
+            showSelectionView();
 
             // Clear URL parameters
             helpers.setURLParameter('adventure', null);
@@ -667,6 +713,78 @@ export function createEventHandlers(deps) {
         modalManager.closeModal('adventureSettingsModal');
     }
 
+    async function saveAdventurePin() {
+        const pinInput = dom.getElementById('adventurePinInput');
+        const pin = pinInput.value.trim();
+        
+        // Validate PIN (must be empty or 4 digits)
+        if (pin && (pin.length !== 4 || !/^\d{4}$/.test(pin))) {
+            alert('PIN must be exactly 4 digits or empty');
+            pinInput.focus();
+            return;
+        }
+        
+        // Get current adventure name
+        const currentAdventure = state.get('currentAdventure');
+        const adventureName = currentAdventure.name;
+        
+        // Check if PIN is actually changing
+        const oldPin = currentAdventure.pin || '';
+        const pinChanged = oldPin !== pin;
+        
+        // Update adventure with new PIN (or remove if empty)
+        if (pin) {
+            currentAdventure.pin = pin;
+            // Increment PIN version to invalidate all existing sessions
+            if (pinChanged) {
+                currentAdventure.pinVersion = (currentAdventure.pinVersion || 0) + 1;
+            }
+        } else {
+            delete currentAdventure.pin;
+            // Increment version even when removing PIN to invalidate sessions
+            if (pinChanged) {
+                currentAdventure.pinVersion = (currentAdventure.pinVersion || 0) + 1;
+            }
+        }
+        
+        // Save adventure with new PIN and version
+        const saveResponse = await fetch(`/api/adventure/${adventureName}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(currentAdventure)
+        });
+        
+        if (saveResponse.status === 403) {
+            alert('Your session is not valid. Please reload the page and re-enter your PIN.');
+            return;
+        }
+        
+        if (!saveResponse.ok) {
+            alert('Failed to save PIN. Please try again.');
+            return;
+        }
+        
+        // Clear current session if PIN changed
+        if (pinChanged) {
+            try {
+                await fetch(`/api/adventure/${adventureName}/invalidate-sessions`, {
+                    method: 'POST'
+                });
+            } catch (error) {
+                console.error('Error clearing session:', error);
+            }
+        }
+        
+        // Close modal and show confirmation
+        closeAdventureSettingsModal();
+        
+        if (pin) {
+            alert(`✓ DM Interface PIN set to: ${pin}\n\nUsers loading this adventure will need to enter this PIN.\nSpectator view remains accessible without PIN.\n\nAll existing sessions have been invalidated.`);
+        } else {
+            alert('✓ PIN protection removed\n\nAnyone can now load this adventure in the DM interface.');
+        }
+    }
+
     // ==================== DAMAGE/HEAL MODAL HANDLERS ====================
 
     function openDamageModal() {
@@ -1072,6 +1190,67 @@ export function createEventHandlers(deps) {
         }
     }
 
+    function showCookieStatus(message, type) {
+        const statusDiv = dom.getElementById('cookieStatus');
+        statusDiv.style.display = 'block';
+        statusDiv.textContent = message;
+        
+        const colors = {
+            success: '#d4edda',
+            error: '#f8d7da',
+            warning: '#fff3cd',
+            info: '#d1ecf1'
+        };
+        
+        statusDiv.style.background = colors[type] || colors.info;
+        statusDiv.style.color = '#333';
+    }
+
+    // Show cookie expiration warning (used by tooltip and monster fetching)
+    function showCookieExpirationWarning(monsterName) {
+        // Only show warning once per session to avoid spam
+        if (window.cookieWarningShown) return;
+        window.cookieWarningShown = true;
+        
+        // Create notification banner
+        const banner = document.createElement('div');
+        banner.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff6b6b;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            max-width: 500px;
+            text-align: center;
+            font-size: 14px;
+        `;
+        banner.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 8px;">🔒 Authentication Failed</div>
+            <div style="margin-bottom: 12px;">Unable to load "${monsterName}" from D&D Beyond. Your cookies may be expired.</div>
+            <button onclick="document.getElementById('settingsBtn').click(); this.parentElement.remove(); window.cookieWarningShown = false;" 
+                    style="background: white; color: #ff6b6b; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                Update Cookies
+            </button>
+            <button onclick="this.parentElement.remove()" 
+                    style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 8px;">
+                Dismiss
+            </button>
+        `;
+        document.body.appendChild(banner);
+        
+        // Auto-dismiss after 15 seconds
+        setTimeout(() => {
+            if (banner.parentElement) {
+                banner.remove();
+            }
+        }, 15000);
+    }
+
     // ==================== KEYBOARD SHORTCUTS ====================
 
     function handleKeyboardShortcut(event) {
@@ -1170,6 +1349,7 @@ export function createEventHandlers(deps) {
         closeSettingsModal,
         openAdventureSettingsModal,
         closeAdventureSettingsModal,
+        saveAdventurePin,
         openDamageModal,
         closeDamageModal,
         confirmDamage,
@@ -1184,11 +1364,14 @@ export function createEventHandlers(deps) {
         // Cookies
         saveCookies,
         clearCookies,
+        showCookieStatus,
+        showCookieExpirationWarning,
 
         // Keyboard
         handleKeyboardShortcut,
 
         // Utility
         openStatisticsInNewWindow,
+        goHome,
     };
 }

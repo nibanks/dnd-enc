@@ -176,6 +176,15 @@ export function initializeApp(config = {}) {
             dom.addEventListener(settingsBtnSelection, 'click', handlers.openSettingsModal);
         }
 
+        // Home link (dice emoji)
+        const homeLink = dom.getElementById('homeLink');
+        if (homeLink) {
+            dom.addEventListener(homeLink, 'click', (e) => {
+                e.preventDefault();
+                handlers.goHome();
+            });
+        }
+
         // Keyboard shortcuts
         dom.addEventListener(doc, 'keydown', handlers.handleKeyboardShortcut);
 

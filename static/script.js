@@ -154,10 +154,7 @@ async function loadMonsters() {
             throw new Error(data.error || 'No monsters returned');
         }
     } catch (error) {
-        console.warn('Could not load from D&D Beyond, using fallback library:', error);
-        // Use fallback monsters
-        DND_MONSTERS = FALLBACK_MONSTERS;
-        monsterserror('Failed to load monsters from D&D Beyond:', error);
+        console.error('Failed to load monsters from D&D Beyond:', error);
         DND_MONSTERS = {};
         monstersLoaded = false;
         updateAuthButton(false);
@@ -426,174 +423,26 @@ function updateAuthButton(authenticated) {
 
 // [MOVED] closeAdventureSettingsModal → eventHandlers.js
 
-async function saveAdventurePin() {
-    const pinInput = document.getElementById('adventurePinInput');
-    const pin = pinInput.value.trim();
-    
-    // Validate PIN (must be empty or 4 digits)
-    if (pin && (pin.length !== 4 || !/^\d{4}$/.test(pin))) {
-        alert('PIN must be exactly 4 digits or empty');
-        pinInput.focus();
-        return;
-    }
-    
-    // Get current adventure name
-    const adventureName = currentAdventure.name;
-    
-    // Check if PIN is actually changing
-    const oldPin = currentAdventure.pin || '';
-    const pinChanged = oldPin !== pin;
-    
-    // Update adventure with new PIN (or remove if empty)
-    if (pin) {
-        currentAdventure.pin = pin;
-        // Increment PIN version to invalidate all existing sessions
-        if (pinChanged) {
-            currentAdventure.pinVersion = (currentAdventure.pinVersion || 0) + 1;
-        }
-    } else {
-        delete currentAdventure.pin;
-        // Increment version even when removing PIN to invalidate sessions
-        if (pinChanged) {
-            currentAdventure.pinVersion = (currentAdventure.pinVersion || 0) + 1;
-        }
-    }
-    
-    // Save adventure with new PIN and version
-    const saveResponse = await fetch(`/api/adventure/${adventureName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentAdventure)
-    });
-    
-    if (saveResponse.status === 403) {
-        alert('Your session is not valid. Please reload the page and re-enter your PIN.');
-        return;
-    }
-    
-    if (!saveResponse.ok) {
-        alert('Failed to save PIN. Please try again.');
-        return;
-    }
-    
-    // Clear current session if PIN changed
-    if (pinChanged) {
-        try {
-            await fetch(`/api/adventure/${adventureName}/invalidate-sessions`, {
-                method: 'POST'
-            });
-        } catch (error) {
-            console.error('Error clearing session:', error);
-        }
-    }
-    
-    // Close modal and show confirmation
-    closeAdventureSettingsModal();
-    
-    if (pin) {
-        alert(`✓ DM Interface PIN set to: ${pin}\n\nUsers loading this adventure will need to enter this PIN.\nSpectator view remains accessible without PIN.\n\nAll existing sessions have been invalidated.`);
-    } else {
-        alert('✓ PIN protection removed\n\nAnyone can now load this adventure in the DM interface.');
-    }
-}
-
-// [MOVED] openDamageModal → eventHandlers.js
-
-// [MOVED] confirmDamage → eventHandlers.js
-
-// [MOVED] openHealModal → eventHandlers.js
-
-// [MOVED] confirmHeal → eventHandlers.js
-
-// [MOVED] saveCookies → eventHandlers.js
-
-// [MOVED] clearCookies → eventHandlers.js
-
-function showCookieStatus(message, type) {
-    const statusDiv = document.getElementById('cookieStatus');
-    statusDiv.style.display = 'block';
-    statusDiv.textContent = message;
-    
-    const colors = {
-        success: '#d4edda',
-        error: '#f8d7da',
-        warning: '#fff3cd',
-        info: '#d1ecf1'
-    };
-    
-    statusDiv.style.background = colors[type] || colors.info;
-    statusDiv.style.color = '#333';
-}
-
-// Show cookie expiration warning (used by tooltip and monster fetching)
-function showCookieExpirationWarning(monsterName) {
-    // Only show warning once per session to avoid spam
-    if (window.cookieWarningShown) return;
-    window.cookieWarningShown = true;
-    
-    // Create notification banner
-    const banner = document.createElement('div');
-    banner.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #ff6b6b;
-        color: white;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 10000;
-        max-width: 500px;
-        text-align: center;
-        font-size: 14px;
-    `;
-    banner.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 8px;">🔒 Authentication Failed</div>
-        <div style="margin-bottom: 12px;">Unable to load "${monsterName}" from D&D Beyond. Your cookies may be expired.</div>
-        <button onclick="document.getElementById('settingsBtn').click(); this.parentElement.remove(); window.cookieWarningShown = false;" 
-                style="background: white; color: #ff6b6b; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-            Update Cookies
-        </button>
-        <button onclick="this.parentElement.remove()" 
-                style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 8px;">
-            Dismiss
-        </button>
-    `;
-    document.body.appendChild(banner);
-    
-    // Auto-dismiss after 15 seconds
-    setTimeout(() => {
-        if (banner.parentElement) {
-            banner.remove();
-        }
-    }, 15000);
-}
+// [MOVED] The following functions have been moved to eventHandlers.js:
+// - openAdventureSettingsModal
+// - closeAdventureSettingsModal
+// - saveAdventurePin (async function for PIN validation and saving)
+// - openDamageModal
+// - confirmDamage
+// - openHealModal
+// - confirmHeal
+// - saveCookies
+// - clearCookies
+// - showCookieStatus(message, type)
+// - showCookieExpirationWarning(monsterName)
+//
+// All functions are exposed globally via app.js through the handlers object
 
 // [MOVED] showToast → helpers.js
 
+// [MOVED] authenticateDndBeyond → Simple wrapper, can be inlined
 
-
-// Authenticate with D&D Beyond
-function authenticateDndBeyond() {
-    openSettingsModal();
-}
-
-// Load adventures list
-async function loadAdventuresList() {
-    const response = await fetch('/api/adventures');
-    const adventures = await response.json();
-    
-    const select = document.getElementById('adventureSelect');
-    select.innerHTML = '<option value="">-- Select Adventure --</option>';
-    
-    adventures.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        select.appendChild(option);
-    });
-}
+// [MOVED] loadAdventuresList → adventureService.js (DUPLICATE - already moved)
 
 // Handle adventure selection
 // Player rendering [MOVED TO playerRenderer.js]
