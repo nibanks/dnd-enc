@@ -14,6 +14,7 @@ import { createEventHandlers } from './core/eventHandlers.js';
 import { createAdventureRenderer } from './renderers/adventureRenderer.js';
 import { createAdventureService } from './services/adventureService.js';
 import * as monsterListRenderer from './renderers/monsterListRenderer.js';
+import * as playerRenderer from './renderers/playerRenderer.js';
 import * as helpers from './utils/helpers.js';
 
 /**
@@ -187,6 +188,9 @@ export function initializeApp(config = {}) {
      */
     async function initialize() {
         setupEventListeners();
+        
+        // Setup player event delegation
+        setupPlayerEventDelegation();
 
         // Check cookie status first
         if (renderers.checkCookieStatus) {
@@ -266,6 +270,104 @@ export function initializeApp(config = {}) {
     win.closeMonsterModal = monsterListRenderer.closeMonsterModal;
     win.addMonsterFromLibrary = monsterListRenderer.addMonsterFromLibrary;
     win.fetchMonsterDetails = monsterListRenderer.fetchMonsterDetails;
+
+    // ==================== PLAYER RENDERER INTEGRATION ====================
+    
+    // Wrapper function for renderPlayers that uses the modular renderer
+    win.renderPlayers = () => {
+        const adventure = win.currentAdventure;
+        const editMode = win.playersEditMode || false;
+        playerRenderer.renderPlayers(adventure, editMode);
+    };
+    
+    // Player management functions
+    win.togglePlayersEditMode = () => {
+        win.playersEditMode = !win.playersEditMode;
+        const btn = document.getElementById('toggleEditPlayersBtn');
+        const addBtn = document.getElementById('addPlayerBtn');
+        if (win.playersEditMode) {
+            btn.textContent = '💾';
+            btn.title = 'Save';
+            btn.style.background = '#27ae60';
+            if (addBtn) addBtn.style.display = 'block';
+        } else {
+            btn.textContent = '✏️';
+            btn.title = 'Edit';
+            btn.style.background = '#f39c12';
+            if (addBtn) addBtn.style.display = 'none';
+        }
+        win.renderPlayers();
+    };
+    
+    win.sortPlayers = (field) => {
+        if (!win.currentAdventure) return;
+        playerRenderer.sortPlayers(win.currentAdventure, field);
+        win.renderPlayers();
+        if (win.autoSave) win.autoSave();
+    };
+    
+    // Setup player event delegation after DOM is ready
+    function setupPlayerEventDelegation() {
+        playerRenderer.setupPlayerEventDelegation((event) => {
+            if (!win.currentAdventure || !win.currentAdventure.players) return;
+            
+            const player = win.currentAdventure.players[event.index];
+            if (!player) return;
+            
+            switch (event.type) {
+                case 'toggleStats':
+                    player.expanded = !player.expanded;
+                    win.renderPlayers();
+                    break;
+                    
+                case 'editUrl':
+                    const url = prompt('Enter D&D Beyond URL for ' + player.name + ':', player.dndBeyondUrl || '');
+                    if (url !== null) {
+                        player.dndBeyondUrl = url;
+                        win.renderPlayers();
+                        if (win.autoSave) win.autoSave();
+                    }
+                    break;
+                    
+                case 'remove':
+                    if (confirm('Remove this player?')) {
+                        win.currentAdventure.players.splice(event.index, 1);
+                        win.renderPlayers();
+                        if (win.autoSave) win.autoSave();
+                    }
+                    break;
+                    
+                case 'updateField':
+                    player[event.field] = event.value;
+                    if (win.autoSave) win.autoSave();
+                    break;
+                    
+                case 'updateAbility':
+                    if (!player.abilityScores) {
+                        player.abilityScores = {
+                            str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10
+                        };
+                    }
+                    player.abilityScores[event.ability] = event.value;
+                    win.renderPlayers(); // Re-render to show updated modifiers
+                    if (win.autoSave) win.autoSave();
+                    break;
+                    
+                case 'updateSkill':
+                    if (!player.skillProficiencies) {
+                        player.skillProficiencies = {
+                            perception: false,
+                            insight: false,
+                            investigation: false
+                        };
+                    }
+                    player.skillProficiencies[event.skill] = event.checked;
+                    win.renderPlayers(); // Re-render to update passive values
+                    if (win.autoSave) win.autoSave();
+                    break;
+            }
+        });
+    }
 
     // ==================== RETURN API ====================
 
