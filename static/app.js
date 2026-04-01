@@ -13,6 +13,7 @@ import { createModalManager } from './components/modalManager.js';
 import { createEventHandlers } from './core/eventHandlers.js';
 import { createAdventureRenderer } from './renderers/adventureRenderer.js';
 import { createAdventureService } from './services/adventureService.js';
+import * as monsterListRenderer from './renderers/monsterListRenderer.js';
 import * as helpers from './utils/helpers.js';
 
 /**
@@ -257,6 +258,14 @@ export function initializeApp(config = {}) {
     win.autoSave = adventureService.autoSave;
     win.loadAdventuresList = adventureService.loadAdventuresList;
     win.checkCookieStatus = adventureService.checkCookieStatus;
+
+    // Expose monster list renderer functions globally for script.js and inline onclick handlers
+    win.renderMonsterList = monsterListRenderer.renderMonsterList;
+    win.selectMonster = monsterListRenderer.selectMonster;
+    win.openMonsterModal = monsterListRenderer.openMonsterModal;
+    win.closeMonsterModal = monsterListRenderer.closeMonsterModal;
+    win.addMonsterFromLibrary = monsterListRenderer.addMonsterFromLibrary;
+    win.fetchMonsterDetails = monsterListRenderer.fetchMonsterDetails;
 
     // ==================== RETURN API ====================
 
