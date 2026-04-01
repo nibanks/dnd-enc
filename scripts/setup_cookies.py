@@ -25,6 +25,10 @@ def print_step(step_num, title, color='\033[92m'):
 
 def main():
     """Main setup function."""
+    # Change to project root directory (parent of scripts/)
+    script_dir = Path(__file__).parent
+    os.chdir(script_dir.parent)
+    
     print_header("D&D Beyond Cookie Setup Helper")
     
     print("\033[93mTo use D&D Beyond features and run integration tests, you need to provide")

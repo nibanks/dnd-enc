@@ -381,11 +381,11 @@ pytest && npm test
 
 To enable the 6 skipped D&D Beyond API integration tests:
 1. Set up cookies in the production app (via Settings)
-2. Or run: `.\setup_cookies.ps1` to configure them manually
+2. Or run: `.\scripts\setup_cookies.ps1` to configure them manually
 
 ### Documentation
 
-See [TESTING.md](TESTING.md) for detailed information on:
+See [docs/TESTING.md](docs/TESTING.md) for detailed information on:
 - Test setup and configuration
 - Running specific tests
 - Writing new tests

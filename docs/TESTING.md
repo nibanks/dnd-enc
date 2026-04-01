@@ -52,8 +52,8 @@ If you want to test D&D Beyond API integration, the tests will automatically use
 
 **To enable D&D Beyond integration tests:**
 - **Option 1 (Easiest):** Set up cookies in the production app via Settings
-- **Option 2:** Run `.\setup_cookies.ps1` to configure them manually
-- **Option 3:** Create `.env.test` with test-specific credentials (see `.env.test.example`)
+- **Option 2:** Run `.\scripts\setup_cookies.ps1` to configure them manually
+- **Option 3:** Create `.env.test` with test-specific credentials (see `config/.env.test.example`)
 
 **Cookie Priority:**
 1. Tests first check `.env.test` for cookies
@@ -67,10 +67,6 @@ If you want to test D&D Beyond API integration, the tests will automatically use
 4. Copy the values for `CobaltId`, `CobaltAff`, and `CobaltAT`
 
 **Note:** Tests marked with `@pytest.mark.dndbeyond` require valid cookies. 
-
-**To enable D&D Beyond integration tests:**
-1. **Easiest:** Set up cookies in the production app (via Settings), which saves to `.cache/cookies.json`
-2. **Or:** Create `.env.test` with separate test credentials (see above)
 
 Other tests will run without them.
 

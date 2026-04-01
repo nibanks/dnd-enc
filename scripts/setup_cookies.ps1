@@ -1,6 +1,10 @@
 # D&D Beyond Cookie Setup Helper
 # This script helps you set up D&D Beyond cookies for the test suite
 
+# Change to project root directory (parent of scripts/)
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location (Split-Path -Parent $scriptPath)
+
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  D&D Beyond Cookie Setup Helper" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan

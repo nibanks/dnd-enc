@@ -1,6 +1,10 @@
 # Test Runner Script for D&D Encounter Tracker
 # This script runs both backend (pytest) and frontend (Jest) tests
 
+# Change to project root directory (parent of scripts/)
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location (Split-Path -Parent $scriptPath)
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  D&D Encounter Tracker - Test Suite  " -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan

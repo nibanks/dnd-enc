@@ -25,8 +25,8 @@ def main():
     print("  D&D Encounter Tracker - Test Suite")
     print("="*60 + "\n")
     
-    # Change to script directory
-    os.chdir(Path(__file__).parent)
+    # Change to project root directory (parent of scripts/)
+    os.chdir(Path(__file__).parent.parent)
     
     all_passed = True
     
