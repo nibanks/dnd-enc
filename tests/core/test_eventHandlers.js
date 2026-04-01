@@ -463,8 +463,58 @@ describe('Event Handlers', () => {
         });
 
         test('openDamageModal', () => {
+            // Mock global functions on window FIRST
+            global.window = global.window || {};
+            global.window.getCombatantName = (c) => c.name;
+            global.window.isPlayerCombatant = (c) => c.id === '1';
+
+            // Mock document.createElement for AC display
+            global.document = global.document || {};
+            global.document.createElement = jest.fn(() => ({
+                id: '',
+                style: {},
+                textContent: ''
+            }));
+
+            // Setup state with an encounter
+            const mockAdventure = {
+                encounters: [{
+                    state: 'started',
+                    combatants: [
+                        { id: '1', name: 'Fighter', hp: 50, maxHp: 50 },
+                        { id: '2', name: 'Goblin', hp: 7, maxHp: 7, ac: 15 }
+                    ],
+                    activeCombatant: 'Fighter'
+                }]
+            };
+            mockDeps.state.get.mockReturnValue(mockAdventure);
+
+            // Mock DOM elements
+            const mockFromSelect = { innerHTML: '', appendChild: jest.fn(), value: '' };
+            const mockToSelect = { 
+                innerHTML: '', 
+                appendChild: jest.fn(), 
+                value: '', 
+                addEventListener: jest.fn(),
+                parentElement: { appendChild: jest.fn() }
+            };
+            const mockAmountInput = { value: '', focus: jest.fn() };
+            const mockModal = { style: {} };
+
+            mockDeps.dom.getElementById.mockImplementation((id) => {
+                if (id === 'damageModal') return mockModal;
+                if (id === 'damageFromSelect') return mockFromSelect;
+                if (id === 'damageToSelect') return mockToSelect;
+                if (id === 'damageAmount') return mockAmountInput;
+                if (id === 'damageTargetAC') return null; // Will be created
+                return null;
+            });
+
             handlers.openDamageModal();
-            expect(mockDeps.modalManager.openModal).toHaveBeenCalledWith('damageModal');
+
+            expect(mockModal.style.display).toBe('flex');
+            expect(mockFromSelect.appendChild).toHaveBeenCalled();
+            expect(mockToSelect.appendChild).toHaveBeenCalled();
         });
 
         test('openAttackResultModal with content', () => {
@@ -525,21 +575,105 @@ describe('Event Handlers', () => {
 
     describe('Keyboard Shortcuts', () => {
         test('Ctrl+D opens damage modal', () => {
+            // Mock global functions on window FIRST
+            global.window = global.window || {};
+            global.window.getCombatantName = (c) => c.name;
+            global.window.isPlayerCombatant = (c) => c.id === '1';
+
+            // Mock document.createElement for AC display
+            global.document = global.document || {};
+            global.document.createElement = jest.fn(() => ({
+                id: '',
+                style: {},
+                textContent: ''
+            }));
+
+            // Setup state with an encounter
+            const mockAdventure = {
+                encounters: [{
+                    state: 'started',
+                    combatants: [
+                        { id: '1', name: 'Fighter', hp: 50, maxHp: 50 },
+                        { id: '2', name: 'Goblin', hp: 7, maxHp: 7, ac: 15 }
+                    ],
+                    activeCombatant: 'Fighter'
+                }]
+            };
+            mockDeps.state.get.mockReturnValue(mockAdventure);
+
+            // Mock DOM elements
+            const mockModal = { style: {} };
+            const mockFromSelect = { innerHTML: '', appendChild: jest.fn(), value: '' };
+            const mockToSelect = { 
+                innerHTML: '', 
+                appendChild: jest.fn(), 
+                value: '', 
+                addEventListener: jest.fn(),
+                parentElement: { appendChild: jest.fn() }
+            };
+            const mockAmountInput = { value: '', focus: jest.fn() };
+
+            mockDeps.dom.getElementById.mockImplementation((id) => {
+                if (id === 'damageModal') return mockModal;
+                if (id === 'damageFromSelect') return mockFromSelect;
+                if (id === 'damageToSelect') return mockToSelect;
+                if (id === 'damageAmount') return mockAmountInput;
+                return null;
+            });
+
             const event = { ctrlKey: true, key: 'd', preventDefault: jest.fn() };
             
             handlers.handleKeyboardShortcut(event);
 
             expect(event.preventDefault).toHaveBeenCalled();
-            expect(mockDeps.modalManager.openModal).toHaveBeenCalledWith('damageModal');
+            expect(mockModal.style.display).toBe('flex');
         });
 
         test('Ctrl+H opens heal modal', () => {
+            // Mock global functions on window FIRST
+            global.window = global.window || {};
+            global.window.getCombatantName = (c) => c.name;
+
+            // Mock document.createElement
+            global.document = global.document || {};
+            global.document.createElement = jest.fn(() => ({
+                value: '',
+                textContent: ''
+            }));
+
+            // Setup state with an encounter
+            const mockAdventure = {
+                encounters: [{
+                    state: 'started',
+                    combatants: [
+                        { id: '1', name: 'Fighter', hp: 50, maxHp: 50 },
+                        { id: '2', name: 'Goblin', hp: 7, maxHp: 7 }
+                    ],
+                    activeCombatant: 'Fighter'
+                }]
+            };
+            mockDeps.state.get.mockReturnValue(mockAdventure);
+
+            // Mock DOM elements
+            const mockModal = { style: {} };
+            const mockFromSelect = { innerHTML: '', appendChild: jest.fn(), value: '' };
+            const mockToSelect = { innerHTML: '', appendChild: jest.fn(), value: '' };
+            const mockAmountInput = { value: '', focus: jest.fn() };
+
+            mockDeps.dom.getElementById.mockImplementation((id) => {
+                if (id === 'healModal') return mockModal;
+                if (id === 'healFromSelect') return mockFromSelect;
+                if (id === 'healToSelect') return mockToSelect;
+                if (id === 'healAmount') return mockAmountInput;
+                return null;
+            });
+
             const event = { ctrlKey: true, key: 'H', preventDefault: jest.fn() };
             
             handlers.handleKeyboardShortcut(event);
 
             expect(event.preventDefault).toHaveBeenCalled();
-            expect(mockDeps.modalManager.openModal).toHaveBeenCalledWith('healModal');
+            expect(mockModal.style.display).toBe('flex');
         });
 
         test('ESC closes current modal', () => {

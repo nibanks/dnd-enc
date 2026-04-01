@@ -667,21 +667,307 @@ export function createEventHandlers(deps) {
         modalManager.closeModal('adventureSettingsModal');
     }
 
+    // ==================== DAMAGE/HEAL MODAL HANDLERS ====================
+
     function openDamageModal() {
-        modalManager.openModal('damageModal');
+        const currentAdventure = state.get('currentAdventure');
+        if (!currentAdventure) return;
+
+        // Find an active encounter (started or just any encounter with combatants)
+        let activeEncounter = currentAdventure.encounters?.find(e => e.state === 'started');
+        
+        // If no started encounter, try to find any encounter with combatants
+        if (!activeEncounter) {
+            activeEncounter = currentAdventure.encounters?.find(e => e.combatants && e.combatants.length > 0);
+        }
+        
+        if (!activeEncounter || !activeEncounter.combatants || activeEncounter.combatants.length === 0) {
+            return; // Only works if there are combatants
+        }
+
+        const modal = dom.getElementById('damageModal');
+        if (!modal) return;
+
+        const fromSelect = dom.getElementById('damageFromSelect');
+        const toSelect = dom.getElementById('damageToSelect');
+        const amountInput = dom.getElementById('damageAmount');
+        
+        let acDisplay = dom.getElementById('damageTargetAC');
+        if (!acDisplay) {
+            // Add AC display if not present
+            const acDiv = document.createElement('div');
+            acDiv.id = 'damageTargetAC';
+            acDiv.style.margin = '10px 0 0 0';
+            acDiv.style.fontWeight = 'bold';
+            acDiv.style.fontSize = '15px';
+            acDiv.style.textAlign = 'right';
+            toSelect.parentElement.appendChild(acDiv);
+            acDisplay = acDiv;
+        }
+
+        // Clear and populate dropdowns
+        fromSelect.innerHTML = '';
+        toSelect.innerHTML = '';
+
+        // Helper to get enemy status
+        function isEnemy(attacker, target) {
+            return window.isPlayerCombatant(attacker) !== window.isPlayerCombatant(target);
+        }
+
+        // Set default "from" to active combatant
+        const activeCombatantIndex = activeEncounter.combatants.findIndex(
+            c => window.getCombatantName(c) === activeEncounter.activeCombatant
+        );
+        let fromIndex = activeCombatantIndex >= 0 ? activeCombatantIndex : 0;
+
+        // Populate "from" select
+        activeEncounter.combatants.forEach((combatant, index) => {
+            const optionFrom = document.createElement('option');
+            optionFrom.value = index;
+            optionFrom.textContent = window.getCombatantName(combatant);
+            fromSelect.appendChild(optionFrom);
+        });
+        fromSelect.value = fromIndex;
+
+        // Sort "to" list: enemies first, then alphabetical
+        const attacker = activeEncounter.combatants[fromIndex];
+        const sortedTargets = activeEncounter.combatants
+            .map((combatant, idx) => ({ combatant, idx }))
+            .sort((a, b) => {
+                const aEnemy = isEnemy(attacker, a.combatant);
+                const bEnemy = isEnemy(attacker, b.combatant);
+                if (aEnemy !== bEnemy) return bEnemy - aEnemy; // enemies first
+                const aName = window.getCombatantName(a.combatant).toLowerCase();
+                const bName = window.getCombatantName(b.combatant).toLowerCase();
+                return aName.localeCompare(bName);
+            });
+
+        sortedTargets.forEach(({ combatant, idx }) => {
+            const optionTo = document.createElement('option');
+            optionTo.value = idx;
+            optionTo.textContent = window.getCombatantName(combatant);
+            toSelect.appendChild(optionTo);
+        });
+        toSelect.value = sortedTargets[0]?.idx ?? 0;
+
+        // Function to update AC display
+        function updateACDisplay() {
+            const targetIdx = parseInt(toSelect.value);
+            const target = activeEncounter.combatants[targetIdx];
+            let ac = '';
+            if (target) {
+                if (window.isPlayerCombatant(target)) {
+                    // Look up player AC
+                    const player = currentAdventure?.players?.find(p => {
+                        const playerId = p.dndBeyondUrl?.split('/').pop() || p.dndBeyondUrl;
+                        return playerId === target.id;
+                    });
+                    ac = player?.ac ?? target.ac ?? '?';
+                } else {
+                    ac = target.ac ?? '?';
+                }
+            }
+            acDisplay.textContent = `AC: ${ac}`;
+        }
+        updateACDisplay();
+        toSelect.addEventListener('change', updateACDisplay);
+
+        amountInput.value = 0;
+        modal.style.display = 'flex';
+        setTimeout(() => amountInput.focus(), 100);
     }
 
     function closeDamageModal() {
-        modalManager.closeModal('damageModal');
+        const modal = dom.getElementById('damageModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    function confirmDamage() {
+        const currentAdventure = state.get('currentAdventure');
+        const activeEncounter = currentAdventure?.encounters?.find(e => e.state === 'started');
+        if (!activeEncounter) {
+            closeDamageModal();
+            return;
+        }
+        
+        const fromIndex = parseInt(dom.getElementById('damageFromSelect').value);
+        const toIndex = parseInt(dom.getElementById('damageToSelect').value);
+        let amount = parseInt(dom.getElementById('damageAmount').value) || 0;
+        
+        if (amount <= 0) {
+            closeDamageModal();
+            return;
+        }
+        
+        // Update the from combatant's DMG
+        if (activeEncounter.combatants[fromIndex]) {
+            activeEncounter.combatants[fromIndex].dmg = (activeEncounter.combatants[fromIndex].dmg || 0) + amount;
+        }
+        
+        // Update the to combatant's HP (handle temp HP first)
+        if (activeEncounter.combatants[toIndex]) {
+            const target = activeEncounter.combatants[toIndex];
+            const tempHp = target.tempHp || 0;
+            
+            // Apply damage to temp HP first
+            if (tempHp > 0) {
+                if (amount <= tempHp) {
+                    target.tempHp = tempHp - amount;
+                    amount = 0;
+                } else {
+                    target.tempHp = 0;
+                    amount -= tempHp;
+                }
+            }
+            
+            // Apply remaining damage to regular HP
+            if (amount > 0) {
+                target.hp = (target.hp || 0) - amount;
+                
+                // Don't let player HP go below 0
+                const isPlayer = window.isPlayerCombatant(target);
+                if (isPlayer && target.hp < 0) {
+                    target.hp = 0;
+                }
+            }
+            
+            // Check concentration (DC = 10 or half damage, whichever is higher)
+            if (target.concentrating && amount > 0) {
+                const dc = Math.max(10, Math.floor(amount / 2));
+                const targetName = window.getCombatantName(target);
+                setTimeout(() => {
+                    if (confirm(`${targetName} is concentrating! Make a DC ${dc} Constitution save or lose concentration.`)) {
+                        // Passed save - do nothing
+                    } else {
+                        // Failed save - lose concentration
+                        target.concentrating = false;
+                        if (window.renderEncounters) window.renderEncounters();
+                        if (window.autoSave) window.autoSave();
+                    }
+                }, 100);
+            }
+            
+            // Clear death saves if healing from 0 HP
+            if (target.deathSaves && target.hp > 0) {
+                target.deathSaves = { successes: 0, failures: 0 };
+            }
+        }
+        
+        // Re-render and close
+        if (window.renderEncounters) window.renderEncounters();
+        if (window.autoSave) window.autoSave();
+        closeDamageModal();
     }
 
     function openHealModal() {
-        modalManager.openModal('healModal');
+        const currentAdventure = state.get('currentAdventure');
+        if (!currentAdventure) return;
+
+        // Find an active encounter (started or just any encounter with combatants)
+        let activeEncounter = currentAdventure.encounters?.find(e => e.state === 'started');
+        
+        // If no started encounter, try to find any encounter with combatants
+        if (!activeEncounter) {
+            activeEncounter = currentAdventure.encounters?.find(e => e.combatants && e.combatants.length > 0);
+        }
+        
+        if (!activeEncounter || !activeEncounter.combatants || activeEncounter.combatants.length === 0) {
+            return; // Only works if there are combatants
+        }
+        
+        const modal = dom.getElementById('healModal');
+        if (!modal) return;
+        
+        const fromSelect = dom.getElementById('healFromSelect');
+        const toSelect = dom.getElementById('healToSelect');
+        const amountInput = dom.getElementById('healAmount');
+        
+        // Clear and populate dropdowns
+        fromSelect.innerHTML = '';
+        toSelect.innerHTML = '';
+        
+        activeEncounter.combatants.forEach((combatant, index) => {
+            const combatantName = window.getCombatantName(combatant);
+            
+            const optionFrom = document.createElement('option');
+            optionFrom.value = index;
+            optionFrom.textContent = combatantName;
+            fromSelect.appendChild(optionFrom);
+            
+            const optionTo = document.createElement('option');
+            optionTo.value = index;
+            optionTo.textContent = combatantName;
+            toSelect.appendChild(optionTo);
+        });
+        
+        // Set default "from" to active combatant
+        const activeCombatantIndex = activeEncounter.combatants.findIndex(
+            c => window.getCombatantName(c) === activeEncounter.activeCombatant
+        );
+        if (activeCombatantIndex >= 0) {
+            fromSelect.value = activeCombatantIndex;
+        }
+        
+        amountInput.value = 0;
+        modal.style.display = 'flex';
+        setTimeout(() => amountInput.focus(), 100);
     }
 
     function closeHealModal() {
-        modalManager.closeModal('healModal');
+        const modal = dom.getElementById('healModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
     }
+
+    function confirmHeal() {
+        const currentAdventure = state.get('currentAdventure');
+        const activeEncounter = currentAdventure?.encounters?.find(e => e.state === 'started');
+        if (!activeEncounter) {
+            closeHealModal();
+            return;
+        }
+        
+        const fromIndex = parseInt(dom.getElementById('healFromSelect').value);
+        const toIndex = parseInt(dom.getElementById('healToSelect').value);
+        const amount = parseInt(dom.getElementById('healAmount').value) || 0;
+        
+        if (amount <= 0) {
+            closeHealModal();
+            return;
+        }
+        
+        // Update the from combatant's Heal
+        if (activeEncounter.combatants[fromIndex]) {
+            activeEncounter.combatants[fromIndex].heal = (activeEncounter.combatants[fromIndex].heal || 0) + amount;
+        }
+        
+        // Update the to combatant's HP (increase it)
+        if (activeEncounter.combatants[toIndex]) {
+            const target = activeEncounter.combatants[toIndex];
+            target.hp = (target.hp || 0) + amount;
+            
+            // Don't let HP go above maxHP
+            const maxHp = target.maxHp || 0;
+            if (target.hp > maxHp) {
+                target.hp = maxHp;
+            }
+            
+            // Clear death saves if healing from 0 HP
+            if (target.deathSaves && target.hp > 0) {
+                target.deathSaves = { successes: 0, failures: 0 };
+            }
+        }
+        
+        // Re-render and close
+        if (window.renderEncounters) window.renderEncounters();
+        if (window.autoSave) window.autoSave();
+        closeHealModal();
+    }
+
+    // ==================== MONSTER MODAL HANDLERS ====================
 
     function openMonsterModal() {
         modalManager.openModal('monsterModal');
@@ -765,6 +1051,32 @@ export function createEventHandlers(deps) {
             return;
         }
 
+        // Ctrl+Right Arrow - Next turn in active encounter
+        if (event.ctrlKey && event.key === 'ArrowRight') {
+            event.preventDefault();
+            const activeEncounter = state.get('currentAdventure')?.encounters?.find(e => e.state === 'started');
+            if (activeEncounter && window.nextTurn) {
+                const encounterIndex = state.get('currentAdventure').encounters.indexOf(activeEncounter);
+                if (encounterIndex >= 0) {
+                    window.nextTurn(encounterIndex);
+                }
+            }
+            return;
+        }
+
+        // Ctrl+Left Arrow - Previous turn in active encounter
+        if (event.ctrlKey && event.key === 'ArrowLeft') {
+            event.preventDefault();
+            const activeEncounter = state.get('currentAdventure')?.encounters?.find(e => e.state === 'started');
+            if (activeEncounter && window.previousTurn) {
+                const encounterIndex = state.get('currentAdventure').encounters.indexOf(activeEncounter);
+                if (encounterIndex >= 0) {
+                    window.previousTurn(encounterIndex);
+                }
+            }
+            return;
+        }
+
         // ESC - Close modals
         if (event.key === 'Escape') {
             modalManager.closeCurrentModal();
@@ -822,8 +1134,10 @@ export function createEventHandlers(deps) {
         closeAdventureSettingsModal,
         openDamageModal,
         closeDamageModal,
+        confirmDamage,
         openHealModal,
         closeHealModal,
+        confirmHeal,
         openMonsterModal,
         closeMonsterModal,
         openAttackResultModal,

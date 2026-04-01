@@ -15,6 +15,7 @@ import { createAdventureRenderer } from './renderers/adventureRenderer.js';
 import { createAdventureService } from './services/adventureService.js';
 import * as monsterListRenderer from './renderers/monsterListRenderer.js';
 import * as playerRenderer from './renderers/playerRenderer.js';
+import * as encounterRenderer from './renderers/encounterRenderer.js';
 import * as helpers from './utils/helpers.js';
 
 /**
@@ -270,6 +271,49 @@ export function initializeApp(config = {}) {
     win.closeMonsterModal = monsterListRenderer.closeMonsterModal;
     win.addMonsterFromLibrary = monsterListRenderer.addMonsterFromLibrary;
     win.fetchMonsterDetails = monsterListRenderer.fetchMonsterDetails;
+
+    // ==================== ENCOUNTER RENDERER INTEGRATION ====================
+    
+    // Expose encounter renderer functions globally for inline onclick handlers
+    win.renderEncounters = encounterRenderer.renderEncounters;
+    win.createEncounterCard = encounterRenderer.createEncounterCard;
+    win.isPlayerCombatant = encounterRenderer.isPlayerCombatant;
+    win.getCombatantName = encounterRenderer.getCombatantName;
+    win.getDexScore = encounterRenderer.getDexScore;
+    win.calculateEncounterXP = encounterRenderer.calculateEncounterXP;
+    win.calculateDefaultEncounterCR = encounterRenderer.calculateDefaultEncounterCR;
+    win.getEncounterCR = encounterRenderer.getEncounterCR;
+    win.toggleEncounterMinimize = encounterRenderer.toggleEncounterMinimize;
+    win.updateEncounterName = encounterRenderer.updateEncounterName;
+    win.updateEncounterCR = encounterRenderer.updateEncounterCR;
+    win.removeEncounter = encounterRenderer.removeEncounter;
+    win.resetEncounter = encounterRenderer.resetEncounter;
+    win.toggleEncounterEdit = encounterRenderer.toggleEncounterEdit;
+    win.addCustomCombatant = encounterRenderer.addCustomCombatant;
+    win.updateCombatant = encounterRenderer.updateCombatant;
+    win.removeCombatant = encounterRenderer.removeCombatant;
+    win.sortInitiative = encounterRenderer.sortInitiative;
+    win.refreshPlayers = encounterRenderer.refreshPlayers;
+    win.refreshMonsterStats = encounterRenderer.refreshMonsterStats;
+    win.toggleDeathSave = encounterRenderer.toggleDeathSave;
+    win.openConditionsDialog = encounterRenderer.openConditionsDialog;
+    win.closeConditionsModal = encounterRenderer.closeConditionsModal;
+    win.saveConditions = encounterRenderer.saveConditions;
+    win.clearConditions = encounterRenderer.clearConditions;
+    win.generateLoot = encounterRenderer.generateLoot;
+    win.clearLoot = encounterRenderer.clearLoot;
+    win.updateTreasure = encounterRenderer.updateTreasure;
+    win.startEncounter = encounterRenderer.startEncounter;
+    win.endEncounter = encounterRenderer.endEncounter;
+    win.nextTurn = encounterRenderer.nextTurn;
+    win.previousTurn = encounterRenderer.previousTurn;
+    win.fetchCRFromCache = encounterRenderer.fetchCRFromCache;
+    win.updateSpectatorUrl = encounterRenderer.updateSpectatorUrl;
+    win.copySpectatorUrl = encounterRenderer.copySpectatorUrl;
+    win.handleDragStart = encounterRenderer.handleDragStart;
+    win.handleDragOver = encounterRenderer.handleDragOver;
+    win.handleDrop = encounterRenderer.handleDrop;
+    win.handleDragEnd = encounterRenderer.handleDragEnd;
 
     // ==================== PLAYER RENDERER INTEGRATION ====================
     
