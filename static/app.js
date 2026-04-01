@@ -17,6 +17,7 @@ import * as monsterListRenderer from './renderers/monsterListRenderer.js';
 import * as playerRenderer from './renderers/playerRenderer.js';
 import * as encounterRenderer from './renderers/encounterRenderer.js';
 import * as helpers from './utils/helpers.js';
+import { tooltipManager } from './components/tooltipManager.js';
 
 /**
  * Initialize and start the application
@@ -314,6 +315,12 @@ export function initializeApp(config = {}) {
     win.handleDragOver = encounterRenderer.handleDragOver;
     win.handleDrop = encounterRenderer.handleDrop;
     win.handleDragEnd = encounterRenderer.handleDragEnd;
+
+    // ==================== TOOLTIP MANAGER INTEGRATION ====================
+    
+    // Expose tooltip functions globally for onclick handlers
+    win.showMonsterTooltip = tooltipManager.showMonsterTooltip;
+    win.hideMonsterTooltip = tooltipManager.hideMonsterTooltip;
 
     // ==================== PLAYER RENDERER INTEGRATION ====================
     
