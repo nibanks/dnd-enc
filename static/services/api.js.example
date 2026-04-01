@@ -1,0 +1,163 @@
+/**
+ * API Service Layer (EXAMPLE for Step 3)
+ * Abstract all API calls for testability
+ * 
+ * This is a template showing how Step 3 would be implemented.
+ * To use: Extract API functions from script.js following this pattern.
+ */
+
+/**
+ * Create API client with configurable base URL
+ * @param {Object} config - Configuration options
+ * @param {string} config.baseURL - Base URL for API calls (default: current origin)
+ * @param {Function} config.fetch - Fetch implementation (injectable for testing)
+ */
+export function createAPIClient(config = {}) {
+    const {
+        baseURL = window?.location?.origin || '',
+        fetch: fetchImpl = fetch
+    } = config;
+    
+    /**
+     * Generic API request helper
+     */
+    async function request(path, options = {}) {
+        const url = `${baseURL}${path}`;
+        const response = await fetchImpl(url, {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            ...options
+        });
+        
+        if (!response.ok) {
+            throw new APIError(`HTTP ${response.status}`, response.status, path);
+        }
+        
+        return response.json();
+    }
+    
+    return {
+        // Adventures API
+        async getAdventures() {
+            return request('/api/adventures');
+        },
+        
+        async getAdventure(name) {
+            return request(`/api/adventure/${encodeURIComponent(name)}`);
+        },
+        
+        async createAdventure(adventureData) {
+            return request('/api/adventure', {
+                method: 'POST',
+                body: JSON.stringify(adventureData)
+            });
+        },
+        
+        async updateAdventure(name, adventureData) {
+            return request(`/api/adventure/${encodeURIComponent(name)}`, {
+                method: 'POST',
+                body: JSON.stringify(adventureData)
+            });
+        },
+        
+        async deleteAdventure(name) {
+            return request(`/api/adventure/${encodeURIComponent(name)}`, {
+                method: 'DELETE'
+            });
+        },
+        
+        // D&D Beyond API
+        async loadMonsters() {
+            const data = await request('/api/dndbeyond/monsters');
+            if (!data.success || !data.monsters) {
+                throw new APIError('No monsters returned', 500, '/api/dndbeyond/monsters');
+            }
+            return data.monsters;
+        },
+        
+        async getMonsterDetails(monsterUrl) {
+            const encodedUrl = encodeURIComponent(monsterUrl);
+            const data = await request(`/api/dndbeyond/monster/${encodedUrl}`);
+            if (!data.success) {
+                throw new APIError(data.error || 'Failed to fetch monster', 500, monsterUrl);
+            }
+            return data.details;
+        },
+        
+        async getCharacterDetails(characterUrl) {
+            const encodedUrl = encodeURIComponent(characterUrl);
+            const data = await request(`/api/dndbeyond/character/${encodedUrl}`);
+            if (!data.success) {
+                throw new APIError(data.error || 'Failed to fetch character', 500, characterUrl);
+            }
+            return data.details;
+        },
+        
+        // Cookies API
+        async getCookieStatus() {
+            const data = await request('/api/dndbeyond/cookie-status');
+            return data.hasCookies || false;
+        },
+        
+        async setCookies(cookies) {
+            return request('/api/dndbeyond/set-cookies', {
+                method: 'POST',
+                body: JSON.stringify({ cookies })
+            });
+        },
+        
+        async clearCookies() {
+            return request('/api/dndbeyond/clear-cookies', {
+                method: 'POST'
+            });
+        },
+        
+        // Server Info
+        async getServerInfo() {
+            return request('/api/server-info');
+        }
+    };
+}
+
+/**
+ * Custom API Error class
+ */
+export class APIError extends Error {
+    constructor(message, status, endpoint) {
+        super(message);
+        this.name = 'APIError';
+        this.status = status;
+        this.endpoint = endpoint;
+    }
+}
+
+/**
+ * Example mock API client for testing
+ */
+export function createMockAPIClient(mockData = {}) {
+    return {
+        getAdventures: jest.fn().mockResolvedValue(mockData.adventures || []),
+        getAdventure: jest.fn().mockResolvedValue(mockData.adventure || null),
+        createAdventure: jest.fn().mockResolvedValue({ success: true }),
+        updateAdventure: jest.fn().mockResolvedValue({ success: true }),
+        deleteAdventure: jest.fn().mockResolvedValue({ success: true }),
+        loadMonsters: jest.fn().mockResolvedValue(mockData.monsters || {}),
+        getMonsterDetails: jest.fn().mockResolvedValue(mockData.monsterDetails || {}),
+        getCharacterDetails: jest.fn().mockResolvedValue(mockData.characterDetails || {}),
+        getCookieStatus: jest.fn().mockResolvedValue(mockData.hasCookies || false),
+        setCookies: jest.fn().mockResolvedValue({ success: true }),
+        clearCookies: jest.fn().mockResolvedValue({ success: true }),
+        getServerInfo: jest.fn().mockResolvedValue(mockData.serverInfo || {})
+    };
+}
+
+// Example usage:
+// const api = createAPIClient();
+// const monsters = await api.loadMonsters();
+// 
+// For testing:
+// const mockAPI = createMockAPIClient({ 
+//     monsters: { 'Goblin': { cr: '1/4' } }
+// });

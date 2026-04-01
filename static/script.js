@@ -1,13 +1,13 @@
-// Global state
-let currentAdventure = null;
-let currentChapter = null;
-let autoSaveTimeout = null;
-let DND_MONSTERS = {}; // Will be populated dynamically or use fallback
-let MONSTER_DETAILS_CACHE = {}; // Client-side cache for full monster details (with abilities, actions, etc.)
-let monstersLoaded = false;
-let hasCookies = false; // Track cookie authentication status
-let playersExpanded = true; // Track players section state
-let playersEditMode = false; // Track players edit mode
+// Global state - Use var so these become window properties (accessible from modular code)
+var currentAdventure = null;
+var currentChapter = null;
+var autoSaveTimeout = null;
+var DND_MONSTERS = {}; // Will be populated dynamically or use fallback
+var MONSTER_DETAILS_CACHE = {}; // Client-side cache for full monster details (with abilities, actions, etc.)
+var monstersLoaded = false;
+var hasCookies = false; // Track cookie authentication status
+var playersExpanded = true; // Track players section state
+var playersEditMode = false; // Track players edit mode
 let encounterEditMode = {}; // Track edit mode for completed encounters by index
 let cachedSpectatorUrl = null; // Cached spectator URL to prevent flashing
 let crFetchStatus = {}; // Track CR fetch status to prevent duplicate fetches: {encounterIndex_combatantIndex: true}
@@ -493,6 +493,18 @@ function updateAuthButton(authenticated) {
     }
 }
 
+// ==================== INITIALIZATION ====================
+// Note: Event handling now managed by app.js (modular architecture)
+// This script provides legacy rendering functions only
+
+// Skip initialization if app.js is present (new modular system)
+const useModularApp = typeof window !== 'undefined' && window.location && 
+    !window.location.search.includes('legacy=true');
+
+if (!useModularApp) {
+    // Legacy initialization path (only used if ?legacy=true in URL)
+    console.log('Using legacy script.js initialization');
+    
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     // Check cookie status first
@@ -533,6 +545,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 });
+
+} else {
+    console.log('✓ Modular app.js detected - using new architecture');
+    console.log('  Script.js provides rendering functions only');
+    console.log('  (Add ?legacy=true to URL to use old script.js initialization)');
+}
 
 function setupEventListeners() {
     document.getElementById('adventureSelect').addEventListener('change', handleAdventureChange);
@@ -1483,6 +1501,10 @@ function handleChapterNotesChange(event) {
 function updateChapterNotesDisplay() {
     const notesTextarea = document.getElementById('chapterNotes');
     if (notesTextarea) {
+        if (!currentAdventure) {
+            notesTextarea.value = '';
+            return;
+        }
         notesTextarea.value = (currentAdventure.chapterNotes && currentAdventure.chapterNotes[currentChapter]) || '';
     }
 }
@@ -1540,6 +1562,10 @@ function deleteChapter() {
 
 // Render adventure
 function renderAdventure() {
+    if (!currentAdventure) {
+        console.warn('renderAdventure called but currentAdventure is null');
+        return;
+    }
     renderChapterSelector();
     updateChapterNotesDisplay();
     renderPlayers();
@@ -1548,6 +1574,10 @@ function renderAdventure() {
 
 // Render chapter selector
 function renderChapterSelector() {
+    if (!currentAdventure || !currentAdventure.chapters) {
+        console.warn('renderChapterSelector called but currentAdventure or chapters is null');
+        return;
+    }
     const selector = document.getElementById('chapterSelect');
     selector.innerHTML = currentAdventure.chapters.map(chapter => 
         `<option value="${chapter}" ${chapter === currentChapter ? 'selected' : ''}>${chapter}</option>`
@@ -1611,6 +1641,11 @@ function sortPlayers(field) {
 function renderPlayers() {
     const tbody = document.getElementById('playersBody');
     tbody.innerHTML = '';
+    
+    if (!currentAdventure) {
+        console.warn('renderPlayers called but currentAdventure is null');
+        return;
+    }
     
     if (!currentAdventure.players) {
         currentAdventure.players = [];
@@ -2080,6 +2115,11 @@ function handleDragEnd(e) {
 function renderEncounters() {
     const container = document.getElementById('encountersContainer');
     container.innerHTML = '';
+    
+    if (!currentAdventure) {
+        console.warn('renderEncounters called but currentAdventure is null');
+        return;
+    }
     
     if (!currentAdventure.encounters) {
         currentAdventure.encounters = [];
