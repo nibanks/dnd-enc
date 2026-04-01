@@ -921,58 +921,6 @@ function confirmHeal() {
     closeHealModal();
 }
 
-// Check cookie status
-async function checkCookieStatus() {
-    try {
-        const response = await fetch('/api/dndbeyond/cookie-status');
-        const result = await response.json();
-        hasCookies = result.hasCookies;
-        updateUIForCookieStatus();
-    } catch (error) {
-        console.error('Error checking cookie status:', error);
-        hasCookies = false;
-        updateUIForCookieStatus();
-    }
-}
-
-// Update UI based on cookie authentication status
-function updateUIForCookieStatus() {
-    const adventureSelect = document.getElementById('adventureSelect');
-    const newAdventureBtn = document.getElementById('newAdventureBtn');
-    const adventureSelectionHeader = document.getElementById('adventureSelectionHeader');
-    
-    if (!hasCookies) {
-        // Disable adventure controls
-        adventureSelect.disabled = true;
-        newAdventureBtn.disabled = true;
-        
-        // Add warning message if not already present
-        if (!document.getElementById('cookieWarning')) {
-            const warning = document.createElement('div');
-            warning.id = 'cookieWarning';
-            warning.style.cssText = 'background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;';
-            warning.innerHTML = `
-                <h3 style="margin: 0 0 10px 0; color: #856404;">⚠️ Authentication Required</h3>
-                <p style="margin: 0 0 10px 0; color: #856404;">You must configure D&D Beyond cookies before using this app.</p>
-                <button onclick="openSettingsModal()" style="background: #9b59b6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">
-                    ⚙️ Open Settings to Configure
-                </button>
-            `;
-            adventureSelectionHeader.parentNode.insertBefore(warning, adventureSelectionHeader.nextSibling);
-        }
-    } else {
-        // Enable adventure controls
-        adventureSelect.disabled = false;
-        newAdventureBtn.disabled = false;
-        
-        // Remove warning if present
-        const warning = document.getElementById('cookieWarning');
-        if (warning) {
-            warning.remove();
-        }
-    }
-}
-
 async function saveCookies() {
     const cookieInput = document.getElementById('cookieInput');
     const cookieString = cookieInput.value.trim();
@@ -1155,22 +1103,6 @@ async function loadAdventuresList() {
 }
 
 // Handle adventure selection
-// Load adventures list
-async function loadAdventuresList() {
-    const response = await fetch('/api/adventures');
-    const adventures = await response.json();
-    
-    const select = document.getElementById('adventureSelect');
-    select.innerHTML = '<option value="">-- Select Adventure --</option>';
-    
-    adventures.forEach(name => {
-        const option = document.createElement('option');
-        option.value = name;
-        option.textContent = name;
-        select.appendChild(option);
-    });
-}
-
 // Render players table
 function sortPlayers(field) {
     if (!currentAdventure.players || currentAdventure.players.length === 0) return;
@@ -3287,52 +3219,6 @@ function previousTurn(encounterIndex) {
 }
 
 // Auto-save
-function autoSave() {
-    clearTimeout(autoSaveTimeout);
-    autoSaveTimeout = setTimeout(async () => {
-        const name = document.getElementById('adventureSelect').value;
-        if (!name) return;
-        
-        // Safety check: only save if currentAdventure is loaded and matches the selected adventure
-        if (!currentAdventure || currentAdventure.name !== name) {
-            console.warn('AutoSave blocked: currentAdventure does not match selected adventure');
-            return;
-        }
-        
-        const response = await fetch(`/api/adventure/${name}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(currentAdventure)
-        });
-        
-        if (response.status === 403) {
-            // Session expired or invalid - clear state and prompt for reload
-            alert('Your session has expired. Please reload the page and re-enter your PIN.');
-            currentAdventure = null;
-            document.getElementById('adventureSelect').value = '';
-            document.getElementById('adventureContent').style.display = 'none';
-            return;
-        }
-        
-        if (response.ok) {
-            showSaveIndicator();
-        }
-    }, 500);
-}
-
-// Show save indicator
-function showSaveIndicator() {
-    let indicator = document.querySelector('.auto-save-indicator');
-    if (!indicator) {
-        indicator = document.createElement('div');
-        indicator.className = 'auto-save-indicator';
-        indicator.textContent = '✓ Saved';
-        document.body.appendChild(indicator);
-    }
-    
-    indicator.classList.add('show');
-    setTimeout(() => indicator.classList.remove('show'), 2000);
-}
 // Monster Tooltip System
 let tooltipElement = null;
 let tooltipTimeout = null;

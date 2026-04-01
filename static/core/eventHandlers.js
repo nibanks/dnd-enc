@@ -74,14 +74,27 @@ export function createEventHandlers(deps) {
 
             state.loadAdventure(adventure);
 
-            // Sync legacy global variables for backward compatibility with script.js renderers
+            // Check URL for chapter parameter
             if (typeof window !== 'undefined') {
+                const urlParams = new URLSearchParams(window.location.search);
+                const chapterParam = urlParams.get('chapter');
+                
+                // If chapter in URL exists in adventure, use it
+                if (chapterParam && adventure.chapters && adventure.chapters.includes(chapterParam)) {
+                    state.setState({ currentChapter: chapterParam });
+                }
+                
+                // Sync legacy global variables for backward compatibility with script.js renderers
                 window.currentAdventure = state.get('currentAdventure');
                 window.currentChapter = state.get('currentChapter');
             }
 
-            // Update URL
+            // Update URL (preserve chapter if it exists)
+            const currentChapter = state.get('currentChapter');
             helpers.setURLParameter('adventure', adventureName);
+            if (currentChapter) {
+                helpers.setURLParameter('chapter', currentChapter);
+            }
 
             // Show adventure content
             dom.getElementById('adventureContent').style.display = 'block';

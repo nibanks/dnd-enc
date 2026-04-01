@@ -12,6 +12,7 @@ import { createDOMHelpers } from './services/dom.js';
 import { createModalManager } from './components/modalManager.js';
 import { createEventHandlers } from './core/eventHandlers.js';
 import { createAdventureRenderer } from './renderers/adventureRenderer.js';
+import { createAdventureService } from './services/adventureService.js';
 import * as helpers from './utils/helpers.js';
 
 /**
@@ -49,6 +50,17 @@ export function initializeApp(config = {}) {
         dom: dom,
     });
 
+    // Initialize adventure service
+    const adventureService = createAdventureService({
+        api: api,
+        dom: dom,
+        getAdventure: () => state.get('currentAdventure'),
+        getAdventureSelectValue: () => {
+            const select = dom.getElementById('adventureSelect');
+            return select ? select.value : '';
+        },
+    });
+
     // Renderer functions - mix of modular renderers and legacy bridges
     // Legacy script.js renderers (players, encounters) called until fully refactored
     const legacyRenderers = {
@@ -83,21 +95,10 @@ export function initializeApp(config = {}) {
         renderPlayers: legacyRenderers.renderPlayers,
         renderEncounters: legacyRenderers.renderEncounters,
         
-        loadAdventuresList: async () => {
-            if (typeof win.loadAdventuresList === 'function') {
-                await win.loadAdventuresList();
-            }
-        },
-        autoSave: () => {
-            if (typeof win.autoSave === 'function') {
-                win.autoSave();
-            }
-        },
-        checkCookieStatus: async () => {
-            if (typeof win.checkCookieStatus === 'function') {
-                await win.checkCookieStatus();
-            }
-        },
+        // Adventure service methods (modular)
+        loadAdventuresList: adventureService.loadAdventuresList,
+        autoSave: adventureService.autoSave,
+        checkCookieStatus: adventureService.checkCookieStatus,
     };
 
     // Initialize event handlers
@@ -251,6 +252,11 @@ export function initializeApp(config = {}) {
             win[key] = handlers[key];
         }
     });
+
+    // Expose service functions globally for legacy script.js compatibility
+    win.autoSave = adventureService.autoSave;
+    win.loadAdventuresList = adventureService.loadAdventuresList;
+    win.checkCookieStatus = adventureService.checkCookieStatus;
 
     // ==================== RETURN API ====================
 
