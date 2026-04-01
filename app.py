@@ -27,6 +27,8 @@ MONSTERS_CACHE = CACHE_DIR / "monsters.json"
 COOKIES_CACHE = CACHE_DIR / "cookies.json"
 MONSTER_DETAILS_DIR = CACHE_DIR / "monsters"
 MONSTER_DETAILS_DIR.mkdir(exist_ok=True)
+IMAGES_CACHE_DIR = CACHE_DIR / "images"
+IMAGES_CACHE_DIR.mkdir(exist_ok=True)
 
 # Store D&D Beyond cookies
 DNDBEYOND_COOKIES = {}
@@ -39,6 +41,55 @@ if COOKIES_CACHE.exists():
         print(f"Loaded {len(DNDBEYOND_COOKIES)} cookies from cache")
     except Exception as e:
         print(f"Error loading cookies: {e}")
+
+def cache_avatar_image(avatar_url):
+    """Download and cache an avatar image, return local path"""
+    if not avatar_url:
+        return None
+    
+    try:
+        # Extract filename from URL (use hash for unique identification)
+        import hashlib
+        url_hash = hashlib.md5(avatar_url.encode()).hexdigest()
+        
+        # Get file extension from URL
+        ext = '.jpeg'
+        if '.png' in avatar_url.lower():
+            ext = '.png'
+        elif '.jpg' in avatar_url.lower():
+            ext = '.jpg'
+        elif '.webp' in avatar_url.lower():
+            ext = '.webp'
+        
+        filename = f"{url_hash}{ext}"
+        cache_path = IMAGES_CACHE_DIR / filename
+        
+        # Return local path if already cached (instant)
+        if cache_path.exists():
+            return f"/cached/images/{filename}"
+        
+        # Download the image
+        print(f"  Downloading avatar: {avatar_url}")
+        response = requests.get(avatar_url, timeout=10)
+        
+        if response.status_code == 200:
+            with open(cache_path, 'wb') as f:
+                f.write(response.content)
+            print(f"  Cached avatar as: {filename}")
+            return f"/cached/images/{filename}"
+        else:
+            print(f"  Failed to download avatar: HTTP {response.status_code}")
+            return avatar_url  # Return original URL as fallback
+            
+    except Exception as e:
+        print(f"  Error caching avatar: {e}")
+        return avatar_url  # Return original URL as fallback
+
+@app.route('/cached/images/<path:filename>')
+def serve_cached_image(filename):
+    """Serve cached avatar images"""
+    from flask import send_from_directory
+    return send_from_directory(IMAGES_CACHE_DIR, filename)
 
 @app.route('/api/dndbeyond/set-cookies', methods=['POST'])
 def set_dndbeyond_cookies():
@@ -287,6 +338,14 @@ def get_character_details(character_url):
                 cache_age = time.time() - cached_data['timestamp']
                 if cache_age < 3600:  # 1 hour
                     print(f"Using cached character data (age: {cache_age:.0f}s)")
+                    
+                    # Cache avatar image if present and not already a local path
+                    if 'avatarUrl' in cached_data and cached_data['avatarUrl']:
+                        if not cached_data['avatarUrl'].startswith('/cached/images/'):
+                            cached_avatar = cache_avatar_image(cached_data['avatarUrl'])
+                            if cached_avatar:
+                                cached_data['avatarUrl'] = cached_avatar
+                    
                     return jsonify(cached_data)
         
         # Call D&D Beyond character API
@@ -390,6 +449,9 @@ def get_character_details(character_url):
         
         if avatar_url:
             print(f"  Found character avatar: {avatar_url}")
+            # Cache the avatar image locally
+            cached_avatar = cache_avatar_image(avatar_url)
+            avatar_url = cached_avatar if cached_avatar else avatar_url
         
         # Build character details
         character_details = {
@@ -672,6 +734,8 @@ def get_character_details_old(character_url):
 @app.route('/api/dndbeyond/monster/<path:monster_url>', methods=['GET'])
 def get_monster_details(monster_url):
     """Fetch detailed monster stats from D&D Beyond (JIT)"""
+    import time
+    start_time = time.time()
     try:
         # Decode the URL-encoded path
         from urllib.parse import unquote
@@ -700,8 +764,23 @@ def get_monster_details(monster_url):
             if 'timestamp' in cached_data:
                 cache_age = time.time() - cached_data['timestamp']
                 if cache_age < 2592000:  # 30 days in seconds
-                    print(f"Returning cached details for {monster_id} (age: {cache_age/86400:.1f} days)")
-                    return jsonify({'success': True, 'details': cached_data.get('data', {}), 'cached': True})
+                    cache_read_time = time.time()
+                    print(f"Returning cached details for {monster_id} (age: {cache_age/86400:.1f} days) [cache read: {(cache_read_time - start_time)*1000:.0f}ms]")
+                    details = cached_data.get('data', {})
+                    
+                    # Cache avatar image if present and not already a local path
+                    if 'avatarUrl' in details and details['avatarUrl']:
+                        if not details['avatarUrl'].startswith('/cached/images/'):
+                            avatar_cache_start = time.time()
+                            cached_avatar = cache_avatar_image(details['avatarUrl'])
+                            avatar_cache_time = time.time()
+                            print(f"  Avatar caching took: {(avatar_cache_time - avatar_cache_start)*1000:.0f}ms")
+                            if cached_avatar:
+                                details['avatarUrl'] = cached_avatar
+                    
+                    total_time = time.time() - start_time
+                    print(f"  TOTAL response time: {total_time*1000:.0f}ms")
+                    return jsonify({'success': True, 'details': details, 'cached': True})
                 else:
                     print(f"Cache expired for {monster_id} (age: {cache_age/86400:.1f} days)")
         
@@ -1194,7 +1273,9 @@ def get_monster_details(monster_url):
                         break
         
         if avatar_url:
-            details['avatarUrl'] = avatar_url
+            # Cache the avatar image locally
+            cached_avatar_url = cache_avatar_image(avatar_url)
+            details['avatarUrl'] = cached_avatar_url if cached_avatar_url else avatar_url
         
         if not details:
             print("  WARNING: No stats found on page - selectors may need updating")

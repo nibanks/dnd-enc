@@ -131,7 +131,7 @@ async function loadMonsters() {
         const response = await fetch('/api/dndbeyond/monsters');
         const data = await response.json();
         
-        console.log('Backend response:', data);
+        // console.log('Backend response:', data); // Removed - logging large objects causes slowdown
         
         if (data.success && data.monsters && Object.keys(data.monsters).length > 0) {
             DND_MONSTERS = data.monsters;
@@ -2860,7 +2860,7 @@ function selectMonster(monsterName) {
         return;
     }
     
-    console.log('Monster found:', monster);
+    // console.log('Monster found:', monster); // Removed - logging large objects causes slowdown
     
     // Validate we have a valid encounter selected
     if (!currentAdventure || !currentAdventure.encounters || currentEncounterIndex === null || !currentAdventure.encounters[currentEncounterIndex]) {
@@ -2969,7 +2969,7 @@ async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterName) {
         }
         
         const details = data.details;
-        console.log(`Fetched details for ${monsterName}:`, details);
+        // console.log(`Fetched details for ${monsterName}:`, details); // Removed - logging large objects causes slowdown
         
         // Check if we got any useful data
         if (!details.ac && !details.hp) {
@@ -4362,15 +4362,26 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
         `/api/dndbeyond/character/${encodeURIComponent(entityUrl)}` :
         `/api/dndbeyond/monster/${encodeURIComponent(entityUrl)}`;
     
+    const fetchStartTime = performance.now();
+    console.log(`[TIMING] Fetch started for ${entityUrl}`);
+    
     fetch(apiEndpoint)
-        .then(response => response.json())
+        .then(response => {
+            const fetchCompleteTime = performance.now();
+            console.log(`[TIMING] Fetch complete: ${(fetchCompleteTime - fetchStartTime).toFixed(0)}ms`);
+            return response.json();
+        })
         .then(data => {
+            const jsonParseTime = performance.now();
+            console.log(`[TIMING] JSON parsed: ${(jsonParseTime - fetchStartTime).toFixed(0)}ms`);
             
             // Clear fetch status
             delete monsterDetailsFetchStatus[entityUrl];
             
-            // Only update if this is still the current tooltip
-            if (currentTooltipMonster !== entityName) return;
+            // Only update if tooltip is still visible (don't check entityName to avoid race conditions)
+            if (!tooltipElement || tooltipElement.style.display === 'none') {
+                return;
+            }
             
             // Check if there was an error
             if (!data.success || data.error) {
@@ -4414,7 +4425,11 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
                 MONSTER_DETAILS_CACHE[entityUrl] = details;
             }
             
+            const renderStartTime = performance.now();
             renderTooltipContent(tooltip, entityName, details, isCharacter, encounterIndex, entityUrl);
+            const renderCompleteTime = performance.now();
+            console.log(`[TIMING] Render complete: ${(renderCompleteTime - fetchStartTime).toFixed(0)}ms (render took ${(renderCompleteTime - renderStartTime).toFixed(0)}ms)`);
+            console.log(`[TIMING] TOTAL tooltip load time: ${(renderCompleteTime - fetchStartTime).toFixed(0)}ms`);
             
             // Reposition after content is loaded in case size changed
             positionTooltip(event);
@@ -4425,7 +4440,7 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
             // Clear fetch status
             delete monsterDetailsFetchStatus[entityUrl];
             
-            if (currentTooltipMonster === entityName) {
+            if (tooltipElement && tooltipElement.style.display !== 'none') {
                 tooltip.innerHTML = `<div class="monster-tooltip-loading">Failed to load ${entityType} details</div>`;
             }
         });
