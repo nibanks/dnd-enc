@@ -12,11 +12,11 @@ module.exports = {
   testTimeout: 10000,
   // Enable ES modules support
   transform: {
-    '^.+\\.js$': ['babel-jest', { 
-      presets: [['@babel/preset-env', { targets: { node: 'current' } }]]
-    }]
+    '^.+\\.js$': 'babel-jest'
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(.*)/)'  // Transform all node_modules if needed
-  ]
+    'node_modules/'
+  ],
+  moduleFileExtensions: ['js', 'json'],
+  testPathIgnorePatterns: ['/node_modules/']
 };
