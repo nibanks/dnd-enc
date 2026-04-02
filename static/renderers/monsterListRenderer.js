@@ -198,11 +198,9 @@ export function renderMonsterList(searchTerm) {
  * @param {string} monsterName - Name of monster to add
  */
 export function selectMonster(monsterName) {
-    console.log('selectMonster called with:', monsterName);
     const monster = window.DND_MONSTERS[monsterName];
     if (!monster) {
         console.error('Monster not found in DND_MONSTERS:', monsterName);
-        console.log('Available monsters:', Object.keys(window.DND_MONSTERS).slice(0, 10));
         alert(`Monster "${monsterName}" not found in monster library.`);
         return;
     }
@@ -272,9 +270,7 @@ export function selectMonster(monsterName) {
         });
     }
     
-    console.log(`Added ${quantity}x ${monsterName} to encounter`);
-    
-    // Call global renderer and auto-save (exposed from legacy script.js)
+    // Call global renderer and auto-save
     if (window.renderEncounters) window.renderEncounters();
     if (window.autoSave) window.autoSave();
     
@@ -290,12 +286,10 @@ export function selectMonster(monsterName) {
  */
 export async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterName) {
     if (!monsterUrl) {
-        console.log('No URL provided for monster details');
         return;
     }
     
     try {
-        console.log(`Fetching details for ${monsterName} from D&D Beyond...`);
         showToast(`Fetching ${monsterName} details from D&D Beyond...`, 'info', 2000);
         
         // URL encode just the URL part for the API
@@ -372,7 +366,6 @@ export async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterNam
         });
         
         if (updated > 0) {
-            console.log(`Updated ${updated} combatant(s) with fetched details`);
             const statsMsg = [];
             if (details.ac) statsMsg.push(`AC ${details.ac}`);
             if (details.hp) statsMsg.push(`HP ${details.hp}`);
@@ -401,7 +394,6 @@ export async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterNam
                     // Roll d20 + modifier
                     const d20 = Math.floor(Math.random() * 20) + 1;
                     combatant.initiative = d20 + details.initiativeModifier;
-                    console.log(`Rolled initiative for ${combatant.name}: ${d20} + ${details.initiativeModifier} = ${combatant.initiative}`);
                 }
             });
             
@@ -438,8 +430,6 @@ export async function addMonsterFromLibrary(encounterIndex) {
 export async function loadMonsters() {
     if (window.monstersLoaded) return true;
     
-    console.log('Loading monsters from backend proxy...');
-    
     // Use backend proxy (bypasses CORS)
     try {
         const response = await fetch('/api/dndbeyond/monsters');
@@ -448,7 +438,6 @@ export async function loadMonsters() {
         if (data.success && data.monsters && Object.keys(data.monsters).length > 0) {
             window.DND_MONSTERS = data.monsters;
             window.monstersLoaded = true;
-            console.log(`✓ Loaded ${Object.keys(window.DND_MONSTERS).length} monsters from D&D Beyond`);
             updateAuthButton(true);
             return true;
         } else {

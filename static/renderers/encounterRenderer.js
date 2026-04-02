@@ -4,6 +4,8 @@
  * Extracted from script.js - ~1500 lines of encounter logic
  */
 
+import { CR_TO_XP, DND_CONDITIONS, CONDITION_ICONS } from '../utils/constants.js';
+
 // ==================== UTILITY FUNCTIONS ====================
 
 /**
@@ -65,7 +67,6 @@ export function getDexScore(combatant) {
 export function calculateEncounterXP(encounter) {
     if (!encounter || !encounter.combatants) return 0;
     
-    const CR_TO_XP = window.CR_TO_XP || {};
     const DND_MONSTERS = window.DND_MONSTERS || {};
     
     // If custom CR is set, convert it to XP
@@ -155,7 +156,6 @@ function formatCR(numericCR) {
 export function calculateDefaultEncounterCR(encounter) {
     if (!encounter || !encounter.combatants) return '0';
     
-    const CR_TO_XP = window.CR_TO_XP || {};
     const DND_MONSTERS = window.DND_MONSTERS || {};
     
     const monsters = encounter.combatants.filter(combatant => !isPlayerCombatant(combatant));
@@ -431,8 +431,6 @@ export function createEncounterCard(encounter, encounterIndex) {
     const cachedSpectatorUrl = window.cachedSpectatorUrl;
     const DND_MONSTERS = window.DND_MONSTERS || {};
     const crFetchStatus = window.crFetchStatus || {};
-    const DND_CONDITIONS = window.DND_CONDITIONS || [];
-    const CONDITION_ICONS = window.CONDITION_ICONS || {};
     
     const card = document.createElement('div');
     card.className = 'encounter-card';
@@ -1059,8 +1057,6 @@ export function openConditionsDialog(encounterIndex, combatantIndex) {
     const combatant = currentAdventure.encounters[encounterIndex].combatants[combatantIndex];
     const conditions = combatant.conditions || [];
     const concentrating = combatant.concentrating || false;
-    const DND_CONDITIONS = window.DND_CONDITIONS || [];
-    const CONDITION_ICONS = window.CONDITION_ICONS || {};
     
     let html = '<div style="max-height: 600px; overflow-y: auto; padding: 10px;">';
     html += '<h3 style="margin-top: 0; margin-bottom: 15px;">Manage Conditions</h3>';
