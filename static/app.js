@@ -2,8 +2,7 @@
  * Main Application Entry Point
  * 
  * Initializes all modules and wires up the application.
- * This serves as the new modular entry point while maintaining
- * backward compatibility with the existing script.js.
+ * This serves as the new modular entry point.
  */
 
 import { createStateManager } from './core/state.js';
@@ -19,6 +18,32 @@ import * as encounterRenderer from './renderers/encounterRenderer.js';
 import * as helpers from './utils/helpers.js';
 import { tooltipManager } from './components/tooltipManager.js';
 import { initializeAttackRollHandler } from './utils/attackRollManager.js';
+import { DND_CLASSES, DND_RACES, CR_TO_XP, LEVEL_THRESHOLDS, DND_CONDITIONS, CONDITION_ICONS } from './utils/constants.js';
+
+// ==================== GLOBAL STATE INITIALIZATION ====================
+// Initialize global state on window object for backward compatibility
+window.currentAdventure = null;
+window.currentChapter = null;
+window.autoSaveTimeout = null;
+window.DND_MONSTERS = {};
+window.MONSTER_DETAILS_CACHE = {};
+window.monstersLoaded = false;
+window.hasCookies = false;
+window.playersExpanded = true;
+window.playersEditMode = false;
+window.encounterEditMode = {};
+window.cachedSpectatorUrl = null;
+window.crFetchStatus = {};
+window.monsterDetailsFetchStatus = {};
+window.initialLoadComplete = false;
+
+// Expose D&D constants globally for backward compatibility
+window.DND_CLASSES = DND_CLASSES;
+window.DND_RACES = DND_RACES;
+window.CR_TO_XP = CR_TO_XP;
+window.LEVEL_THRESHOLDS = LEVEL_THRESHOLDS;
+window.DND_CONDITIONS = DND_CONDITIONS;
+window.CONDITION_ICONS = CONDITION_ICONS;
 
 /**
  * Initialize and start the application

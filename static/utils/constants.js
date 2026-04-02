@@ -1,39 +1,26 @@
-// Global state - Use var so these become window properties (accessible from modular code)
-var currentAdventure = null;
-var currentChapter = null;
-var autoSaveTimeout = null;
-var DND_MONSTERS = {}; // Will be populated dynamically or use fallback
-var MONSTER_DETAILS_CACHE = {}; // Client-side cache for full monster details (with abilities, actions, etc.)
-var monstersLoaded = false;
-var hasCookies = false; // Track cookie authentication status
-var playersExpanded = true; // Track players section state
-var playersEditMode = false; // Track players edit mode
-var encounterEditMode = {}; // Track edit mode for completed encounters by index
-var cachedSpectatorUrl = null; // Cached spectator URL to prevent flashing
-var crFetchStatus = {}; // Track CR fetch status to prevent duplicate fetches: {encounterIndex_combatantIndex: true}
-var monsterDetailsFetchStatus = {}; // Track monster details fetch status to prevent duplicate fetches: {entityUrl: true}
-var initialLoadComplete = false; // Track if initial render has completed to prevent network flooding
+/**
+ * D&D 5e/2024 Reference Data Constants
+ * 
+ * Contains all D&D reference data used throughout the application.
+ * Exported as named exports for ES6 modules.
+ */
 
 // D&D 5e/2024 Classes
-const DND_CLASSES = [
+export const DND_CLASSES = [
     'Barbarian', 'Bard', 'Cleric', 'Druid', 'Fighter', 'Monk',
     'Paladin', 'Ranger', 'Rogue', 'Sorcerer', 'Warlock', 'Wizard'
 ];
 
 // D&D 5e/2024 Races
-const DND_RACES = [
+export const DND_RACES = [
     'Aarakocra', 'Aasimar', 'Bugbear', 'Dragonborn', 'Dwarf', 'Elf', 'Firbolg', 
     'Genasi', 'Gnome', 'Goblin', 'Goliath', 'Half-Elf', 'Half-Orc', 'Halfling', 
     'Hobgoblin', 'Human', 'Kenku', 'Kobold', 'Leonin', 'Lizardfolk', 'Orc', 
     'Satyr', 'Tabaxi', 'Tiefling', 'Tortle', 'Triton', 'Warforged', 'Yuan-ti'
 ];
 
-// Expose globally for modular code
-window.DND_CLASSES = DND_CLASSES;
-window.DND_RACES = DND_RACES;
-
 // CR to XP mapping (D&D 5e)
-const CR_TO_XP = {
+export const CR_TO_XP = {
     '0': 10,
     '1/8': 25,
     '1/4': 50,
@@ -70,11 +57,8 @@ const CR_TO_XP = {
     '30': 155000
 };
 
-// Expose CR_TO_XP globally for encounterRenderer
-window.CR_TO_XP = CR_TO_XP;
-
 // D&D 5e XP thresholds for leveling
-const LEVEL_THRESHOLDS = [
+export const LEVEL_THRESHOLDS = [
     { level: 1, xp: 0, color: '#ecf0f120' },
     { level: 2, xp: 300, color: '#d5e8d420' },
     { level: 3, xp: 900, color: '#d4edda20' },
@@ -98,7 +82,7 @@ const LEVEL_THRESHOLDS = [
 ];
 
 // Common D&D conditions
-const DND_CONDITIONS = [
+export const DND_CONDITIONS = [
     'Blinded', 'Charmed', 'Deafened', 'Frightened', 'Grappled', 
     'Incapacitated', 'Invisible', 'Paralyzed', 'Petrified', 'Poisoned', 
     'Prone', 'Restrained', 'Stunned', 'Unconscious', 'Concentrating',
@@ -106,7 +90,7 @@ const DND_CONDITIONS = [
 ];
 
 // Condition icons mapping
-const CONDITION_ICONS = {
+export const CONDITION_ICONS = {
     'Blinded': '🙈',
     'Charmed': '💖',
     'Deafened': '🔇',
@@ -127,26 +111,3 @@ const CONDITION_ICONS = {
     'Raging': '💢',
     'Hidden': '🫥'
 };
-
-// Expose globally for encounterRenderer
-window.DND_CONDITIONS = DND_CONDITIONS;
-window.CONDITION_ICONS = CONDITION_ICONS;
-
-// ==================== MODULAR ARCHITECTURE ====================
-// All functionality moved to ES6 modules in static/ subdirectories.
-// Modules are imported and initialized by app.js, exposed globally for compatibility.
-//
-// Module Locations:
-//   - adventureService.js: Adventure CRUD, auto-save, cookie status
-//   - monsterListRenderer.js: Monster library, selection modal, loadMonsters, updateAuthButton
-//   - playerRenderer.js: Player list rendering, sorting, editing, stats management
-//   - encounterRenderer.js: Encounter cards, initiative, CR/XP calculations, combatant management
-//   - tooltipManager.js: Monster/character tooltips with stats and actions
-//   - eventHandlers.js: Modal management, settings, damage/heal, PIN protection, cookies
-//   - attackRollManager.js: Attack roll event handling, damage application
-//   - helpers.js: Toast notifications, utility functions
-//
-// This file now only contains:
-//   - Global state variables (var declarations for window.* access)
-//   - D&D reference data constants (classes, races, CR/XP, conditions)
-//   - All exposed globally via window.* for backward compatibility
