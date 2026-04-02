@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
-    name: Run Backend Tests
+  backend-tests:
+    name: Backend Tests (Python)
     runs-on: ubuntu-latest
     
     steps:
@@ -22,7 +22,7 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
       
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -37,12 +37,46 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
-          flags: unittests
+          flags: backend
           fail_ci_if_error: false
       
       - name: Test Summary
         if: always()
         run: |
-          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## Backend Test Results" >> $GITHUB_STEP_SUMMARY
           echo "Python Version: 3.12" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+  
+  frontend-tests:
+    name: Frontend Tests (JavaScript)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install npm dependencies
+        run: npm ci
+      
+      - name: Run Jest tests
+        run: npm test -- --coverage
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage/coverage-final.json
+          flags: frontend
+          fail_ci_if_error: false
+      
+      - name: Test Summary
+        if: always()
+        run: |
+          echo "## Frontend Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "Node Version: 20" >> $GITHUB_STEP_SUMMARY
           echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
