@@ -1,54 +1,49 @@
 /**
  * Tests for D&D Encounter Tracker JavaScript functionality
+ * Tests the modular ES6 architecture
  */
 
-// Mock the script.js file - in a real setup, you'd load it properly
-// For now, we'll define the key functions and constants to test
+import { 
+  DND_CLASSES, 
+  DND_RACES, 
+  CR_TO_XP, 
+  LEVEL_THRESHOLDS,
+  DND_CONDITIONS,
+  CONDITION_ICONS 
+} from '../static/utils/constants.js';
 
-// Import the constants and functions from script.js
-// Note: You may need to refactor script.js to export these for testing
-// or use a bundler like webpack to load the actual file
+import {
+  parseCR,
+  formatNumber,
+  escapeHTML,
+  isCharacterUrl,
+  getCombatantName,
+  getCombatantDexScore,
+  getDamageTypeClass,
+  generateId,
+  debounce
+} from '../static/utils/helpers.js';
 
-describe('D&D Encounter Tracker - Constants and Data', () => {
-  // Define constants for testing (these should match script.js)
-  const CR_TO_XP = {
-    '0': 10,
-    '1/8': 25,
-    '1/4': 50,
-    '1/2': 100,
-    '1': 200,
-    '2': 450,
-    '3': 700,
-    '4': 1100,
-    '5': 1800,
-    '6': 2300,
-    '7': 2900,
-    '8': 3900,
-    '9': 5000,
-    '10': 5900,
-    '11': 7200,
-    '12': 8400,
-    '13': 10000,
-    '14': 11500,
-    '15': 13000,
-    '16': 15000,
-    '17': 18000,
-    '18': 20000,
-    '19': 22000,
-    '20': 25000,
-    '21': 33000,
-    '22': 41000,
-    '23': 50000,
-    '24': 62000,
-    '25': 75000,
-    '26': 90000,
-    '27': 105000,
-    '28': 120000,
-    '29': 135000,
-    '30': 155000
-  };
+describe('D&D Constants - Classes and Races', () => {
+  test('DND_CLASSES contains all 12 PHB classes', () => {
+    expect(DND_CLASSES).toHaveLength(12);
+    expect(DND_CLASSES).toContain('Fighter');
+    expect(DND_CLASSES).toContain('Wizard');
+    expect(DND_CLASSES).toContain('Rogue');
+    expect(DND_CLASSES).toContain('Cleric');
+  });
 
-  test('CR_TO_XP mapping contains all standard CRs', () => {
+  test('DND_RACES contains common races', () => {
+    expect(DND_RACES.length).toBeGreaterThan(20);
+    expect(DND_RACES).toContain('Human');
+    expect(DND_RACES).toContain('Elf');
+    expect(DND_RACES).toContain('Dwarf');
+    expect(DND_RACES).toContain('Dragonborn');
+  });
+});
+
+describe('D&D Constants - CR to XP Mapping', () => {
+  test('CR_TO_XP contains all standard CRs', () => {
     expect(CR_TO_XP['0']).toBe(10);
     expect(CR_TO_XP['1/8']).toBe(25);
     expect(CR_TO_XP['1/4']).toBe(50);
@@ -66,7 +61,6 @@ describe('D&D Encounter Tracker - Constants and Data', () => {
   });
 
   test('CR XP values increase with CR rating', () => {
-    // Test specific CR progressions
     expect(CR_TO_XP['0']).toBeLessThan(CR_TO_XP['1/8']);
     expect(CR_TO_XP['1/8']).toBeLessThan(CR_TO_XP['1/4']);
     expect(CR_TO_XP['1/4']).toBeLessThan(CR_TO_XP['1/2']);
@@ -78,65 +72,215 @@ describe('D&D Encounter Tracker - Constants and Data', () => {
   });
 });
 
-describe('Global State Management', () => {
-  let mockState;
-
-  beforeEach(() => {
-    // Initialize mock state
-    mockState = {
-      currentAdventure: null,
-      currentChapter: null,
-      DND_MONSTERS: {},
-      MONSTER_DETAILS_CACHE: {},
-      monstersLoaded: false,
-      hasCookies: false,
-      playersExpanded: true,
-      playersEditMode: false,
-      encounterEditMode: {},
-      crFetchStatus: {},
-      monsterDetailsFetchStatus: {}
-    };
+describe('D&D Constants - Level Thresholds', () => {
+  test('LEVEL_THRESHOLDS contains all 20 levels', () => {
+    expect(LEVEL_THRESHOLDS).toHaveLength(20);
+    expect(LEVEL_THRESHOLDS[0].level).toBe(1);
+    expect(LEVEL_THRESHOLDS[19].level).toBe(20);
   });
 
-  test('initial state is correct', () => {
-    expect(mockState.currentAdventure).toBeNull();
-    expect(mockState.currentChapter).toBeNull();
-    expect(mockState.DND_MONSTERS).toEqual({});
-    expect(mockState.MONSTER_DETAILS_CACHE).toEqual({});
-    expect(mockState.monstersLoaded).toBe(false);
-    expect(mockState.hasCookies).toBe(false);
-    expect(mockState.playersExpanded).toBe(true);
-    expect(mockState.playersEditMode).toBe(false);
+  test('Level thresholds increase progressively', () => {
+    for (let i = 1; i < LEVEL_THRESHOLDS.length; i++) {
+      expect(LEVEL_THRESHOLDS[i].xp).toBeGreaterThan(LEVEL_THRESHOLDS[i - 1].xp);
+    }
   });
 
-  test('state can be updated', () => {
-    mockState.currentAdventure = { name: 'Test Adventure' };
-    mockState.monstersLoaded = true;
-    mockState.hasCookies = true;
+  test('Level 1 starts at 0 XP', () => {
+    expect(LEVEL_THRESHOLDS[0].xp).toBe(0);
+  });
+});
 
-    expect(mockState.currentAdventure.name).toBe('Test Adventure');
-    expect(mockState.monstersLoaded).toBe(true);
-    expect(mockState.hasCookies).toBe(true);
+describe('D&D Constants - Conditions', () => {
+  test('DND_CONDITIONS contains standard conditions', () => {
+    expect(DND_CONDITIONS).toContain('Blinded');
+    expect(DND_CONDITIONS).toContain('Charmed');
+    expect(DND_CONDITIONS).toContain('Paralyzed');
+    expect(DND_CONDITIONS).toContain('Unconscious');
   });
 
-  test('cache objects can store data', () => {
-    mockState.MONSTER_DETAILS_CACHE['goblin'] = {
-      name: 'Goblin',
-      cr: '1/4',
-      hp: 7
-    };
+  test('CONDITION_ICONS maps all conditions to icons', () => {
+    expect(CONDITION_ICONS['Blinded']).toBe('🙈');
+    expect(CONDITION_ICONS['Charmed']).toBe('💖');
+    expect(CONDITION_ICONS['Paralyzed']).toBe('🧊');
+    expect(CONDITION_ICONS['Unconscious']).toBe('⚰️');
+  });
+});
 
-    expect(mockState.MONSTER_DETAILS_CACHE['goblin'].name).toBe('Goblin');
-    expect(mockState.MONSTER_DETAILS_CACHE['goblin'].cr).toBe('1/4');
+describe('Helpers - parseCR', () => {
+  test('parses whole number CRs', () => {
+    expect(parseCR('1')).toBe(1);
+    expect(parseCR('5')).toBe(5);
+    expect(parseCR('20')).toBe(20);
   });
 
-  test('fetch status tracking prevents duplicates', () => {
-    const encounterKey = '0_1';
-    expect(mockState.crFetchStatus[encounterKey]).toBeUndefined();
-
-    mockState.crFetchStatus[encounterKey] = true;
-    expect(mockState.crFetchStatus[encounterKey]).toBe(true);
+  test('parses fractional CRs', () => {
+    expect(parseCR('1/8')).toBe(0.125);
+    expect(parseCR('1/4')).toBe(0.25);
+    expect(parseCR('1/2')).toBe(0.5);
   });
+
+  test('handles numeric input', () => {
+    expect(parseCR(5)).toBe(5);
+    expect(parseCR(0.25)).toBe(0.25);
+  });
+
+  test('handles invalid input', () => {
+    expect(parseCR('')).toBe(0);
+    expect(parseCR(null)).toBe(0);
+  });
+});
+
+describe('Helpers - formatNumber', () => {
+  test('formats numbers with thousands separator', () => {
+    const result = formatNumber(1000);
+    expect(result).toMatch(/1[,\s]000/); // Handles different locale separators
+  });
+
+  test('handles small numbers', () => {
+    expect(formatNumber(100)).toBeTruthy();
+  });
+});
+
+describe('Helpers - escapeHTML', () => {
+  test('escapes HTML special characters', () => {
+    const result = escapeHTML('<script>alert("xss")</script>');
+    expect(result).not.toContain('<script>');
+    expect(result).toContain('&lt;');
+    expect(result).toContain('&gt;');
+  });
+
+  test('escapes ampersands', () => {
+    const result = escapeHTML('Tom & Jerry');
+    expect(result).toContain('&amp;');
+  });
+});
+
+describe('Helpers - isCharacterUrl', () => {
+  test('identifies character URLs', () => {
+    expect(isCharacterUrl('/profile/username/characters/12345')).toBe(true);
+    expect(isCharacterUrl('/characters/12345')).toBe(true);
+  });
+
+  test('rejects monster URLs', () => {
+    expect(isCharacterUrl('/monsters/17140-goblin')).toBe(false);
+  });
+
+  test('handles null/undefined', () => {
+    expect(isCharacterUrl(null)).toBe(false);
+    expect(isCharacterUrl(undefined)).toBe(false);
+    expect(isCharacterUrl('')).toBe(false);
+  });
+});
+
+describe('Helpers - getCombatantName', () => {
+  const players = [
+    { 
+      name: 'Aragorn', 
+      dndBeyondUrl: '/characters/12345' 
+    },
+    { 
+      name: 'Legolas', 
+      dndBeyondUrl: '/characters/67890' 
+    }
+  ];
+
+  test('returns monster name directly', () => {
+    const combatant = { name: 'Goblin' };
+    expect(getCombatantName(combatant, players)).toBe('Goblin');
+  });
+
+  test('looks up player name by ID', () => {
+    const combatant = { id: '12345' };
+    expect(getCombatantName(combatant, players)).toBe('Aragorn');
+  });
+
+  test('handles unknown player', () => {
+    const combatant = { id: '99999' };
+    expect(getCombatantName(combatant, players)).toBe('Unknown Player');
+  });
+});
+
+describe('Helpers - getCombatantDexScore', () => {
+  const players = [
+    { 
+      dndBeyondUrl: '/characters/12345',
+      abilityScores: { dex: 16 }
+    }
+  ];
+
+  test('returns player DEX score', () => {
+    const combatant = { id: '12345' };
+    expect(getCombatantDexScore(combatant, players)).toBe(16);
+  });
+
+  test('returns monster dexScore if available', () => {
+    const combatant = { name: 'Goblin', dexScore: 14 };
+    expect(getCombatantDexScore(combatant, players)).toBe(14);
+  });
+
+  test('defaults to 10 for unknown', () => {
+    const combatant = { id: '99999' };
+    expect(getCombatantDexScore(combatant, players)).toBe(10);
+  });
+});
+
+describe('Helpers - getDamageTypeClass', () => {
+  test('returns correct class for damage types', () => {
+    expect(getDamageTypeClass('fire')).toBe('damage-fire');
+    expect(getDamageTypeClass('cold')).toBe('damage-cold');
+    expect(getDamageTypeClass('poison')).toBe('damage-poison');
+  });
+
+  test('handles case insensitivity', () => {
+    expect(getDamageTypeClass('FIRE')).toBe('damage-fire');
+    expect(getDamageTypeClass('Fire')).toBe('damage-fire');
+  });
+
+  test('returns empty string for unknown type', () => {
+    expect(getDamageTypeClass('unknown')).toBe('');
+    expect(getDamageTypeClass(null)).toBe('');
+  });
+});
+
+describe('Helpers - generateId', () => {
+  test('generates unique IDs', () => {
+    const id1 = generateId();
+    const id2 = generateId();
+    expect(id1).not.toBe(id2);
+  });
+
+  test('returns string', () => {
+    expect(typeof generateId()).toBe('string');
+  });
+});
+
+describe('Helpers - debounce', () => {
+  jest.useFakeTimers();
+
+  test('delays function execution', () => {
+    const func = jest.fn();
+    const debouncedFunc = debounce(func, 100);
+    
+    debouncedFunc();
+    expect(func).not.toHaveBeenCalled();
+    
+    jest.advanceTimersByTime(100);
+    expect(func).toHaveBeenCalledTimes(1);
+  });
+
+  test('cancels previous call', () => {
+    const func = jest.fn();
+    const debouncedFunc = debounce(func, 100);
+    
+    debouncedFunc();
+    debouncedFunc();
+    debouncedFunc();
+    
+    jest.advanceTimersByTime(100);
+    expect(func).toHaveBeenCalledTimes(1);
+  });
+
+  jest.useRealTimers();
 });
 
 describe('Adventure Data Validation', () => {
@@ -177,7 +321,7 @@ describe('Adventure Data Validation', () => {
     const encounter = {
       name: 'Test Encounter',
       monsters: [
-        { name: 'Goblin',  count: 3, url: 'monsters/17140-goblin' }
+        { name: 'Goblin', count: 3, url: 'monsters/17140-goblin' }
       ],
       description: 'A test encounter'
     };
@@ -185,559 +329,5 @@ describe('Adventure Data Validation', () => {
     expect(encounter.name).toBeDefined();
     expect(Array.isArray(encounter.monsters)).toBe(true);
     expect(encounter.monsters[0].count).toBeGreaterThan(0);
-  });
-});
-
-describe('XP Calculation', () => {
-  const CR_TO_XP = {
-    '0': 10,
-    '1/8': 25,
-    '1/4': 50,
-    '1/2': 100,
-    '1': 200,
-    '2': 450,
-    '3': 700,
-    '4': 1100,
-    '5': 1800
-  };
-
-  function calculateEncounterXP(monsters) {
-    return monsters.reduce((total, monster) => {
-      const xp = CR_TO_XP[monster.cr] || 0;
-      return total + (xp * monster.count);
-    }, 0);
-  }
-
-  test('calculate XP for single monster', () => {
-    const monsters = [{ cr: '1/4', count: 1 }];
-    const xp = calculateEncounterXP(monsters);
-    expect(xp).toBe(50);
-  });
-
-  test('calculate XP for multiple monsters of same type', () => {
-    const monsters = [{ cr: '1/4', count: 3 }];
-    const xp = calculateEncounterXP(monsters);
-    expect(xp).toBe(150); // 50 * 3
-  });
-
-  test('calculate XP for mixed monster types', () => {
-    const monsters = [
-      { cr: '1/4', count: 2 },
-      { cr: '1', count: 1 }
-    ];
-    const xp = calculateEncounterXP(monsters);
-    expect(xp).toBe(300); // (50 * 2) + (200 * 1)
-  });
-
-  test('handle invalid CR gracefully', () => {
-    const monsters = [{ cr: 'invalid', count: 1 }];
-    const xp = calculateEncounterXP(monsters);
-    expect(xp).toBe(0);
-  });
-
-  test('handle zero count', () => {
-    const monsters = [{ cr: '1', count: 0 }];
-    const xp = calculateEncounterXP(monsters);
-    expect(xp).toBe(0);
-  });
-});
-
-describe('HP Calculations', () => {
-  test('damage reduces current HP', () => {
-    let player = { maxHp: 45, currentHp: 45 };
-    const damage = 10;
-    
-    player.currentHp -= damage;
-    
-    expect(player.currentHp).toBe(35);
-    expect(player.currentHp).toBeLessThan(player.maxHp);
-  });
-
-  test('healing increases current HP', () => {
-    let player = { maxHp: 45, currentHp: 20 };
-    const healing = 15;
-    
-    player.currentHp += healing;
-    
-    expect(player.currentHp).toBe(35);
-  });
-
-  test('healing cannot exceed max HP', () => {
-    let player = { maxHp: 45, currentHp: 40 };
-    const healing = 10;
-    
-    player.currentHp = Math.min(player.currentHp + healing, player.maxHp);
-    
-    expect(player.currentHp).toBe(45);
-    expect(player.currentHp).toBeLessThanOrEqual(player.maxHp);
-  });
-
-  test('damage cannot reduce HP below 0', () => {
-    let player = { maxHp: 45, currentHp: 5 };
-    const damage = 10;
-    
-    player.currentHp = Math.max(player.currentHp - damage, 0);
-    
-    expect(player.currentHp).toBe(0);
-    expect(player.currentHp).toBeGreaterThanOrEqual(0);
-  });
-
-  test('temp HP is tracked separately', () => {
-    let player = { maxHp: 45, currentHp: 45, tempHp: 0 };
-    
-    player.tempHp = 10;
-    
-    expect(player.tempHp).toBe(10);
-    expect(player.currentHp).toBe(45); // Temp HP doesn't affect current HP
-  });
-});
-
-describe('Data Structures', () => {
-  const DND_CLASSES = [
-    'Barbarian', 'Bard', 'Cleric', 'Druid', 'Fighter',
-    'Monk', 'Paladin', 'Ranger', 'Rogue', 'Sorcerer',
-    'Warlock', 'Wizard'
-  ];
-
-  const DND_RACES = [
-    'Dragonborn', 'Dwarf', 'Elf', 'Gnome', 'Half-Elf',
-    'Half-Orc', 'Halfling', 'Human', 'Tiefling'
-  ];
-
-  test('D&D classes list is complete', () => {
-    expect(DND_CLASSES).toContain('Fighter');
-    expect(DND_CLASSES).toContain('Wizard');
-    expect(DND_CLASSES).toContain('Rogue');
-    expect(DND_CLASSES.length).toBe(12);
-  });
-
-  test('D&D races list contains standard races', () => {
-    expect(DND_RACES).toContain('Human');
-    expect(DND_RACES).toContain('Elf');
-    expect(DND_RACES).toContain('Dwarf');
-    expect(DND_RACES.length).toBeGreaterThanOrEqual(9);
-  });
-
-  test('classes are unique', () => {
-    const uniqueClasses = [...new Set(DND_CLASSES)];
-    expect(uniqueClasses.length).toBe(DND_CLASSES.length);
-  });
-
-  test('races are unique', () => {
-    const uniqueRaces = [...new Set(DND_RACES)];
-    expect(uniqueRaces.length).toBe(DND_RACES.length);
-  });
-});
-
-describe('Ability Score Modifiers', () => {
-  function getAbilityModifier(score) {
-    return Math.floor((score - 10) / 2);
-  }
-
-  test('calculate ability modifiers correctly', () => {
-    expect(getAbilityModifier(10)).toBe(0);
-    expect(getAbilityModifier(11)).toBe(0);
-    expect(getAbilityModifier(12)).toBe(1);
-    expect(getAbilityModifier(14)).toBe(2);
-    expect(getAbilityModifier(16)).toBe(3);
-    expect(getAbilityModifier(18)).toBe(4);
-    expect(getAbilityModifier(20)).toBe(5);
-  });
-
-  test('negative modifiers for low scores', () => {
-    expect(getAbilityModifier(8)).toBe(-1);
-    expect(getAbilityModifier(6)).toBe(-2);
-    expect(getAbilityModifier(4)).toBe(-3);
-  });
-
-  test('edge cases', () => {
-    expect(getAbilityModifier(1)).toBe(-5);  // Min score: (1-10)/2 = -4.5 -> -5
-    expect(getAbilityModifier(30)).toBe(10); // Max normal score
-  });
-});
-
-describe('DOM Manipulation', () => {
-  beforeEach(() => {
-    // Set up DOM elements for testing
-    document.body.innerHTML = `
-      <div id="attackResultModal" class="modal">
-        <div class="modal-content">
-          <span class="close">&times;</span>
-          <div id="attackResultContent"></div>
-        </div>
-      </div>
-      <div id="settingsModal" class="modal"></div>
-      <div id="playersSection">
-        <div id="playersTableContainer"></div>
-      </div>
-      <button id="togglePlayersBtn">Toggle Players</button>
-    `;
-  });
-
-  afterEach(() => {
-    document.body.innerHTML = '';
-  });
-
-  test('modal can be opened and closed', () => {
-    const modal = document.getElementById('attackResultModal');
-    
-    // Open modal
-    modal.style.display = 'block';
-    expect(modal.style.display).toBe('block');
-    
-    // Close modal
-    modal.style.display = 'none';
-    expect(modal.style.display).toBe('none');
-  });
-
-  test('modal content can be updated', () => {
-    const content = document.getElementById('attackResultContent');
-    const testHTML = '<p>Test content</p>';
-    
-    content.innerHTML = testHTML;
-    
-    expect(content.innerHTML).toBe(testHTML);
-    expect(content.querySelector('p')).not.toBeNull();
-    expect(content.querySelector('p').textContent).toBe('Test content');
-  });
-
-  test('toggle players section', () => {
-    const playersSection = document.getElementById('playersSection');
-    let isExpanded = true;
-    
-    // Toggle to collapsed
-    if (isExpanded) {
-      playersSection.style.display = 'none';
-      isExpanded = false;
-    }
-    
-    expect(playersSection.style.display).toBe('none');
-    expect(isExpanded).toBe(false);
-    
-    // Toggle back to expanded
-    if (!isExpanded) {
-      playersSection.style.display = 'block';
-      isExpanded = true;
-    }
-    
-    expect(playersSection.style.display).toBe('block');
-    expect(isExpanded).toBe(true);
-  });
-
-  test('creating table rows dynamically', () => {
-    const container = document.getElementById('playersTableContainer');
-    const players = [
-      { name: 'Player 1', level: 5, class: 'Fighter' },
-      { name: 'Player 2', level: 3, class: 'Wizard' }
-    ];
-    
-    const table = document.createElement('table');
-    players.forEach(player => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${player.name}</td>
-        <td>${player.level}</td>
-        <td>${player.class}</td>
-      `;
-      table.appendChild(row);
-    });
-    
-    container.appendChild(table);
-    
-    expect(table.querySelectorAll('tr').length).toBe(2);
-    expect(table.querySelector('tr td').textContent).toBe('Player 1');
-  });
-
-  test('updating DOM elements with new data', () => {
-    document.body.innerHTML = '<div id="playerHp">45</div>';
-    const hpElement = document.getElementById('playerHp');
-    
-    let currentHp = 45;
-    currentHp -= 10; // Take damage
-    hpElement.textContent = currentHp;
-    
-    expect(hpElement.textContent).toBe('35');
-    expect(parseInt(hpElement.textContent)).toBe(35);
-  });
-
-  test('adding CSS classes dynamically', () => {
-    document.body.innerHTML = '<div id="player"></div>';
-    const playerElement = document.getElementById('player');
-    
-    // Add class for low HP
-    playerElement.classList.add('low-hp');
-    expect(playerElement.classList.contains('low-hp')).toBe(true);
-    
-    // Remove class when healed
-    playerElement.classList.remove('low-hp');
-    expect(playerElement.classList.contains('low-hp')).toBe(false);
-  });
-
-  test('event listeners can be attached', () => {
-    const button = document.getElementById('togglePlayersBtn');
-    let clicked = false;
-    
-    button.addEventListener('click', () => {
-      clicked = true;
-    });
-    
-    button.click();
-    expect(clicked).toBe(true);
-  });
-});
-
-describe('API Integration', () => {
-  beforeEach(() => {
-    fetch.mockClear();
-  });
-
-  test('fetch adventures list', async () => {
-    const mockAdventures = ['Adventure 1', 'Adventure 2'];
-    
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockAdventures
-    });
-    
-    const response = await fetch('/api/adventures');
-    const data = await response.json();
-    
-    expect(fetch).toHaveBeenCalledWith('/api/adventures');
-    expect(data).toEqual(mockAdventures);
-  });
-
-  test('load specific adventure', async () => {
-    const mockAdventure = {
-      name: 'Test Adventure',
-      chapters: [],
-      players: []
-    };
-    
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockAdventure
-    });
-    
-    const response = await fetch('/api/adventure/Test Adventure');
-    const data = await response.json();
-    
-    expect(fetch).toHaveBeenCalledWith('/api/adventure/Test Adventure');
-    expect(data.name).toBe('Test Adventure');
-  });
-
-  test('save adventure', async () => {
-    const adventure = {
-      name: 'Test Adventure',
-      chapters: [],
-      players: []
-    };
-    
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true })
-    });
-    
-    const response = await fetch('/api/adventure/Test Adventure', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(adventure)
-    });
-    
-    const data = await response.json();
-    
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/adventure/Test Adventure',
-      expect.objectContaining({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-    );
-    expect(data.success).toBe(true);
-  });
-
-  test('fetch D&D Beyond monsters', async () => {
-    const mockMonsters = [
-      { id: 1, name: 'Goblin', url: 'monsters/17140-goblin' },
-      { id: 2, name: 'Kobold', url: 'monsters/17145-kobold' }
-    ];
-    
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockMonsters
-    });
-    
-    const response = await fetch('/api/dndbeyond/monsters');
-    const data = await response.json();
-    
-    expect(data).toHaveLength(2);
-    expect(data[0].name).toBe('Goblin');
-  });
-
-  test('fetch monster details with caching', async () => {
-    const cache = {};
-    const monsterUrl = 'monsters/17140-goblin';
-    const mockMonster = { name: 'Goblin', cr: '1/4', hp: 7 };
-    
-    // First fetch - from API
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockMonster
-    });
-    
-    if (!cache[monsterUrl]) {
-      const response = await fetch(`/api/dndbeyond/monster/${monsterUrl}`);
-      cache[monsterUrl] = await response.json();
-    }
-    
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(cache[monsterUrl].name).toBe('Goblin');
-    
-    // Second fetch - from cache
-    const cachedMonster = cache[monsterUrl];
-    
-    expect(fetch).toHaveBeenCalledTimes(1); // Still only 1 call
-    expect(cachedMonster.name).toBe('Goblin');
-  });
-
-  test('handle API errors gracefully', async () => {
-    fetch.mockRejectedValueOnce(new Error('Network error'));
-    
-    try {
-      await fetch('/api/adventures');
-      fail('Should have thrown an error');
-    } catch (error) {
-      expect(error.message).toBe('Network error');
-    }
-  });
-
-  test('handle 404 responses', async () => {
-    fetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      json: async () => ({ error: 'Not found' })
-    });
-    
-    const response = await fetch('/api/adventure/NonExistent');
-    const data = await response.json();
-    
-    expect(response.ok).toBe(false);
-    expect(response.status).toBe(404);
-    expect(data.error).toBe('Not found');
-  });
-
-  test('verify PIN for protected adventure', async () => {
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ success: true })
-    });
-    
-    const response = await fetch('/api/adventure/Protected Adventure/verify-pin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin: '1234' })
-    });
-    
-    const data = await response.json();
-    
-    expect(data.success).toBe(true);
-  });
-
-  test('check cookie status', async () => {
-    fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ configured: true })
-    });
-    
-    const response = await fetch('/api/dndbeyond/cookie-status');
-    const data = await response.json();
-    
-    expect(data.configured).toBe(true);
-  });
-});
-
-describe('SessionStorage', () => {
-  beforeEach(() => {
-    sessionStorage.clear();
-  });
-
-  test('save and retrieve scroll position', () => {
-    const scrollPosition = 500;
-    
-    sessionStorage.setItem('scrollPosition', scrollPosition);
-    const retrieved = sessionStorage.getItem('scrollPosition');
-    
-    expect(retrieved).toBe('500');
-    expect(parseInt(retrieved)).toBe(scrollPosition);
-  });
-
-  test('sessionStorage persists data', () => {
-    sessionStorage.setItem('testKey', 'testValue');
-    
-    expect(sessionStorage.getItem('testKey')).toBe('testValue');
-  });
-
-  test('sessionStorage can be cleared', () => {
-    sessionStorage.setItem('key1', 'value1');
-    sessionStorage.setItem('key2', 'value2');
-    
-    sessionStorage.clear();
-    
-    expect(sessionStorage.getItem('key1')).toBeNull();
-    expect(sessionStorage.getItem('key2')).toBeNull();
-  });
-
-  test('remove specific item from sessionStorage', () => {
-    sessionStorage.setItem('keep', 'value1');
-    sessionStorage.setItem('remove', 'value2');
-    
-    sessionStorage.removeItem('remove');
-    
-    expect(sessionStorage.getItem('keep')).toBe('value1');
-    expect(sessionStorage.getItem('remove')).toBeNull();
-  });
-});
-
-describe('Error Handling', () => {
-  test('handle missing DOM elements gracefully', () => {
-    const element = document.getElementById('nonexistent');
-    expect(element).toBeNull();
-    
-    // Should not throw when checking null
-    if (element) {
-      element.textContent = 'test';
-    }
-    // Test passes if no error thrown
-  });
-
-  test('handle invalid JSON gracefully', () => {
-    const invalidJSON = '{invalid json}';
-    
-    expect(() => {
-      JSON.parse(invalidJSON);
-    }).toThrow();
-  });
-
-  test('handle undefined adventure data', () => {
-    let adventure = undefined;
-    
-    const safeGetName = () => {
-      return adventure?.name || 'Unnamed Adventure';
-    };
-    
-    expect(safeGetName()).toBe('Unnamed Adventure');
-  });
-
-  test('handle division by zero', () => {
-    const result = 10 / 0;
-    expect(result).toBe(Infinity);
-  });
-
-  test('handle empty arrays', () => {
-    const players = [];
-    const averageLevel = players.length > 0
-      ? players.reduce((sum, p) => sum + p.level, 0) / players.length
-      : 0;
-    
-    expect(averageLevel).toBe(0);
   });
 });

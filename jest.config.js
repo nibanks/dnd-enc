@@ -3,8 +3,7 @@ module.exports = {
   testMatch: ['**/tests/**/*.test.js', '**/tests/**/test_*.js'],
   collectCoverageFrom: [
     'static/**/*.js',
-    '!static/chart.umd.min.js',
-    '!static/script.js'  // Exclude legacy script.js from coverage for now
+    '!static/chart.umd.min.js'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'html', 'lcov'],
