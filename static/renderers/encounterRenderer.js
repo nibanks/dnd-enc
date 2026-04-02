@@ -5,7 +5,6 @@
  */
 
 import { CR_TO_XP, DND_CONDITIONS, CONDITION_ICONS } from '../utils/constants.js';
-import { parseCR } from '../utils/helpers.js';
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -121,19 +120,6 @@ export function calculateEncounterXP(encounter) {
     
     const adjustedXP = Math.round(totalXP * multiplier);
     return adjustedXP.toLocaleString();
-}
-
-/**
- * Format numeric CR back to string
- */
-function formatCR(numericCR) {
-    if (numericCR === 0) return '0';
-    if (numericCR < 1) {
-        if (numericCR === 0.125) return '1/8';
-        if (numericCR === 0.25) return '1/4';
-        if (numericCR === 0.5) return '1/2';
-    }
-    return String(Math.round(numericCR));
 }
 
 /**
