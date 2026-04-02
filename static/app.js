@@ -291,6 +291,7 @@ export function initializeApp(config = {}) {
     win.checkCookieStatus = adventureService.checkCookieStatus;
 
     // Expose monster list renderer functions globally for script.js and inline onclick handlers
+    win.loadMonsters = monsterListRenderer.loadMonsters;
     win.renderMonsterList = monsterListRenderer.renderMonsterList;
     win.selectMonster = monsterListRenderer.selectMonster;
     win.openMonsterModal = monsterListRenderer.openMonsterModal;
