@@ -132,88 +132,21 @@ const CONDITION_ICONS = {
 window.DND_CONDITIONS = DND_CONDITIONS;
 window.CONDITION_ICONS = CONDITION_ICONS;
 
-// [MOVED] loadMonsters → monsterListRenderer.js
-
-// [MOVED] openAttackResultModal → eventHandlers.js
-// [MOVED] closeAttackResultModal → eventHandlers.js
-// [MOVED] applyAttackResultToPlayer → attackRollManager.js (exposed globally)
-// [MOVED] getDamageTypeClass → attackRollManager.js
-// [MOVED] Attack roll event listener → attackRollManager.js (initializeAttackRollHandler)
-
-// ==================== END ATTACK ROLL MODAL ====================
-
-// [MOVED] updateAuthButton → monsterListRenderer.js
-
-// ==================== INITIALIZATION ====================
-// Note: All event handling and initialization now managed by app.js (modular architecture)
-// This script provides rendering functions only
-
-// [MOVED] togglePlayersSection → eventHandlers.js
-
-// [MOVED] openStatisticsInNewWindow → eventHandlers.js
-
-// [MOVED] openSettingsModal → eventHandlers.js
-
-// [MOVED] closeSettingsModal → eventHandlers.js
-
-// [MOVED] openAdventureSettingsModal → eventHandlers.js
-
-// [MOVED] closeAdventureSettingsModal → eventHandlers.js
-
-// [MOVED] The following functions have been moved to eventHandlers.js:
-// - openAdventureSettingsModal
-// - closeAdventureSettingsModal
-// - saveAdventurePin (async function for PIN validation and saving)
-// - openDamageModal
-// - confirmDamage
-// - openHealModal
-// - confirmHeal
-// - saveCookies
-// - clearCookies
-// - showCookieStatus(message, type)
-// - showCookieExpirationWarning(monsterName)
+// ==================== MODULAR ARCHITECTURE ====================
+// All functionality moved to ES6 modules in static/ subdirectories.
+// Modules are imported and initialized by app.js, exposed globally for compatibility.
 //
-// All functions are exposed globally via app.js through the handlers object
-
-// [MOVED] showToast → helpers.js
-
-// [MOVED] authenticateDndBeyond → Simple wrapper, can be inlined
-
-// [MOVED] loadAdventuresList → adventureService.js (DUPLICATE - already moved)
-
-// Handle adventure selection
-// Player rendering [MOVED TO playerRenderer.js]
-// - renderPlayers() - Main rendering with edit/view modes
-// - sortPlayers(field) - Sort players by field
-// - togglePlayerStats(index) - Expand/collapse ability scores
-// - updatePlayer(index, field, value) - Update player field
-// - updatePlayerAbility(index, ability, value) - Update ability score
-// - updatePlayerSkillProf(index, skill, isProficient) - Update skill proficiency
-// - removePlayer(index) - Remove player
-// - editPlayerUrl(index) - Edit D&D Beyond URL
-// - togglePlayersEditMode() - Toggle edit mode
-// All now use event delegation instead of inline onclick handlers
-
-// Encounter rendering [MOVED TO encounterRenderer.js]
-// All ~35 encounter functions (~1420 lines) moved to static/renderers/encounterRenderer.js
-// Functions include:
-//   Utilities: isPlayerCombatant, getCombatantName, getDexScore
-//   Calculations: calculateEncounterXP, calculateDefaultEncounterCR, getEncounterCR, parseCR, formatCR
-//   Drag & Drop: handleDragStart, handleDragOver, handleDrop, handleDragEnd
-//   Main Rendering: renderEncounters, createEncounterCard
-//   Management: toggleEncounterMinimize, updateEncounterName, updateEncounterCR, removeEncounter, resetEncounter, toggleEncounterEdit
-//   Combatants: addCustomCombatant, updateCombatant, removeCombatant, sortInitiative, refreshPlayers, refreshMonsterStats
-//   Special Features: toggleDeathSave, openConditionsDialog, saveConditions, clearConditions, generateLoot, clearLoot, updateTreasure
-//   State Management: startEncounter, endEncounter, nextTurn, previousTurn
-//   Helpers: fetchCRFromCache, updateSpectatorUrl, copySpectatorUrl, closeConditionsModal
+// Module Locations:
+//   - adventureService.js: Adventure CRUD, auto-save, cookie status
+//   - monsterListRenderer.js: Monster library, selection modal, loadMonsters, updateAuthButton
+//   - playerRenderer.js: Player list rendering, sorting, editing, stats management
+//   - encounterRenderer.js: Encounter cards, initiative, CR/XP calculations, combatant management
+//   - tooltipManager.js: Monster/character tooltips with stats and actions
+//   - eventHandlers.js: Modal management, settings, damage/heal, PIN protection, cookies
+//   - attackRollManager.js: Attack roll event handling, damage application
+//   - helpers.js: Toast notifications, utility functions
 //
-// All functions exposed globally via window.* for onclick handler compatibility
-
-// [MOVED] Tooltip system → tooltipManager.js
-// - createTooltipElement
-// - formatModifier
-// - formatActionDescription
-// - renderTooltipContent
-// - isCharacterUrl
-// - showMonsterTooltip
-// - hideMonsterTooltip
+// This file now only contains:
+//   - Global state variables (var declarations for window.* access)
+//   - D&D reference data constants (classes, races, CR/XP, conditions)
+//   - All exposed globally via window.* for backward compatibility
