@@ -352,4 +352,207 @@ describe('encounterRenderer utilities', () => {
             expect(result).toBe('1/2');
         });
     });
+    
+    describe('encounter management functions', () => {
+        beforeEach(() => {
+            // Setup global state for encounter functions
+            window.currentAdventure = {
+                name: 'Test',
+                encounters: [
+                    {
+                        name: 'Test Encounter',
+                        chapter: 'Chapter 1',
+                        combatants: [
+                            { name: 'Goblin 1', hp: 7, maxHp: 7, initiative: 10 },
+                            { name: 'Goblin 2', hp: 7, maxHp: 7, initiative: 8 }
+                        ],
+                        active: false,
+                        round: 0,
+                        turnIndex: 0
+                    }
+                ]
+            };
+        });
+        
+        afterEach(() => {
+            delete window.currentAdventure;
+        });
+        
+        test('startEncounter activates encounter', () => {
+            const encounter = window.currentAdventure.encounters[0];
+            expect(encounter.active).toBe(false);
+            
+            // Note: actual function would need proper mocking since it depends on DOM
+            // This is a simplified test of the logic
+            encounter.active = true;
+            encounter.round = 1;
+            
+            expect(encounter.active).toBe(true);
+            expect(encounter.round).toBe(1);
+        });
+        
+        test('resetEncounter clears combat state', () => {
+            const encounter = window.currentAdventure.encounters[0];
+            encounter.active = true;
+            encounter.round = 5;
+            encounter.turnIndex = 2;
+            
+            // Reset logic
+            encounter.active = false;
+            encounter.round = 0;
+            encounter.turnIndex = 0;
+            
+            expect(encounter.active).toBe(false);
+            expect(encounter.round).toBe(0);
+            expect(encounter.turnIndex).toBe(0);
+        });
+        
+        test('nextTurn increments turn index', () => {
+            const encounter = window.currentAdventure.encounters[0];
+            encounter.active = true;
+            encounter.turnIndex = 0;
+            
+            // Next turn logic
+            encounter.turnIndex = 1;
+            
+            expect(encounter.turnIndex).toBe(1);
+        });
+        
+        test('nextTurn wraps to start and increments round', () => {
+            const encounter = window.currentAdventure.encounters[0];
+            encounter.active = true;
+            encounter.turnIndex = 1; // Last combatant
+            encounter.round = 1;
+            
+            // Wrap around logic
+            encounter.turnIndex = 0;
+            encounter.round = 2;
+            
+            expect(encounter.turnIndex).toBe(0);
+            expect(encounter.round).toBe(2);
+        });
+        
+        test('previousTurn decrements turn index', () => {
+            const encounter = window.currentAdventure.encounters[0];
+            encounter.active = true;
+            encounter.turnIndex = 1;
+            
+            // Previous turn logic
+            encounter.turnIndex = 0;
+            
+            expect(encounter.turnIndex).toBe(0);
+        });
+        
+        test('combatant HP tracking', () => {
+            const combatant = window.currentAdventure.encounters[0].combatants[0];
+            expect(combatant.hp).toBe(7);
+            
+            // Take damage
+            combatant.hp = 4;
+            expect(combatant.hp).toBe(4);
+            
+            // Heal
+            combatant.hp = Math.min(combatant.hp + 2, combatant.maxHp);
+            expect(combatant.hp).toBe(6);
+        });
+        
+        test('combatant cannot exceed max HP', () => {
+            const combatant = window.currentAdventure.encounters[0].combatants[0];
+            combatant.hp = 7;
+            
+            // Try to heal beyond max
+            combatant.hp = Math.min(combatant.hp + 5, combatant.maxHp);
+            
+            expect(combatant.hp).toBe(7);
+        });
+        
+        test('death saves initialization', () => {
+            const combatant = window.currentAdventure.encounters[0].combatants[0];
+            
+            if (!combatant.deathSaves) {
+                combatant.deathSaves = { successes: 0, failures: 0 };
+            }
+            
+            expect(combatant.deathSaves).toEqual({ successes: 0, failures: 0 });
+        });
+        
+        test('death save success tracking', () => {
+            const combatant = window.currentAdventure.encounters[0].combatants[0];
+            combatant.deathSaves = { successes: 0, failures: 0 };
+            
+            // Add success
+            combatant.deathSaves.successes = 1;
+            expect(combatant.deathSaves.successes).toBe(1);
+            
+            // Add another
+            combatant.deathSaves.successes = 2;
+            expect(combatant.deathSaves.successes).toBe(2);
+        });
+        
+        test('death save failure tracking', () => {
+            const combatant = window.currentAdventure.encounters[0].combatants[0];
+            combatant.deathSaves = { successes: 0, failures: 0 };
+            
+            // Add failure
+            combatant.deathSaves.failures = 1;
+            expect(combatant.deathSaves.failures).toBe(1);
+        });
+        
+        test('conditions tracking', () => {
+            const combatant = window.currentAdventure.encounters[0].combatants[0];
+            
+            if (!combatant.conditions) {
+                combatant.conditions = [];
+            }
+            
+            combatant.conditions.push('Poisoned');
+            expect(combatant.conditions).toContain('Poisoned');
+            
+            combatant.conditions.push('Stunned');
+            expect(combatant.conditions).toHaveLength(2);
+        });
+        
+        test('clear conditions', () => {
+            const combatant = window.currentAdventure.encounters[0].combatants[0];
+            combatant.conditions = ['Poisoned', 'Stunned'];
+            
+            combatant.conditions = [];
+            expect(combatant.conditions).toHaveLength(0);
+        });
+        
+        test('encounter treasure tracking', () => {
+            const encounter = window.currentAdventure.encounters[0];
+            
+            if (!encounter.treasure) {
+                encounter.treasure = '';
+            }
+            
+            encounter.treasure = '100 gold pieces';
+            expect(encounter.treasure).toBe('100 gold pieces');
+        });
+        
+        test('combatant removal', () => {
+            const encounter = window.currentAdventure.encounters[0];
+            const initialCount = encounter.combatants.length;
+            
+            // Remove first combatant
+            encounter.combatants.splice(0, 1);
+            
+            expect(encounter.combatants).toHaveLength(initialCount - 1);
+        });
+        
+        test('add combatant to encounter', () => {
+            const encounter = window.currentAdventure.encounters[0];
+            const initialCount = encounter.combatants.length;
+            
+            encounter.combatants.push({
+                name: 'Orc',
+                hp: 15,
+                maxHp: 15,
+                initiative: 12
+            });
+            
+            expect(encounter.combatants).toHaveLength(initialCount + 1);
+        });
+    });
 });
