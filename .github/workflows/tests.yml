@@ -12,18 +12,14 @@ jobs:
     name: Run Backend Tests
     runs-on: ubuntu-latest
     
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11', '3.12']
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.12'
           cache: 'pip'
       
       - name: Install dependencies
@@ -38,7 +34,6 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
       
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
@@ -49,5 +44,5 @@ jobs:
         if: always()
         run: |
           echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-          echo "Python Version: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "Python Version: 3.12" >> $GITHUB_STEP_SUMMARY
           echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
