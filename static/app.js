@@ -238,12 +238,28 @@ export function initializeApp(config = {}) {
                     select.value = adventureName;
                     // Trigger the change event to load the adventure
                     await handlers.handleAdventureChange({ target: select });
+                    
+                    // Mark initial load as complete after a short delay to allow rendering to finish
+                    // This prevents network flooding from hundreds of simultaneous CR fetches
+                    setTimeout(() => {
+                        win.initialLoadComplete = true;
+                        
+                        // Now batch fetch all missing CRs with staggered timing
+                        if (win.fetchAllMissingCRs) {
+                            win.fetchAllMissingCRs();
+                        }
+                    }, 500);
                 }
             } else {
                 // Redirect to home and show settings
                 win.history.replaceState({}, '', '/');
                 handlers.openSettingsModal();
             }
+        } else {
+            // No adventure parameter - mark as loaded immediately
+            setTimeout(() => {
+                win.initialLoadComplete = true;
+            }, 500);
         }
     }
 
@@ -318,6 +334,7 @@ export function initializeApp(config = {}) {
     win.nextTurn = encounterRenderer.nextTurn;
     win.previousTurn = encounterRenderer.previousTurn;
     win.fetchCRFromCache = encounterRenderer.fetchCRFromCache;
+    win.fetchAllMissingCRs = encounterRenderer.fetchAllMissingCRs;
     win.updateSpectatorUrl = encounterRenderer.updateSpectatorUrl;
     win.copySpectatorUrl = encounterRenderer.copySpectatorUrl;
     win.handleDragStart = encounterRenderer.handleDragStart;
@@ -328,8 +345,8 @@ export function initializeApp(config = {}) {
     // ==================== TOOLTIP MANAGER INTEGRATION ====================
     
     // Expose tooltip functions globally for onclick handlers
-    win.showMonsterTooltip = tooltipManager.showMonsterTooltip;
-    win.hideMonsterTooltip = tooltipManager.hideMonsterTooltip;
+    window.showMonsterTooltip = tooltipManager.showMonsterTooltip;
+    window.hideMonsterTooltip = tooltipManager.hideMonsterTooltip;
 
     // ==================== PLAYER RENDERER INTEGRATION ====================
     

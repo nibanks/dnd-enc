@@ -314,6 +314,42 @@ export function renderEncounters() {
         return;
     }
     
+    // Backfill missing dndBeyondUrl from sibling combatants with same base name
+    if (currentAdventure.encounters) {
+        currentAdventure.encounters.forEach(encounter => {
+            if (!encounter.combatants) return;
+            
+            // Group combatants by base name (without numbers)
+            const combatantsByBaseName = {};
+            encounter.combatants.forEach(combatant => {
+                if (!combatant.name) return;
+                const baseName = combatant.name.replace(/\s+\d+$/, '').trim();
+                if (!combatantsByBaseName[baseName]) {
+                    combatantsByBaseName[baseName] = [];
+                }
+                combatantsByBaseName[baseName].push(combatant);
+            });
+            
+            // For each group, find one with a URL and copy to others
+            Object.values(combatantsByBaseName).forEach(group => {
+                const withUrl = group.find(c => c.dndBeyondUrl && c.dndBeyondUrl !== '');
+                if (withUrl) {
+                    group.forEach(combatant => {
+                        if (!combatant.dndBeyondUrl || combatant.dndBeyondUrl === '') {
+                            combatant.dndBeyondUrl = withUrl.dndBeyondUrl;
+                            // Also copy other fetched data if missing
+                            if (!combatant.ac && withUrl.ac) combatant.ac = withUrl.ac;
+                            if (!combatant.maxHp && withUrl.maxHp) combatant.maxHp = withUrl.maxHp;
+                            if (!combatant.cr && withUrl.cr) combatant.cr = withUrl.cr;
+                            if (!combatant.id && withUrl.id) combatant.id = withUrl.id;
+                        }
+                    });
+                }
+            });
+        });
+    }
+    const backfillEnd = performance.now();
+    
     if (!currentAdventure.encounters) {
         currentAdventure.encounters = [];
     }
@@ -557,7 +593,8 @@ export function createEncounterCard(encounter, encounterIndex) {
             if (!cr && (combatant.dndBeyondUrl || combatant.id)) {
                 const monsterUrl = combatant.dndBeyondUrl || combatant.id;
                 const fetchKey = `${encounterIndex}_${combatantIndex}`;
-                if (monsterUrl && monsterUrl.includes('dndbeyond.com') && !crFetchStatus[fetchKey] && window.fetchCRFromCache) {
+                // Only fetch CR after initial load completes to prevent network flooding
+                if (window.initialLoadComplete && monsterUrl && monsterUrl.includes('dndbeyond.com') && !crFetchStatus[fetchKey] && window.fetchCRFromCache) {
                     crFetchStatus[fetchKey] = true;
                     window.fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex);
                 }
@@ -575,8 +612,9 @@ export function createEncounterCard(encounter, encounterIndex) {
         const inheritColor = isUnconscious ? '#e74c3c' : 'inherit';
         
         if (isPlayer) {
-            const escapedName = combatantName.replace(/'/g, "\\'");
-            const escapedUrl = dndBeyondUrl ? dndBeyondUrl.replace(/'/g, "\\'") : '';
+            // Escape for JavaScript string literals: backslashes first, then quotes
+            const escapedName = (combatantName || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+            const escapedUrl = dndBeyondUrl ? dndBeyondUrl.replace(/\\/g, "\\\\").replace(/'/g, "\\'") : '';
             const playerUrl = escapedUrl || `player:${escapedName}`;
             
             if (dndBeyondUrl) {
@@ -595,13 +633,23 @@ export function createEncounterCard(encounter, encounterIndex) {
                 style="width: 100%; padding: 4px; border: 1px solid #ddd; border-radius: 3px; font-weight: 500;"
                 onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'name', this.value)">`;
         } else if (dndBeyondUrl) {
-            const escapedUrl = dndBeyondUrl.replace(/'/g, "\\'");
+            // Escape for JavaScript string literals in HTML attributes
+            // First escape backslashes, then escape single quotes
+            const escapedName = (combatantName || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+            const escapedUrl = dndBeyondUrl.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+            
             nameHTML = `<a href="${dndBeyondUrl}" target="_blank" style="color: ${textColor}; text-decoration: none; font-weight: 500;" 
                 class="monster-name-hover" 
-                onmouseenter="showMonsterTooltip('${combatantName.replace(/'/g, "\\'")}', '${escapedUrl}', event, ${encounterIndex})"
+                onmouseenter="showMonsterTooltip('${escapedName}', '${escapedUrl}', event, ${encounterIndex})"
                 onmouseleave="hideMonsterTooltip()">${combatantName || ''}</a>`;
         } else {
-            nameHTML = `<span style="font-weight: 500; color: ${inheritColor};">${combatantName || ''}</span>`;
+            // Monster with no URL - still add tooltip support
+            const escapedName = (combatantName || '').replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+            const monsterUrl = `monster:${escapedName}`;
+            nameHTML = `<span style="font-weight: 500; color: ${inheritColor};" 
+                class="monster-name-hover"
+                onmouseenter="showMonsterTooltip('${escapedName}', '${monsterUrl}', event, ${encounterIndex})"
+                onmouseleave="hideMonsterTooltip()">${combatantName || ''}</span>`;
         }
         
         // Temp HP cell
@@ -683,7 +731,7 @@ export function createEncounterCard(encounter, encounterIndex) {
         row.innerHTML = `
             <td style="text-align: center;">${(encounter.state === 'started' && encounter.activeCombatant === combatantName) ? '▶' : ''}</td>
             <td>${nameHTML}${deathSavesCell}</td>
-            <td style="text-align: center;">${isPlayer ? '<span style="color: #999;">-</span>' : `<span style="color: #666; font-weight: 500;">${cr}</span>`}</td>
+            <td style="text-align: center;">${isPlayer ? '<span style="color: #999;">-</span>' : `<span id="cr-${encounterIndex}-${combatantIndex}" style="color: #666; font-weight: 500;">${cr}</span>`}</td>
             <td style="text-align: center;">${!encounter.state || encounterEditMode[encounterIndex] ? `<input type="number" value="${combatant.initiative || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'initiative', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${initiativeDisplay}</span>`}</td>
             <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${ac}</span></td>
             <td style="text-align: center;">${!encounter.state || encounterEditMode[encounterIndex] ? `<input type="number" value="${combatant.maxHp || 0}" style="text-align: center; width: 100%;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'maxHp', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${combatant.maxHp || 0}</span>`}</td>
@@ -731,9 +779,16 @@ export function createEncounterCard(encounter, encounterIndex) {
 export function toggleEncounterMinimize(encounterIndex) {
     const currentAdventure = window.currentAdventure;
     const encounter = currentAdventure.encounters[encounterIndex];
+    const wasMinimized = encounter.minimized;
     encounter.minimized = !encounter.minimized;
     if (window.renderEncounters) window.renderEncounters();
     if (window.autoSave) window.autoSave();
+    
+    // If expanding an encounter, fetch missing CRs for it
+    if (wasMinimized && !encounter.minimized && window.initialLoadComplete && window.fetchAllMissingCRs) {
+        // Small delay to let render complete first
+        setTimeout(() => window.fetchAllMissingCRs(), 100);
+    }
 }
 
 export function updateEncounterName(encounterIndex, name) {
@@ -1323,6 +1378,55 @@ export function previousTurn(encounterIndex) {
 
 // ==================== HELPER FUNCTIONS ====================
 
+/**
+ * Batch fetch all missing CR values after initial page load
+ * This prevents network flooding during render but still populates CRs
+ * Only fetches for the CURRENT CHAPTER and VISIBLE (non-minimized) encounters
+ */
+export async function fetchAllMissingCRs() {
+    const currentAdventure = window.currentAdventure;
+    const currentChapter = window.currentChapter;
+    const crFetchStatus = window.crFetchStatus || {};
+    
+    if (!currentAdventure || !currentAdventure.encounters) return;
+    
+    let fetchCount = 0;
+    
+    // Only process encounters in the current chapter
+    for (let encounterIndex = 0; encounterIndex < currentAdventure.encounters.length; encounterIndex++) {
+        const encounter = currentAdventure.encounters[encounterIndex];
+        if (!encounter || !encounter.combatants) continue;
+        
+        // Skip encounters from other chapters
+        if (encounter.chapter !== currentChapter) continue;
+        
+        // Skip minimized/collapsed encounters to reduce initial load
+        if (encounter.minimized) continue;
+        
+        for (let combatantIndex = 0; combatantIndex < encounter.combatants.length; combatantIndex++) {
+            const combatant = encounter.combatants[combatantIndex];
+            
+            // Skip if already has CR or if it's a player
+            if (combatant.cr || !combatant.name || combatant.name.includes('(Player)')) continue;
+            
+            const monsterUrl = combatant.dndBeyondUrl || combatant.id;
+            const fetchKey = `${encounterIndex}_${combatantIndex}`;
+            
+            if (monsterUrl && monsterUrl.includes('dndbeyond.com') && !crFetchStatus[fetchKey] && window.fetchCRFromCache) {
+                crFetchStatus[fetchKey] = true;
+                window.crFetchStatus = crFetchStatus;
+                
+                // Add small delay between fetches to avoid overwhelming the network
+                setTimeout(() => {
+                    window.fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex);
+                }, fetchCount * 50); // Stagger by 50ms each
+                
+                fetchCount++;
+            }
+        }
+    }
+}
+
 export async function fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex) {
     const currentAdventure = window.currentAdventure;
     
@@ -1342,7 +1446,13 @@ export async function fetchCRFromCache(monsterUrl, encounterIndex, combatantInde
                 
                 if (combatant.cr !== newCR) {
                     combatant.cr = newCR;
-                    if (window.renderEncounters) window.renderEncounters();
+                    
+                    // Update the specific CR element directly instead of full re-render
+                    const crElement = document.getElementById(`cr-${encounterIndex}-${combatantIndex}`);
+                    if (crElement) {
+                        crElement.textContent = newCR;
+                    }
+                    
                     if (window.autoSave) window.autoSave();
                 }
             }

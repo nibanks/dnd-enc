@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D&D Encounter Tracker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260401180457">
     <script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>
 </head>
 <body>
@@ -282,14 +282,23 @@
             </div>
             <div class="modal-body" style="padding-top: 16px;">
                 <div id="attackResultContent" style="white-space: pre-line; font-size: 15px;"></div>
+                
+                <!-- Player target selector -->
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 2px solid #ddd;">
+                    <label for="attackTargetSelect" style="display: block; margin-bottom: 8px; font-weight: bold;">Apply damage to:</label>
+                    <select id="attackTargetSelect" style="width: 100%; padding: 8px; font-size: 14px; border: 2px solid #ccc; border-radius: 4px; margin-bottom: 12px;">
+                        <option value="">-- Select Player --</option>
+                    </select>
+                    <button id="applyAttackDamageBtn" onclick="applySelectedAttackDamage()" disabled style="width: 100%; padding: 10px; background: #95a5a6; color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: not-allowed; opacity: 0.5;" title="Select a player target">Apply Damage</button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Load legacy rendering functions first -->
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=20260402085332"></script>
     
     <!-- Load new modular application -->
-    <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='app.js') }}?v=20260402085332"></script>
 </body>
 </html>

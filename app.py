@@ -731,6 +731,61 @@ def get_character_details_old(character_url):
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
 
+@app.route('/api/dndbeyond/monster/search/<monster_name>', methods=['GET'])
+def search_monster_by_name(monster_name):
+    """Search for a monster by name in the cached monsters dictionary"""
+    try:
+        from urllib.parse import unquote
+        monster_name = unquote(monster_name).strip()
+        
+        print(f"Searching for monster: {monster_name}")
+        
+        # Check if monsters are cached
+        if not MONSTERS_CACHE.exists():
+            return jsonify({'success': False, 'error': 'Monster list not loaded. Please load monsters first.'})
+        
+        # Load monsters from cache (stored as dict with name as key)
+        with open(MONSTERS_CACHE, 'r', encoding='utf-8') as f:
+            all_monsters = json.load(f)
+        
+        # Search for exact match (case-insensitive)
+        for name, monster_data in all_monsters.items():
+            if name.lower() == monster_name.lower():
+                print(f"Found monster: {name} -> {monster_data['url']}")
+                
+                # Also fetch full details if possible
+                monster_url = monster_data['url']
+                monster_id = monster_url.split('/')[-1]
+                details_cache = MONSTER_DETAILS_DIR / f"{monster_id}.json"
+                
+                details = None
+                if details_cache.exists():
+                    with open(details_cache, 'r', encoding='utf-8') as f:
+                        details = json.load(f)
+                    print(f"Found cached details for {name}")
+                
+                return jsonify({
+                    'success': True,
+                    'url': monster_data['url'],
+                    'name': name,
+                    'cr': monster_data.get('cr'),
+                    'type': monster_data.get('type'),
+                    'size': monster_data.get('size'),
+                    'alignment': monster_data.get('alignment'),
+                    'id': monster_id,
+                    'details': details
+                })
+        
+        # No exact match found
+        print(f"Monster '{monster_name}' not found. Available monsters sample: {list(all_monsters.keys())[:5]}")
+        return jsonify({'success': False, 'error': f'Monster "{monster_name}" not found in cached list'})
+        
+    except Exception as e:
+        print(f"Error searching for monster: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)})
+
 @app.route('/api/dndbeyond/monster/<path:monster_url>', methods=['GET'])
 def get_monster_details(monster_url):
     """Fetch detailed monster stats from D&D Beyond (JIT)"""

@@ -252,6 +252,11 @@ export function createEventHandlers(deps) {
         if (renderers.updateChapterNotesDisplay) {
             renderers.updateChapterNotesDisplay();
         }
+        
+        // Fetch missing CRs for the new chapter's visible encounters
+        if (window.initialLoadComplete && window.fetchAllMissingCRs) {
+            setTimeout(() => window.fetchAllMissingCRs(), 100);
+        }
     }
 
     function handleChapterNotesChange(event) {
@@ -1133,18 +1138,161 @@ export function createEventHandlers(deps) {
         modalManager.closeModal('monsterModal');
     }
 
-    function openAttackResultModal(html) {
+    function openAttackResultModal(html, attackData = null) {
         const modal = modalManager.openModal('attackResultModal');
         if (modal) {
             const content = modal.querySelector('.modal-body');
             if (content) {
-                content.innerHTML = html;
+                // Set attack result content
+                const resultDiv = content.querySelector ? content.querySelector('#attackResultContent') : null;
+                if (resultDiv) {
+                    resultDiv.innerHTML = html;
+                    // Store attack data for AC comparison
+                    if (attackData) {
+                        resultDiv.dataset.attackTotal = attackData.attackTotal || '';
+                        resultDiv.dataset.isCritSuccess = attackData.isCritSuccess || '';
+                        resultDiv.dataset.isCritFail = attackData.isCritFail || '';
+                        resultDiv.dataset.isSavingThrow = attackData.isSavingThrow || '';
+                    }
+                } else {
+                    // Fallback for tests/legacy code
+                    content.innerHTML = html;
+                }
+                
+                // Populate player selector with AC info
+                const selectElement = content.querySelector ? content.querySelector('#attackTargetSelect') : null;
+                if (selectElement && currentAdventure && currentAdventure.players) {
+                    // Clear existing options except the first one
+                    selectElement.innerHTML = '<option value="">-- Select Player --</option>';
+                    
+                    // Remove old event listener if it exists
+                    selectElement.removeEventListener('change', updateApplyDamageButton);
+                    
+                    // Add player options with AC
+                    currentAdventure.players.forEach((player, idx) => {
+                        const option = document.createElement('option');
+                        option.value = idx;
+                        const playerAC = player.ac || 10;
+                        option.dataset.ac = playerAC;
+                        option.textContent = `${player.name || 'Player ' + (idx + 1)} (AC ${playerAC})`;
+                        selectElement.appendChild(option);
+                    });
+                    
+                    // Add change listener to update button state
+                    selectElement.addEventListener('change', updateApplyDamageButton);
+                }
+                
+                // Initial button state update
+                updateApplyDamageButton();
             }
+        }
+    }
+    
+    function updateApplyDamageButton() {
+        const selectElement = document.getElementById('attackTargetSelect');
+        const resultDiv = document.getElementById('attackResultContent');
+        const applyBtn = document.getElementById('applyAttackDamageBtn');
+        
+        if (!selectElement || !resultDiv || !applyBtn) {
+            return;
+        }
+        
+        const selectedOption = selectElement.options[selectElement.selectedIndex];
+        
+        // If no player selected, disable button
+        if (!selectedOption || selectedOption.value === '') {
+            applyBtn.disabled = true;
+            applyBtn.style.opacity = '0.5';
+            applyBtn.style.cursor = 'not-allowed';
+            applyBtn.title = 'Select a player target';
+            return;
+        }
+        
+        // Check if it's a saving throw (always allow application)
+        const isSavingThrow = resultDiv.dataset.isSavingThrow === 'true';
+        if (isSavingThrow) {
+            applyBtn.disabled = false;
+            applyBtn.style.opacity = '1';
+            applyBtn.style.cursor = 'pointer';
+            applyBtn.title = 'Apply damage (saving throw)';
+            return;
+        }
+        
+        // Check critical success (always hits)
+        const isCritSuccess = resultDiv.dataset.isCritSuccess === 'true';
+        if (isCritSuccess) {
+            applyBtn.disabled = false;
+            applyBtn.style.opacity = '1';
+            applyBtn.style.cursor = 'pointer';
+            applyBtn.style.background = '#2ecc71';
+            applyBtn.title = 'Critical Hit! Apply damage';
+            return;
+        }
+        
+        // Check critical failure (always misses)
+        const isCritFail = resultDiv.dataset.isCritFail === 'true';
+        if (isCritFail) {
+            applyBtn.disabled = true;
+            applyBtn.style.opacity = '0.5';
+            applyBtn.style.cursor = 'not-allowed';
+            applyBtn.style.background = '#95a5a6';
+            applyBtn.title = 'Critical Miss! No damage to apply';
+            return;
+        }
+        
+        // Compare attack roll with player AC
+        const attackTotal = parseInt(resultDiv.dataset.attackTotal);
+        const playerAC = parseInt(selectedOption.dataset.ac);
+        
+        if (!isNaN(attackTotal) && !isNaN(playerAC)) {
+            if (attackTotal >= playerAC) {
+                // Hit!
+                applyBtn.disabled = false;
+                applyBtn.style.opacity = '1';
+                applyBtn.style.cursor = 'pointer';
+                applyBtn.style.background = '#2ecc71';
+                applyBtn.title = `Hit! (${attackTotal} vs AC ${playerAC})`;
+            } else {
+                // Miss!
+                applyBtn.disabled = true;
+                applyBtn.style.opacity = '0.5';
+                applyBtn.style.cursor = 'not-allowed';
+                applyBtn.style.background = '#95a5a6';
+                applyBtn.title = `Miss! (${attackTotal} vs AC ${playerAC})`;
+            }
+        } else {
+            // Unknown, allow application
+            applyBtn.disabled = false;
+            applyBtn.style.opacity = '1';
+            applyBtn.style.cursor = 'pointer';
+            applyBtn.title = 'Apply damage';
         }
     }
 
     function closeAttackResultModal() {
         modalManager.closeModal('attackResultModal');
+    }
+
+    function applySelectedAttackDamage() {
+        const selectElement = document.getElementById('attackTargetSelect');
+        const resultDiv = document.getElementById('attackResultContent');
+        
+        if (!selectElement || !resultDiv) {
+            return;
+        }
+        
+        const playerIdx = parseInt(selectElement.value);
+        if (isNaN(playerIdx) || selectElement.value === '') {
+            helpers.showToast('Please select a player target', 'error');
+            return;
+        }
+        
+        const resultHtml = resultDiv.innerHTML;
+        
+        // Call the attack roll manager's function
+        if (window.applyAttackResultToPlayer) {
+            window.applyAttackResultToPlayer(playerIdx, resultHtml);
+        }
     }
 
     // ==================== COOKIE MANAGEMENT ====================
@@ -1360,6 +1508,8 @@ export function createEventHandlers(deps) {
         closeMonsterModal,
         openAttackResultModal,
         closeAttackResultModal,
+        applySelectedAttackDamage,
+        updateApplyDamageButton,
 
         // Cookies
         saveCookies,

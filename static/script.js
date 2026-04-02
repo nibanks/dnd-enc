@@ -12,6 +12,7 @@ var encounterEditMode = {}; // Track edit mode for completed encounters by index
 var cachedSpectatorUrl = null; // Cached spectator URL to prevent flashing
 var crFetchStatus = {}; // Track CR fetch status to prevent duplicate fetches: {encounterIndex_combatantIndex: true}
 var monsterDetailsFetchStatus = {}; // Track monster details fetch status to prevent duplicate fetches: {entityUrl: true}
+var initialLoadComplete = false; // Track if initial render has completed to prevent network flooding
 
 // D&D 5e/2024 Classes
 const DND_CLASSES = [
@@ -131,42 +132,15 @@ const CONDITION_ICONS = {
 window.DND_CONDITIONS = DND_CONDITIONS;
 window.CONDITION_ICONS = CONDITION_ICONS;
 
-// Load monsters from D&D Beyond
-async function loadMonsters() {
-    if (monstersLoaded) return true;
-    
-    console.log('Loading monsters from backend proxy...');
-    
-    // Use backend proxy (bypasses CORS)
-    try {
-        const response = await fetch('/api/dndbeyond/monsters');
-        const data = await response.json();
-        
-        // console.log('Backend response:', data); // Removed - logging large objects causes slowdown
-        
-        if (data.success && data.monsters && Object.keys(data.monsters).length > 0) {
-            DND_MONSTERS = data.monsters;
-            monstersLoaded = true;
-            console.log(`✓ Loaded ${Object.keys(DND_MONSTERS).length} monsters from D&D Beyond`);
-            updateAuthButton(true);
-            return true;
-        } else {
-            throw new Error(data.error || 'No monsters returned');
-        }
-    } catch (error) {
-        console.error('Failed to load monsters from D&D Beyond:', error);
-        DND_MONSTERS = {};
-        monstersLoaded = false;
-        updateAuthButton(false);
-        return false;
-    }
-}
+// [MOVED] loadMonsters → monsterListRenderer.js
 
 // [MOVED] openAttackResultModal → eventHandlers.js
-
 // [MOVED] closeAttackResultModal → eventHandlers.js
+// [MOVED] applyAttackResultToPlayer → attackRollManager.js (exposed globally)
+// [MOVED] getDamageTypeClass → attackRollManager.js
+// [MOVED] Attack roll event listener → attackRollManager.js (initializeAttackRollHandler)
 
-// Apply damage from attack result to selected player
+// Function stub kept for backwards compatibility - actual implementation in attackRollManager.js
 function applyAttackResultToPlayer(playerIdx, resultHtml) {
     if (playerIdx === null || playerIdx === undefined || isNaN(playerIdx)) {
         return;
@@ -338,11 +312,14 @@ document.addEventListener('click', function(e) {
             
             // Build result HTML
             let resultHtml = '';
+            let attackData = null;
+            
             if (saveMatch) {
                 const dc = saveMatch[1];
                 const saveType = saveMatch[2];
                 resultHtml = `<div><b>Each target must make a DC ${dc} ${saveType} saving throw.</b></div>`;
                 resultHtml += `<div style="margin-top:8px;"><b>Damage:</b> ${damageHtml}</div>`;
+                attackData = { isSavingThrow: true };
             } else {
                 // Parse attack bonus (handle formats like "+4to hit" or "+4 to hit")
                 let attackBonus = 0;
@@ -356,15 +333,24 @@ document.addEventListener('click', function(e) {
                 const attackTotal = d20 + attackBonus;
                 
                 let critMsg = '';
-                if (d20 === 1) critMsg = '<span style="color:#e74c3c;">Critical Failure!</span>';
-                if (d20 === 20) critMsg = '<span style="color:#2ecc71;">Critical Success!</span>';
+                const isCritSuccess = d20 === 20;
+                const isCritFail = d20 === 1;
+                if (isCritFail) critMsg = '<span style="color:#e74c3c;">Critical Failure!</span>';
+                if (isCritSuccess) critMsg = '<span style="color:#2ecc71;">Critical Success!</span>';
                 
                 resultHtml = `<div><b>Attack Roll:</b> d20 (${d20}) + ${attackBonus} = <b>${attackTotal}</b></div>`;
                 if (critMsg) resultHtml += `<div style="margin-top:4px;">${critMsg}</div>`;
                 resultHtml += `<div style="margin-top:8px;"><b>Damage:</b> ${damageHtml}</div>`;
+                
+                attackData = {
+                    attackTotal: attackTotal,
+                    isCritSuccess: isCritSuccess,
+                    isCritFail: isCritFail,
+                    isSavingThrow: false
+                };
             }
             
-            openAttackResultModal(resultHtml);
+            openAttackResultModal(resultHtml, attackData);
         }
         
         // Use cached details or fetch from API

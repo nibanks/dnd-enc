@@ -5,6 +5,8 @@
 let tooltipElement = null;
 let tooltipTimeout = null;
 let currentTooltipMonster = null;
+let currentTooltipEntityKey = null;
+let pendingPositionFrame = null;
 
 /**
  * Create the tooltip element if it doesn't exist
@@ -15,6 +17,15 @@ function createTooltipElement() {
         tooltipElement.className = 'monster-tooltip';
         tooltipElement.style.display = 'none';
         document.body.appendChild(tooltipElement);
+        
+        // Add event handlers once when creating the tooltip
+        tooltipElement.addEventListener('mouseenter', () => {
+            clearTimeout(tooltipTimeout);
+        });
+        
+        tooltipElement.addEventListener('mouseleave', () => {
+            hideMonsterTooltip();
+        });
     }
     return tooltipElement;
 }
@@ -408,47 +419,100 @@ function isCharacterUrl(url) {
     return url && (url.includes('/profile/') || url.includes('/characters/'));
 }
 
+// Track last call time per entity to prevent rapid repeated calls
+const lastCallTimes = new Map();
+
 /**
  * Show monster/character tooltip on hover
  */
 function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null) {
+    const entryTime = performance.now();
+    
+    // Prevent infinite loop: only block if showing the EXACT same entity (name + url match)
+    const entityKey = `${entityName}|${entityUrl}`;
+    
+    // Prevent rapid repeated calls (within 100ms) for same entity
+    const lastCallTime = lastCallTimes.get(entityKey) || 0;
+    if (entryTime - lastCallTime < 100) {
+        return;
+    }
+    lastCallTimes.set(entityKey, entryTime);
+    
+    if (tooltipElement && tooltipElement.style.display === 'block' && entityKey === currentTooltipEntityKey) {
+        // Already showing this exact entity - ignore repeated call to prevent infinite loop
+        return;
+    }
+    
     clearTimeout(tooltipTimeout);
+    
+    // Cancel any pending position adjustments from previous tooltips
+    if (pendingPositionFrame !== null) {
+        cancelAnimationFrame(pendingPositionFrame);
+        pendingPositionFrame = null;
+    }
     
     const tooltip = createTooltipElement();
     
     // Position tooltip near the cursor (fixed position, doesn't follow mouse)
     const positionTooltip = (e) => {
-        const x = e.clientX + 15;
-        const y = e.clientY + 15;
+        const offsetX = 40; // Increased from 15 to prevent covering source element
+        const offsetY = 40; // Increased from 15 to prevent covering source element
+        const padding = 20; // padding from viewport edges
         
         // Get viewport dimensions
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         
-        // Set initial position
-        tooltip.style.left = x + 'px';
-        tooltip.style.top = y + 'px';
+        // Set initial position to measure the tooltip size
+        tooltip.style.left = (e.clientX + offsetX) + 'px';
+        tooltip.style.top = (e.clientY + offsetY) + 'px';
+        
+        // Cancel any previously pending position adjustment
+        if (pendingPositionFrame !== null) {
+            cancelAnimationFrame(pendingPositionFrame);
+        }
         
         // After rendering, check if it goes off screen and adjust
-        requestAnimationFrame(() => {
+        pendingPositionFrame = requestAnimationFrame(() => {
+            pendingPositionFrame = null;
+            
             const rect = tooltip.getBoundingClientRect();
             
-            let finalX = x;
-            let finalY = y;
+            let finalX = e.clientX + offsetX;
+            let finalY = e.clientY + offsetY;
             
             // Adjust horizontal position if off screen
-            if (rect.right > viewportWidth - 20) {
-                finalX = viewportWidth - rect.width - 20;
+            if (rect.right > viewportWidth - padding) {
+                // Try positioning to the left of cursor
+                finalX = e.clientX - rect.width - offsetX;
+                // If that's also off screen, clamp to viewport
+                if (finalX < padding) {
+                    finalX = viewportWidth - rect.width - padding;
+                }
             }
             
             // Adjust vertical position if off screen
-            if (rect.bottom > viewportHeight - 20) {
-                finalY = viewportHeight - rect.height - 20;
+            if (rect.bottom > viewportHeight - padding) {
+                // Try positioning above the cursor
+                finalY = e.clientY - rect.height - offsetY;
+                // If that's also off screen (tooltip too tall), position at top with scrolling
+                if (finalY < padding) {
+                    // Check if there's more room above or below cursor
+                    const roomBelow = viewportHeight - e.clientY;
+                    const roomAbove = e.clientY;
+                    
+                    if (roomAbove > roomBelow) {
+                        // More room above - position at top of viewport
+                        finalY = padding;
+                    } else {
+                        // More room below - position to fit in viewport
+                        finalY = Math.max(padding, viewportHeight - rect.height - padding);
+                    }
+                }
             }
             
-            // Ensure it's not off the left or top
-            finalX = Math.max(10, finalX);
-            finalY = Math.max(10, finalY);
+            // Ensure it's not off the left edge
+            finalX = Math.max(padding, finalX);
             
             tooltip.style.left = finalX + 'px';
             tooltip.style.top = finalY + 'px';
@@ -457,18 +521,11 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
     
     // Store current entity being displayed
     currentTooltipMonster = entityName;
+    currentTooltipEntityKey = entityKey;
     
-    // Add mouse enter/leave handlers to keep tooltip visible when hovering over it
-    tooltip.addEventListener('mouseenter', () => {
-        clearTimeout(tooltipTimeout);
-    });
-    
-    tooltip.addEventListener('mouseleave', () => {
-        hideMonsterTooltip();
-    });
-    
-    // Check if this is a local player (using player: prefix)
+    // Check if this is a local player (using player: prefix) or local monster (monster: prefix)
     const isLocalPlayer = entityUrl.startsWith('player:');
+    const isLocalMonster = entityUrl.startsWith('monster:');
     
     // Determine if this is a character or monster
     const isCharacter = isLocalPlayer || isCharacterUrl(entityUrl);
@@ -489,6 +546,134 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
                 cachedDetails = player;
                 break;
             }
+        }
+    }
+    
+    // For local monsters (no URL), try to find URL and update
+    if (isLocalMonster && currentAdventure && currentAdventure.encounters) {
+        // Use the specific encounter if index provided, otherwise search all
+        const encountersToSearch = encounterIndex !== null && encounterIndex !== undefined
+            ? [currentAdventure.encounters[encounterIndex]]
+            : currentAdventure.encounters;
+        
+        // Strip trailing numbers to get base name (e.g., "Cultist 2" -> "Cultist")
+        const baseEntityName = entityName.replace(/\s+\d+$/, '').trim();
+        
+        for (const encounter of encountersToSearch) {
+            if (encounter && encounter.combatants) {
+                // First check if any combatants with this base name NOW HAVE a URL (from previous hover)
+                const combatantsWithUrl = encounter.combatants.filter(combatant => {
+                    const combatantBaseName = (combatant.name || '').replace(/\s+\d+$/, '').trim();
+                    return combatantBaseName === baseEntityName && combatant.dndBeyondUrl && combatant.dndBeyondUrl !== '';
+                });
+                
+                if (combatantsWithUrl.length > 0) {
+                    // Use the real URL for cache checking
+                    entityUrl = combatantsWithUrl[0].dndBeyondUrl;
+                    isLocalMonster = false; // Treat as normal monster now
+                    cachedDetails = combatantsWithUrl[0];
+                    break;
+                }
+                
+                // Find all combatants matching the base name WITHOUT a URL (since those use monster: prefix)
+                const matchingCombatants = encounter.combatants.filter(combatant => {
+                    const combatantBaseName = combatant.name || combatant.monster;
+                    if (!combatantBaseName) return false;
+                    
+                    const baseCombatantName = combatantBaseName.replace(/\s+\d+$/, '').trim();
+                    return baseCombatantName === baseEntityName && !combatant.dndBeyondUrl;
+                });
+                
+                // Use the first match (all variants share same base stats anyway)
+                if (matchingCombatants.length > 0) {
+                    cachedDetails = matchingCombatants[0];
+                    break;
+                }
+            }
+        }
+        
+        // If found monster without URL, fetch from D&D Beyond by name
+        if (cachedDetails && !cachedDetails.dndBeyondUrl) {
+            // Show loading state
+            tooltip.innerHTML = `<div class="monster-tooltip-loading">Loading ${baseEntityName} from D&D Beyond...</div>`;
+            tooltip.style.display = 'block';
+            positionTooltip(event);
+            
+            // Fetch by monster name using search endpoint
+            fetch(`/api/dndbeyond/monster/search/${encodeURIComponent(baseEntityName)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.url) {
+                        // Update all matching combatants with the found URL
+                        currentAdventure.encounters.forEach(encounter => {
+                            if (encounter.combatants) {
+                                encounter.combatants.forEach(c => {
+                                    const cBaseName = (c.name || '').replace(/\s+\d+$/, '').trim();
+                                    if (cBaseName === baseEntityName && !c.dndBeyondUrl) {
+                                        c.dndBeyondUrl = data.url;
+                                        if (data.ac) c.ac = data.ac;
+                                        if (data.maxHp) c.maxHp = data.maxHp;
+                                        if (data.cr) c.cr = data.cr;
+                                        if (data.id) c.id = data.id;
+                                    }
+                                });
+                            }
+                        });
+                        
+                        if (window.autoSave) window.autoSave();
+                        
+                        // Cache the details if provided
+                        if (data.details && data.details.abilities) {
+                            MONSTER_DETAILS_CACHE[data.url] = data.details;
+                            window.MONSTER_DETAILS_CACHE = MONSTER_DETAILS_CACHE;
+                        }
+                        
+                        // Render tooltip with details
+                        if (data.details) {
+                            renderTooltipContent(tooltip, entityName, data.details, false, encounterIndex, data.url);
+                            // Don't re-render immediately - it causes lag. Will update on next render cycle.
+                        } else {
+                            tooltip.innerHTML = `<div class="monster-tooltip-loading">Monster found! Refreshing...</div>`;
+                            setTimeout(() => {
+                                hideMonsterTooltip();
+                                if (window.renderEncounters) window.renderEncounters();
+                            }, 800);
+                        }
+                    } else {
+                        tooltip.innerHTML = `<div class="monster-tooltip-loading">
+                            <div style="font-weight: bold; margin-bottom: 8px;">${entityName}</div>
+                            <div style="margin-top: 8px; font-size: 11px; color: #666;">
+                                Monster not found in D&D Beyond. Please add it from the monster library or manually enter a URL.
+                            </div>
+                        </div>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('[Tooltip ERROR] Failed to search for monster:', error);
+                    tooltip.innerHTML = `<div class="monster-tooltip-loading">
+                        <div style="font-weight: bold; margin-bottom: 8px;">${entityName}</div>
+                        ${cachedDetails.hp !== undefined || cachedDetails.maxHp ? `<div>HP: ${cachedDetails.hp !== undefined ? cachedDetails.hp : cachedDetails.maxHp}${cachedDetails.maxHp ? '/' + cachedDetails.maxHp : ''}</div>` : ''}
+                        <div style="margin-top: 8px; font-size: 11px; color: #999;">
+                            Unable to fetch from D&D Beyond. Add from library for full stats.
+                        </div>
+                    </div>`;
+                });
+            
+            return;
+        }
+        
+        // Fallback for no match found
+        if (isLocalMonster) {
+            // No data found for local monster
+            tooltip.innerHTML = `<div class="monster-tooltip-loading">
+                <div style="margin-bottom: 8px;">${entityName}</div>
+                <div style="font-size: 12px; color: #666;">
+                    No additional details available.
+                </div>
+            </div>`;
+            tooltip.style.display = 'block';
+            positionTooltip(event);
+            return;
         }
     }
     
@@ -553,36 +738,6 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
         return;
     }
     
-    // For monsters, check the DND_MONSTERS cache before fetching from server
-    // Check even if cachedDetails exists but doesn't have full info (abilities)
-    if (!isCharacter && (!cachedDetails || !cachedDetails.abilities) && DND_MONSTERS) {
-        // Extract monster slug from URL (e.g., "scout" from "https://www.dndbeyond.com/monsters/5174957-scout")
-        const urlMatch = entityUrl.match(/\/monsters\/(\d+-)?([^/?#]+)/);
-        if (urlMatch) {
-            const monsterIdWithSlug = urlMatch[0].replace('/monsters/', ''); // "5174957-scout"
-            const monsterId = urlMatch[1] ? urlMatch[1].replace('-', '') : null; // "5174957"
-            const monsterSlug = urlMatch[2]; // "scout"
-            
-            // Try multiple lookup strategies:
-            // 1. Full ID-slug combo
-            // 2. Just the ID
-            // 3. Capitalized slug (Scout)
-            // 4. Lowercase match by name in values
-            let monsterData = DND_MONSTERS[monsterIdWithSlug] || 
-                             DND_MONSTERS[monsterId] ||
-                             DND_MONSTERS[monsterSlug.charAt(0).toUpperCase() + monsterSlug.slice(1)];
-            
-            if (monsterData && monsterData.abilities) {
-                // Only use cache if it has full details (abilities present)
-                cachedDetails = monsterData;
-                tooltip.style.display = 'block';
-                positionTooltip(event);
-                renderTooltipContent(tooltip, entityName, cachedDetails, isCharacter, encounterIndex, entityUrl);
-                return;
-            }
-        }
-    }
-    
     // Otherwise, show loading and fetch from server (unless preview already shown)
     if (!tooltip.innerHTML || tooltip.innerHTML.indexOf('Loading full details') === -1) {
         const loadingText = isCharacter ? 'Loading character details...' : 'Loading monster details...';
@@ -605,19 +760,9 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
         `/api/dndbeyond/character/${encodeURIComponent(entityUrl)}` :
         `/api/dndbeyond/monster/${encodeURIComponent(entityUrl)}`;
     
-    const fetchStartTime = performance.now();
-    console.log(`[TIMING] Fetch started for ${entityUrl}`);
-    
     fetch(apiEndpoint)
-        .then(response => {
-            const fetchCompleteTime = performance.now();
-            console.log(`[TIMING] Fetch complete: ${(fetchCompleteTime - fetchStartTime).toFixed(0)}ms`);
-            return response.json();
-        })
+        .then(response => response.json())
         .then(data => {
-            const jsonParseTime = performance.now();
-            console.log(`[TIMING] JSON parsed: ${(jsonParseTime - fetchStartTime).toFixed(0)}ms`);
-            
             // Clear fetch status
             delete monsterDetailsFetchStatus[entityUrl];
             window.monsterDetailsFetchStatus = monsterDetailsFetchStatus;
@@ -670,11 +815,7 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
                 window.MONSTER_DETAILS_CACHE = MONSTER_DETAILS_CACHE;
             }
             
-            const renderStartTime = performance.now();
             renderTooltipContent(tooltip, entityName, details, isCharacter, encounterIndex, entityUrl);
-            const renderCompleteTime = performance.now();
-            console.log(`[TIMING] Render complete: ${(renderCompleteTime - fetchStartTime).toFixed(0)}ms (render took ${(renderCompleteTime - renderStartTime).toFixed(0)}ms)`);
-            console.log(`[TIMING] TOTAL tooltip load time: ${(renderCompleteTime - fetchStartTime).toFixed(0)}ms`);
             
             // Reposition after content is loaded in case size changed
             positionTooltip(event);
@@ -703,7 +844,8 @@ function hideMonsterTooltip() {
         }
     }, 100);
 }
-
+    currentTooltipEntityKey = null;
+        
 export const tooltipManager = {
     showMonsterTooltip,
     hideMonsterTooltip,

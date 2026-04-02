@@ -231,7 +231,6 @@ input[type="number"]:focus {
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
-    cursor: move;
     transition: all 0.2s ease;
 }
 
@@ -253,6 +252,8 @@ input[type="number"]:focus {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
+    cursor: move;
+}
 }
 
 .encounter-title {
@@ -619,7 +620,7 @@ input[type="number"]:focus {
     font-style: italic;
 }
 
-.monster-name-hover {
+.monster-name-ho !importantver {
     position: relative;
     cursor: help;
 }

@@ -431,3 +431,51 @@ export async function addMonsterFromLibrary(encounterIndex) {
     currentEncounterIndex = encounterIndex;
     openMonsterModal();
 }
+/**
+ * Load monsters from D&D Beyond
+ * @returns {Promise<boolean>} True if monsters loaded successfully
+ */
+export async function loadMonsters() {
+    if (window.monstersLoaded) return true;
+    
+    console.log('Loading monsters from backend proxy...');
+    
+    // Use backend proxy (bypasses CORS)
+    try {
+        const response = await fetch('/api/dndbeyond/monsters');
+        const data = await response.json();
+        
+        if (data.success && data.monsters && Object.keys(data.monsters).length > 0) {
+            window.DND_MONSTERS = data.monsters;
+            window.monstersLoaded = true;
+            console.log(`✓ Loaded ${Object.keys(window.DND_MONSTERS).length} monsters from D&D Beyond`);
+            updateAuthButton(true);
+            return true;
+        } else {
+            throw new Error(data.error || 'No monsters returned');
+        }
+    } catch (error) {
+        console.error('Failed to load monsters from D&D Beyond:', error);
+        window.DND_MONSTERS = {};
+        window.monstersLoaded = false;
+        updateAuthButton(false);
+        return false;
+    }
+}
+
+/**
+ * Update authentication button UI
+ * @param {boolean} authenticated - Whether user is authenticated
+ */
+export function updateAuthButton(authenticated) {
+    const btn = document.getElementById('authDndBeyondBtn');
+    if (btn) {
+        if (authenticated) {
+            btn.textContent = '✓ D&D Beyond Connected';
+            btn.style.background = '#2ecc71';
+        } else {
+            btn.textContent = '🔒 Connect D&D Beyond';
+            btn.style.background = '#e8491d';
+        }
+    }
+}
