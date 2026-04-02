@@ -2,6 +2,8 @@
  * Tooltip Manager - Handles monster/character tooltips on hover
  */
 
+import { showCookieExpirationWarning } from '../utils/helpers.js';
+
 let tooltipElement = null;
 let tooltipTimeout = null;
 let currentTooltipMonster = null;
@@ -775,8 +777,8 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
             // Check if there was an error
             if (!data.success || data.error) {
                 // Check for authentication failure
-                if (data.auth_failed && window.showCookieExpirationWarning) {
-                    window.showCookieExpirationWarning(entityName);
+                if (data.auth_failed) {
+                    showCookieExpirationWarning(entityName);
                 }
                 
                 if (isCharacter) {

@@ -1354,51 +1354,6 @@ export function createEventHandlers(deps) {
         statusDiv.style.color = '#333';
     }
 
-    // Show cookie expiration warning (used by tooltip and monster fetching)
-    function showCookieExpirationWarning(monsterName) {
-        // Only show warning once per session to avoid spam
-        if (window.cookieWarningShown) return;
-        window.cookieWarningShown = true;
-        
-        // Create notification banner
-        const banner = document.createElement('div');
-        banner.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #ff6b6b;
-            color: white;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 10000;
-            max-width: 500px;
-            text-align: center;
-            font-size: 14px;
-        `;
-        banner.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 8px;">🔒 Authentication Failed</div>
-            <div style="margin-bottom: 12px;">Unable to load "${monsterName}" from D&D Beyond. Your cookies may be expired.</div>
-            <button onclick="document.getElementById('settingsBtn').click(); this.parentElement.remove(); window.cookieWarningShown = false;" 
-                    style="background: white; color: #ff6b6b; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                Update Cookies
-            </button>
-            <button onclick="this.parentElement.remove()" 
-                    style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 8px;">
-                Dismiss
-            </button>
-        `;
-        document.body.appendChild(banner);
-        
-        // Auto-dismiss after 15 seconds
-        setTimeout(() => {
-            if (banner.parentElement) {
-                banner.remove();
-            }
-        }, 15000);
-    }
-
     // ==================== KEYBOARD SHORTCUTS ====================
 
     function handleKeyboardShortcut(event) {
@@ -1515,7 +1470,6 @@ export function createEventHandlers(deps) {
         saveCookies,
         clearCookies,
         showCookieStatus,
-        showCookieExpirationWarning,
 
         // Keyboard
         handleKeyboardShortcut,

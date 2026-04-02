@@ -3,106 +3,10 @@
  * Handles monster selection modal, monster list rendering, and adding monsters to encounters
  */
 
+import { parseCR, showCookieExpirationWarning, showToast } from '../utils/helpers.js';
+
 // Track current encounter index for monster selection
 let currentEncounterIndex = null;
-
-/**
- * Parse CR string to numeric value for sorting
- * @param {string} cr - CR string (e.g., "1/2", "5", "1/4")
- * @returns {number} Numeric CR value
- */
-function parseCR(cr) {
-    if (cr.includes('/')) {
-        const parts = cr.split('/');
-        return parseFloat(parts[0]) / parseFloat(parts[1]);
-    }
-    return parseFloat(cr);
-}
-
-/**
- * Show cookie expiration warning banner
- * @param {string} monsterName - Name of monster that failed to load
- */
-function showCookieExpirationWarning(monsterName) {
-    // Only show warning once per session to avoid spam
-    if (window.cookieWarningShown) return;
-    window.cookieWarningShown = true;
-    
-    // Create notification banner
-    const banner = document.createElement('div');
-    banner.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #ff6b6b;
-        color: white;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 10000;
-        max-width: 500px;
-        text-align: center;
-        font-size: 14px;
-    `;
-    banner.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 8px;">🔒 Authentication Failed</div>
-        <div style="margin-bottom: 12px;">Unable to load "${monsterName}" from D&D Beyond. Your cookies may be expired.</div>
-        <button onclick="document.getElementById('settingsBtn').click(); this.parentElement.remove(); window.cookieWarningShown = false;" 
-                style="background: white; color: #ff6b6b; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">
-            Update Cookies
-        </button>
-        <button onclick="this.parentElement.remove()" 
-                style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 8px;">
-            Dismiss
-        </button>
-    `;
-    document.body.appendChild(banner);
-    
-    // Auto-dismiss after 15 seconds
-    setTimeout(() => {
-        if (banner.parentElement) {
-            banner.remove();
-        }
-    }, 15000);
-}
-
-/**
- * Show toast notification
- * @param {string} message - Message to display
- * @param {string} type - Toast type: 'success', 'error', 'warning', 'info'
- * @param {number} duration - Duration in milliseconds
- */
-function showToast(message, type = 'info', duration = 3000) {
-    const toast = document.createElement('div');
-    toast.style.position = 'fixed';
-    toast.style.bottom = '20px';
-    toast.style.right = '20px';
-    toast.style.padding = '12px 20px';
-    toast.style.borderRadius = '8px';
-    toast.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-    toast.style.zIndex = '10000';
-    toast.style.fontSize = '14px';
-    toast.style.maxWidth = '300px';
-    toast.textContent = message;
-    
-    const colors = {
-        success: { bg: '#d4edda', text: '#155724' },
-        error: { bg: '#f8d7da', text: '#721c24' },
-        warning: { bg: '#fff3cd', text: '#856404' },
-        info: { bg: '#d1ecf1', text: '#0c5460' }
-    };
-    
-    const color = colors[type] || colors.info;
-    toast.style.background = color.bg;
-    toast.style.color = color.text;
-    
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, duration);
-}
 
 /**
  * Open monster selection modal

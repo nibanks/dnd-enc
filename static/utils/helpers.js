@@ -285,3 +285,67 @@ export function setURLParameter(name, value) {
     }
     window.history.pushState({}, '', url);
 }
+
+/**
+ * Parse CR string to numeric value for sorting/comparison
+ * @param {string} cr - Challenge Rating (e.g., "1/4", "5", "1/2")
+ * @returns {number} Numeric CR value
+ */
+export function parseCR(cr) {
+    if (typeof cr !== 'string') {
+        return parseFloat(cr) || 0;
+    }
+    if (cr.includes('/')) {
+        const parts = cr.split('/');
+        return parseFloat(parts[0]) / parseFloat(parts[1]);
+    }
+    return parseFloat(cr) || 0;
+}
+
+/**
+ * Show cookie expiration warning banner
+ * @param {string} monsterName - Name of monster that failed to load
+ */
+export function showCookieExpirationWarning(monsterName) {
+    // Only show warning once per session to avoid spam
+    if (window.cookieWarningShown) return;
+    window.cookieWarningShown = true;
+    
+    // Create notification banner
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ff6b6b;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10000;
+        max-width: 500px;
+        text-align: center;
+        font-size: 14px;
+    `;
+    banner.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 8px;">🔒 Authentication Failed</div>
+        <div style="margin-bottom: 12px;">Unable to load "${monsterName}" from D&D Beyond. Your cookies may be expired.</div>
+        <button onclick="document.getElementById('settingsBtn').click(); this.parentElement.remove(); window.cookieWarningShown = false;" 
+                style="background: white; color: #ff6b6b; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;">
+            Update Cookies
+        </button>
+        <button onclick="this.parentElement.remove()" 
+                style="background: transparent; color: white; border: 1px solid white; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-left: 8px;">
+            Dismiss
+        </button>
+    `;
+    document.body.appendChild(banner);
+    
+    // Auto-dismiss after 15 seconds
+    setTimeout(() => {
+        if (banner.parentElement) {
+            banner.remove();
+        }
+    }, 15000);
+}
