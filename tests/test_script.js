@@ -255,7 +255,13 @@ describe('Helpers - generateId', () => {
 });
 
 describe('Helpers - debounce', () => {
-  jest.useFakeTimers();
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
 
   test('delays function execution', () => {
     const func = jest.fn();
@@ -279,8 +285,6 @@ describe('Helpers - debounce', () => {
     jest.advanceTimersByTime(100);
     expect(func).toHaveBeenCalledTimes(1);
   });
-
-  jest.useRealTimers();
 });
 
 describe('Adventure Data Validation', () => {
