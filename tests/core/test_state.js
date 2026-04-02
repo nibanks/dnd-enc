@@ -176,6 +176,30 @@ describe('state management', () => {
         });
     });
     
+    describe('setNested', () => {
+        test('sets nested property', () => {
+            state.setState({ currentAdventure: { name: 'Test' } });
+            
+            state.setNested('currentAdventure.name', 'Updated');
+            
+            expect(state.get('currentAdventure').name).toBe('Updated');
+        });
+        
+        test('handles deeply nested paths', () => {
+            state.setState({ 
+                currentAdventure: { 
+                    encounters: [
+                        { combatants: [] }
+                    ]
+                } 
+            });
+            
+            state.setNested('currentAdventure.encounters', []);
+            
+            expect(state.get('currentAdventure').encounters).toEqual([]);
+        });
+    });
+    
     describe('updateAdventure', () => {
         beforeEach(() => {
             const adventure = {
@@ -373,6 +397,141 @@ describe('state management', () => {
             const editMode = state.get('encounterEditMode');
             expect(editMode[0]).toBe(true);
             expect(editMode[1]).toBe(false);
+        });
+    });
+    
+    describe('edge cases', () => {
+        test('updateEncounter does nothing if no adventure', () => {
+            state.setState({ currentAdventure: null });
+            
+            expect(() => {
+                state.updateEncounter(0, { name: 'Test' });
+            }).not.toThrow();
+        });
+        
+        test('updateEncounter does nothing if no encounters', () => {
+            state.setState({ currentAdventure: { name: 'Test' } });
+            
+            expect(() => {
+                state.updateEncounter(0, { name: 'Test' });
+            }).not.toThrow();
+        });
+        
+        test('updateCombatant does nothing if no adventure', () => {
+            state.setState({ currentAdventure: null });
+            
+            expect(() => {
+                state.updateCombatant(0, 0, { hp: 5 });
+            }).not.toThrow();
+        });
+        
+        test('updateCombatant does nothing if no encounters', () => {
+            state.setState({ currentAdventure: { name: 'Test' } });
+            
+            expect(() => {
+                state.updateCombatant(0, 0, { hp: 5 });
+            }).not.toThrow();
+        });
+        
+        test('updatePlayer does nothing if no adventure', () => {
+            state.setState({ currentAdventure: null });
+            
+            expect(() => {
+                state.updatePlayer(0, { level: 5 });
+            }).not.toThrow();
+        });
+        
+        test('updatePlayer does nothing if no players', () => {
+            state.setState({ currentAdventure: { name: 'Test' } });
+            
+            expect(() => {
+                state.updatePlayer(0, { level: 5 });
+            }).not.toThrow();
+        });
+        
+        test('addPlayer does nothing if no adventure', () => {
+            state.setState({ currentAdventure: null });
+            
+            expect(() => {
+                state.addPlayer({ name: 'Test' });
+            }).not.toThrow();
+        });
+        
+        test('addPlayer initializes players array if missing', () => {
+            state.setState({ currentAdventure: { name: 'Test' } });
+            
+            state.addPlayer({ name: 'Test' });
+            
+            const adventure = state.get('currentAdventure');
+            expect(adventure.players).toHaveLength(1);
+        });
+        
+        test('removePlayer does nothing if no adventure', () => {
+            state.setState({ currentAdventure: null });
+            
+            expect(() => {
+                state.removePlayer(0);
+            }).not.toThrow();
+        });
+        
+        test('removePlayer does nothing if no players', () => {
+            state.setState({ currentAdventure: { name: 'Test' } });
+            
+            expect(() => {
+                state.removePlayer(0);
+            }).not.toThrow();
+        });
+        
+        test('addEncounter does nothing if no adventure', () => {
+            state.setState({ currentAdventure: null });
+            
+            expect(() => {
+                state.addEncounter({ name: 'Test' });
+            }).not.toThrow();
+        });
+        
+        test('addEncounter initializes encounters array if missing', () => {
+            state.setState({ currentAdventure: { name: 'Test' } });
+            
+            state.addEncounter({ name: 'Test' });
+            
+            const adventure = state.get('currentAdventure');
+            expect(adventure.encounters).toHaveLength(1);
+        });
+        
+        test('removeEncounter does nothing if no adventure', () => {
+            state.setState({ currentAdventure: null });
+            
+            expect(() => {
+                state.removeEncounter(0);
+            }).not.toThrow();
+        });
+        
+        test('removeEncounter does nothing if no encounters', () => {
+            state.setState({ currentAdventure: { name: 'Test' } });
+            
+            expect(() => {
+                state.removeEncounter(0);
+            }).not.toThrow();
+        });
+        
+        test('loadAdventure handles null chapter gracefully', () => {
+            const adventure = {
+                name: 'Test',
+                chapters: ['Ch1']
+            };
+            
+            state.loadAdventure(adventure, null);
+            
+            expect(state.get('currentChapter')).toBe('Ch1');
+        });
+        
+        test('loadAdventure handles adventure without chapters', () => {
+            const adventure = { name: 'Test' };
+            
+            state.loadAdventure(adventure);
+            
+            expect(state.get('currentChapter')).toBeNull();
         });
     });
 });
