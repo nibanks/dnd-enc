@@ -18,6 +18,7 @@ import * as playerRenderer from './renderers/playerRenderer.js';
 import * as encounterRenderer from './renderers/encounterRenderer.js';
 import * as helpers from './utils/helpers.js';
 import { tooltipManager } from './components/tooltipManager.js';
+import { initializeAttackRollHandler } from './utils/attackRollManager.js';
 
 /**
  * Initialize and start the application
@@ -348,6 +349,15 @@ export function initializeApp(config = {}) {
     // Expose tooltip functions globally for onclick handlers
     window.showMonsterTooltip = tooltipManager.showMonsterTooltip;
     window.hideMonsterTooltip = tooltipManager.hideMonsterTooltip;
+
+    // ==================== ATTACK ROLL MANAGER INTEGRATION ====================
+    
+    // Initialize attack roll event handler with dependencies
+    initializeAttackRollHandler({
+        hideMonsterTooltip: tooltipManager.hideMonsterTooltip,
+        openAttackResultModal: handlers.openAttackResultModal,
+        DND_MONSTERS: win.DND_MONSTERS
+    });
 
     // ==================== PLAYER RENDERER INTEGRATION ====================
     
