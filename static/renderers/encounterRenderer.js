@@ -968,13 +968,16 @@ export async function refreshMonsterStats(encounterIndex, showNotification = tru
                 if (data.success && data.details) {
                     const details = data.details;
                     urlToMonsters[url].forEach(monster => {
-                        if (details.initiativeModifier !== undefined) {
-                            monster.initiativeBonus = details.initiativeModifier;
+                        // Use initBonus from format v2 (fallback to initiativeModifier for old format)
+                        const initBonus = details.initBonus !== undefined ? details.initBonus : details.initiativeModifier;
+                        if (initBonus !== undefined) {
+                            monster.initiativeBonus = initBonus;
                             const d20 = Math.floor(Math.random() * 20) + 1;
-                            monster.initiative = d20 + details.initiativeModifier;
+                            monster.initiative = d20 + initBonus;
                         }
-                        if (details.abilities && details.abilities.dex) {
-                            monster.dexScore = details.abilities.dex.score;
+                        // Format v2: abilities are flat numbers, not nested objects
+                        if (details.abilities && details.abilities.dex !== undefined) {
+                            monster.dexScore = typeof details.abilities.dex === 'number' ? details.abilities.dex : details.abilities.dex.score;
                         }
                         if (details.ac) monster.ac = details.ac;
                         if (details.hp) {

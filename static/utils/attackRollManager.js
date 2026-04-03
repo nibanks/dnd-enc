@@ -138,10 +138,29 @@ export function initializeAttackRollHandler(deps = {}) {
                 window.currentEncounterIndex = encounterIndex;
             }
             
-            // Get monster details
+            // Get monster details from cache
             let monsterDetails = null;
+            const MONSTER_DETAILS_CACHE = window.MONSTER_DETAILS_CACHE || {};
+            
+            // Try DND_MONSTERS first (old cache)
             if (monsterId && DND_MONSTERS && DND_MONSTERS[monsterId]) {
                 monsterDetails = DND_MONSTERS[monsterId];
+            }
+            
+            // Try MONSTER_DETAILS_CACHE if not found (new cache from tooltips)
+            if (!monsterDetails && monsterId && MONSTER_DETAILS_CACHE) {
+                // Try exact match first
+                monsterDetails = MONSTER_DETAILS_CACHE[monsterId];
+                
+                // If not found, try to match by URL pattern (monsterId might be a slug)
+                if (!monsterDetails) {
+                    for (const url in MONSTER_DETAILS_CACHE) {
+                        if (url.includes(`/${monsterId}`) || url.endsWith(monsterId)) {
+                            monsterDetails = MONSTER_DETAILS_CACHE[url];
+                            break;
+                        }
+                    }
+                }
             }
             
             function handleRollWithDetails(details) {
@@ -154,20 +173,56 @@ export function initializeAttackRollHandler(deps = {}) {
                 
                 const action = details.actions[actionIdx];
                 const actionName = action.name;
-                const actionDesc = action.description;
+                // Format v2: action may not have description, use structured fields
+                const actionDesc = action.description || '';
                 
-                // Detect saving throw
-                const saveMatch = actionDesc.match(/DC (\d+) ([A-Za-z]+) saving throw/i);
+                // Detect saving throw - check structured field first
+                let saveMatch = null;
+                if (action.save) {
+                    // Format v2: structured save data
+                    saveMatch = { dc: action.save.dc, ability: action.save.ability };
+                } else if (actionDesc) {
+                    // Old format: parse from description
+                    const match = actionDesc.match(/DC (\d+) ([A-Za-z]+) saving throw/i);
+                    if (match) {
+                        saveMatch = { dc: parseInt(match[1]), ability: match[2] };
+                    }
+                }
                 
-                // Parse damage expressions (handle formats like "5(1d6 + 2)piercing" or "5 (1d6 + 2) piercing")
+                // Parse damage expressions - handle both format v2 (structured) and old format (description text)
                 const damageParts = [];
-                const diceDamageRegex = /([0-9]+)\s*\(([^)]+)\)\s*([A-Za-z]+)\s*damage/g;
-                let match;
-                while ((match = diceDamageRegex.exec(actionDesc)) !== null) {
-                    damageParts.push({
-                        dice: match[2].replace(/\s+/g, ''),
-                        type: match[3]
-                    });
+                
+                // Format v2: use structured damage fields
+                if (action.damage) {
+                    // Parse "17 (3d8 + 4) Piercing" format
+                    const dmgMatch = action.damage.match(/(\d+)\s*\(([^)]+)\)\s*([A-Za-z]+)/);
+                    if (dmgMatch) {
+                        damageParts.push({
+                            dice: dmgMatch[2].replace(/\s+/g, ''),
+                            type: dmgMatch[3]
+                        });
+                    }
+                }
+                if (action.damage2) {
+                    const dmgMatch = action.damage2.match(/(\d+)\s*\(([^)]+)\)\s*([A-Za-z]+)/);
+                    if (dmgMatch) {
+                        damageParts.push({
+                            dice: dmgMatch[2].replace(/\s+/g, ''),
+                            type: dmgMatch[3]
+                        });
+                    }
+                }
+                
+                // Old format: parse from description text
+                if (actionDesc && damageParts.length === 0) {
+                    const diceDamageRegex = /([0-9]+)\s*\(([^)]+)\)\s*([A-Za-z]+)\s*damage/g;
+                    let match;
+                    while ((match = diceDamageRegex.exec(actionDesc)) !== null) {
+                        damageParts.push({
+                            dice: match[2].replace(/\s+/g, ''),
+                            type: match[3]
+                        });
+                    }
                 }
                 
                 // Roll damage
@@ -203,17 +258,23 @@ export function initializeAttackRollHandler(deps = {}) {
                 let attackData = null;
                 
                 if (saveMatch) {
-                    const dc = saveMatch[1];
-                    const saveType = saveMatch[2];
+                    const dc = saveMatch.dc || saveMatch[1];
+                    const saveType = saveMatch.ability || saveMatch[2];
                     resultHtml = `<div><b>Each target must make a DC ${dc} ${saveType} saving throw.</b></div>`;
                     resultHtml += `<div style="margin-top:8px;"><b>Damage:</b> ${damageHtml}</div>`;
                     attackData = { isSavingThrow: true };
                 } else {
-                    // Parse attack bonus (handle formats like "+4to hit" or "+4 to hit")
+                    // Parse attack bonus - use structured field first (format v2)
                     let attackBonus = 0;
-                    const attackMatch = actionDesc.match(/\+?([0-9]+)\s*to\s*hit/);
-                    if (attackMatch) {
-                        attackBonus = parseInt(attackMatch[1]);
+                    if (action.hit !== undefined) {
+                        // Format v2: structured hit bonus
+                        attackBonus = action.hit;
+                    } else if (actionDesc) {
+                        // Old format: parse from description
+                        const attackMatch = actionDesc.match(/\+?([0-9]+)\s*to\s*hit/);
+                        if (attackMatch) {
+                            attackBonus = parseInt(attackMatch[1]);
+                        }
                     }
                     
                     // Roll attack

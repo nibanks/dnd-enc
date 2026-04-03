@@ -81,6 +81,77 @@ function formatActionDescription(text) {
 }
 
 /**
+ * Format structured action from Format v2
+ * @param {Object} action - Action object with type, hit, damage, etc.
+ * @returns {string} Formatted action description
+ */
+function formatStructuredAction(action) {
+    if (!action) return '';
+    
+    // If action has a description field, use it (old format or description-only legendary actions)
+    if (action.description) {
+        return formatActionDescription(action.description);
+    }
+    
+    // Format v2: Build description from structured fields
+    let parts = [];
+    
+    // Type and attack/save info
+    if (action.type) {
+        if (action.type.includes('Attack')) {
+            parts.push(`<strong>${action.type}:</strong>`);
+            if (action.hit) {
+                parts.push(`${action.hit} to hit,`);
+            }
+            if (action.reach) {
+                parts.push(`reach ${action.reach},`);
+            }
+            if (action.range) {
+                parts.push(`range ${action.range},`);
+            }
+            parts.push('one target.');
+        } else if (action.type === 'Saving Throw' || action.save) {
+            parts.push(`<strong>Saving Throw:</strong>`);
+            if (action.save) {
+                parts.push(`DC ${action.save.dc} ${action.save.ability}`);
+            }
+            if (action.area) {
+                parts.push(`(${action.area})`);
+            }
+        }
+    }
+    
+    // Damage
+    if (action.damage) {
+        const hitLabel = action.type && action.type.includes('Attack') ? '<strong>Hit:</strong>' : '';
+        parts.push(`${hitLabel} <strong>${action.damage}</strong>`);
+    }
+    
+    // Second damage type
+    if (action.damage2) {
+        parts.push(`plus <strong>${action.damage2}</strong>`);
+    }
+    
+    // Effects
+    if (action.failureEffect) {
+        parts.push(`<strong>Failure:</strong> ${action.failureEffect}`);
+    }
+    if (action.successEffect) {
+        parts.push(`<strong>Success:</strong> ${action.successEffect}`);
+    }
+    if (action.halfDamageOnSave) {
+        parts.push('(half damage on successful save)');
+    }
+    
+    // Extra text
+    if (action.extra) {
+        parts.push(action.extra);
+    }
+    
+    return parts.join(' ');
+}
+
+/**
  * Render tooltip content from entity details
  */
 function renderTooltipContent(tooltip, entityName, details, isCharacter = false, encounterIndex = null, entityUrl = null) {
@@ -129,10 +200,15 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false,
             meta.push(`(${details.playerName})`);
         }
     } else {
-        // For monsters, show size/type/alignment
-        if (details.size) meta.push(details.size);
-        if (details.type) meta.push(details.type);
-        if (details.alignment) meta.push(details.alignment);
+        // For monsters, show typeAndAlignment if available (format v2), otherwise build from size/type/alignment
+        if (details.typeAndAlignment) {
+            meta.push(details.typeAndAlignment);
+        } else {
+            // Old format: build from separate fields
+            if (details.size) meta.push(details.size);
+            if (details.type) meta.push(details.type);
+            if (details.alignment) meta.push(details.alignment);
+        }
     }
     if (meta.length > 0) {
         html += `<div class="monster-tooltip-meta">${meta.join(', ')}</div>`;
@@ -167,16 +243,24 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false,
         html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">Speed:</span><span class="monster-tooltip-stat-value">${details.walkSpeed} ft.</span></div>`;
     }
     // Handle both initiativeBonus (monsters) and initiative (characters)
+    // Format v2: initBonus, old format: initiativeModifier
     const init = details.initiativeBonus !== undefined ? details.initiativeBonus : 
+                 details.initBonus !== undefined ? details.initBonus :
                  details.initiativeModifier !== undefined ? details.initiativeModifier : details.initiative;
     if (init !== undefined) {
         const initDisplay = init >= 0 ? `+${init}` : `${init}`;
         html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">Initiative:</span><span class="monster-tooltip-stat-value">${initDisplay}</span></div>`;
     }
     if (!isCharacter && details.cr) {
-        const xp = details.xp || CR_TO_XP[details.cr] || '';
+        // Format v2 removed xp field - calculate from CR
+        const xp = CR_TO_XP[details.cr] || '';
         const crDisplay = xp ? `${details.cr} (${xp} XP)` : details.cr;
         html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">CR:</span><span class="monster-tooltip-stat-value">${crDisplay}</span></div>`;
+    }
+    // Format v2: profBonus (proficiency bonus)
+    if (!isCharacter && details.profBonus !== undefined) {
+        const profDisplay = details.profBonus >= 0 ? `+${details.profBonus}` : `${details.profBonus}`;
+        html += `<div class="monster-tooltip-stat"><span class="monster-tooltip-stat-label">Prof. Bonus:</span><span class="monster-tooltip-stat-value">${profDisplay}</span></div>`;
     }
     html += '</div>';
     
@@ -227,10 +311,15 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false,
         }
     }
     
-    // Skills
+    // Skills - Format v2: array of objects, old format: string or object
     if (details.skills) {
         let skillsText = '';
-        if (typeof details.skills === 'string') {
+        if (Array.isArray(details.skills)) {
+            // Format v2: array of objects like [{skill: "Stealth", mod: 5}]
+            skillsText = details.skills
+                .map(s => `${s.skill} ${s.mod >= 0 ? '+' : ''}${s.mod}`)
+                .join(', ');
+        } else if (typeof details.skills === 'string') {
             // Parse "Deception+3,Stealth+5" format and add spaces
             skillsText = details.skills.replace(/([a-zA-Z]+)(\+|-)/g, '$1 $2');
         } else if (typeof details.skills === 'object' && Object.keys(details.skills).length > 0) {
@@ -307,12 +396,21 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false,
         }
     }
     
-    // Senses
+    // Senses - Format v2: array of strings, old format: string
     if (details.senses) {
-        html += '<div class="monster-tooltip-section">';
-        html += '<div class="monster-tooltip-section-title">Senses</div>';
-        html += `<div class="monster-tooltip-section-content">${details.senses}</div>`;
-        html += '</div>';
+        let sensesText = '';
+        if (Array.isArray(details.senses)) {
+            // Format v2: array of strings like ["Darkvision 60 ft.", "Passive Perception 12"]
+            sensesText = details.senses.join(', ');
+        } else if (typeof details.senses === 'string') {
+            sensesText = details.senses;
+        }
+        if (sensesText) {
+            html += '<div class="monster-tooltip-section">';
+            html += '<div class="monster-tooltip-section-title">Senses</div>';
+            html += `<div class="monster-tooltip-section-content">${sensesText}</div>`;
+            html += '</div>';
+        }
     }
     
     // Languages
@@ -353,48 +451,144 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false,
         html += '</div>';
     }
     
-    // Actions (for monsters)
-    if (!isCharacter && details.actions && details.actions.length > 0) {
+    // Actions (for monsters) - includes both specialActions and structured actions
+    const hasActions = !isCharacter && (details.specialActions || details.actions);
+    if (hasActions && ((details.specialActions && details.specialActions.length > 0) || (details.actions && details.actions.length > 0))) {
         html += `<div class="monster-tooltip-section" data-encounter-index="${encounterIndex !== null ? encounterIndex : ''}">`;
         html += '<div class="monster-tooltip-section-title">Actions</div>';
-        details.actions.forEach((action, actionIdx) => {
-            html += `<div class="monster-tooltip-action">`;
-            html += `<div class="monster-tooltip-action-name">${action.name}`;
-            
-            // Add [roll] button for DM only (if action has dice rolls)
-            const hasDiceRolls = action.description && (/\d+d\d+|to hit|DC \d+/i.test(action.description));
-            if (hasDiceRolls && currentAdventure) {
-                // Extract monster slug from entityUrl (e.g., "https://www.dndbeyond.com/monsters/5174957-scout" -> "scout")
-                let monsterIdForBtn = details.slug || details.id || details.name;
-                if (!monsterIdForBtn && entityUrl) {
-                    const urlMatch = entityUrl.match(/\/monsters\/(\d+-)?([^/?#]+)/);
-                    if (urlMatch) {
-                        monsterIdForBtn = urlMatch[2]; // Extract just the slug without ID prefix
+        
+        // Show special actions first (e.g., Multiattack)
+        if (details.specialActions && details.specialActions.length > 0) {
+            details.specialActions.forEach(action => {
+                html += `<div class="monster-tooltip-action">`;
+                html += `<div class="monster-tooltip-action-name">${action.name}</div>`;
+                html += `<div class="monster-tooltip-action-desc">${formatActionDescription(action.description)}</div>`;
+                html += `</div>`;
+            });
+        }
+        
+        // Then show structured actions
+        if (details.actions && details.actions.length > 0) {
+            details.actions.forEach((action, actionIdx) => {
+                html += `<div class="monster-tooltip-action">`;
+                html += `<div class="monster-tooltip-action-name">${action.name}`;
+                
+                // Add [roll] button for DM only (if action has dice rolls or structured fields)
+                const hasDescription = action.description && (/\d+d\d+|to hit|DC \d+/i.test(action.description));
+                const hasStructuredData = action.type || action.hit || action.damage;
+                if ((hasDescription || hasStructuredData) && currentAdventure) {
+                    // Extract monster slug from entityUrl (e.g., "https://www.dndbeyond.com/monsters/5174957-scout" -> "scout")
+                    let monsterIdForBtn = details.slug || details.id || details.name;
+                    if (!monsterIdForBtn && entityUrl) {
+                        const urlMatch = entityUrl.match(/\/monsters\/(\d+-)?([^/?#]+)/);
+                        if (urlMatch) {
+                            monsterIdForBtn = urlMatch[2]; // Extract just the slug without ID prefix
+                        }
                     }
+                    html += ` <button class="roll-attack-btn" data-action-idx="${actionIdx}" data-entity-name="${entityName}" data-monster-id="${monsterIdForBtn}" style="margin-left:8px; padding:2px 6px; font-size:11px; background:#3498db; color:white; border:none; border-radius:3px; cursor:pointer;">[roll]</button>`;
                 }
-                html += ` <button class="roll-attack-btn" data-action-idx="${actionIdx}" data-entity-name="${entityName}" data-monster-id="${monsterIdForBtn}" style="margin-left:8px; padding:2px 6px; font-size:11px; background:#3498db; color:white; border:none; border-radius:3px; cursor:pointer;">[roll]</button>`;
-            }
-            
-            html += `</div>`;
-            html += `<div class="monster-tooltip-action-desc">${formatActionDescription(action.description)}</div>`;
+                
+                html += `</div>`;
+                html += `<div class="monster-tooltip-action-desc">${formatStructuredAction(action)}</div>`;
+                html += `</div>`;
+            });
+        }
+        html += '</div>';
+    }
+    
+    // Bonus Actions (Format v2)
+    if (!isCharacter && details.bonusActions && details.bonusActions.length > 0) {
+        html += '<div class="monster-tooltip-section">';
+        html += '<div class="monster-tooltip-section-title">Bonus Actions</div>';
+        details.bonusActions.forEach(action => {
+            html += `<div class="monster-tooltip-action">`;
+            html += `<div class="monster-tooltip-action-name">${action.name}</div>`;
+            html += `<div class="monster-tooltip-action-desc">${formatStructuredAction(action)}</div>`;
             html += `</div>`;
         });
         html += '</div>';
     }
     
-    // Legendary Actions (for monsters)
-    if (!isCharacter && details.legendaryActions && details.legendaryActions.length > 0) {
-        html += '<div class="monster-tooltip-section">';
-        html += '<div class="monster-tooltip-section-title">Legendary Actions</div>';
-        if (details.legendaryActionsDescription) {
-            html += `<div class="monster-tooltip-section-content" style="margin-bottom: 8px;">${formatActionDescription(details.legendaryActionsDescription)}</div>`;
+    // Legendary Actions (for monsters) - Format v2 has structure with uses
+    if (!isCharacter && details.legendaryActions) {
+        // Format v2: object with uses and actions array
+        if (typeof details.legendaryActions === 'object' && !Array.isArray(details.legendaryActions)) {
+            const legendaryData = details.legendaryActions;
+            if (legendaryData.actions && legendaryData.actions.length > 0) {
+                html += '<div class="monster-tooltip-section">';
+                html += '<div class="monster-tooltip-section-title">Legendary Actions';
+                if (legendaryData.uses) {
+                    html += ` (${legendaryData.uses})`;
+                }
+                html += '</div>';
+                
+                if (legendaryData.description) {
+                    html += `<div class="monster-tooltip-section-content" style="margin-bottom: 8px;">${formatActionDescription(legendaryData.description)}</div>`;
+                }
+                
+                legendaryData.actions.forEach(action => {
+                    html += `<div class="monster-tooltip-action">`;
+                    html += `<div class="monster-tooltip-action-name">${action.name}</div>`;
+                    html += `<div class="monster-tooltip-action-desc">${formatStructuredAction(action)}</div>`;
+                    html += `</div>`;
+                });
+                html += '</div>';
+            }
         }
-        details.legendaryActions.forEach(action => {
-            html += `<div class="monster-tooltip-action">`;
-            html += `<div class="monster-tooltip-action-name">${action.name}</div>`;
-            html += `<div class="monster-tooltip-action-desc">${formatActionDescription(action.description)}</div>`;
-            html += `</div>`;
-        });
+        // Old format: array of actions
+        else if (Array.isArray(details.legendaryActions) && details.legendaryActions.length > 0) {
+            html += '<div class="monster-tooltip-section">';
+            html += '<div class="monster-tooltip-section-title">Legendary Actions</div>';
+            if (details.legendaryActionsDescription) {
+                html += `<div class="monster-tooltip-section-content" style="margin-bottom: 8px;">${formatActionDescription(details.legendaryActionsDescription)}</div>`;
+            }
+            details.legendaryActions.forEach(action => {
+                html += `<div class="monster-tooltip-action">`;
+                html += `<div class="monster-tooltip-action-name">${action.name}</div>`;
+                html += `<div class="monster-tooltip-action-desc">${formatActionDescription(action.description)}</div>`;
+                html += `</div>`;
+            });
+            html += '</div>';
+        }
+    }
+    
+    // Spellcasting (Format v2 - structured)
+    if (!isCharacter && details.spellcasting) {
+        html += '<div class="monster-tooltip-section">';
+        html += '<div class="monster-tooltip-section-title">Spellcasting</div>';
+        
+        if (details.spellcasting.description) {
+            html += `<div class="monster-tooltip-section-content">${formatActionDescription(details.spellcasting.description)}</div>`;
+        }
+        
+        if (details.spellcasting.spells) {
+            const spells = details.spellcasting.spells;
+            
+            // At Will spells
+            if (spells.atWill && spells.atWill.length > 0) {
+                html += `<div style="margin-top: 8px;"><strong>At Will:</strong> ${spells.atWill.join(', ')}</div>`;
+            }
+            
+            // X/Day spells
+            ['3PerDay', '2PerDay', '1PerDay'].forEach(key => {
+                if (spells[key] && spells[key].length > 0) {
+                    const label = key.replace('PerDay', '/Day');
+                    html += `<div style="margin-top: 4px;"><strong>${label}:</strong> ${spells[key].join(', ')}</div>`;
+                }
+            });
+            
+            // Cantrips and leveled spell slots
+            if (spells.cantrips && spells.cantrips.length > 0) {
+                html += `<div style="margin-top: 4px;"><strong>Cantrips (at will):</strong> ${spells.cantrips.join(', ')}</div>`;
+            }
+            for (let level = 1; level <= 9; level++) {
+                const key = `level${level}`;
+                if (spells[key] && spells[key].length > 0) {
+                    html += `<div style="margin-top: 4px;"><strong>${level}${level === 1 ? 'st' : level === 2 ? 'nd' : level === 3 ? 'rd' : 'th'} level:</strong> ${spells[key].join(', ')}</div>`;
+                }
+            }
+        }
+        
         html += '</div>';
     }
     
@@ -628,6 +822,12 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
                         if (data.details && data.details.abilities) {
                             MONSTER_DETAILS_CACHE[data.url] = data.details;
                             window.MONSTER_DETAILS_CACHE = MONSTER_DETAILS_CACHE;
+                            
+                            // Also cache to DND_MONSTERS for legacy code (using slug/id as key)
+                            const monsterKey = data.details.slug || data.details.id || data.details.name;
+                            if (monsterKey && window.DND_MONSTERS) {
+                                window.DND_MONSTERS[monsterKey] = data.details;
+                            }
                         }
                         
                         // Render tooltip with details
@@ -815,6 +1015,12 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
             if (!isCharacter && details.abilities) {
                 MONSTER_DETAILS_CACHE[entityUrl] = details;
                 window.MONSTER_DETAILS_CACHE = MONSTER_DETAILS_CACHE;
+                
+                // Also cache to DND_MONSTERS for legacy code and attack rolls (using slug/id as key)
+                const monsterKey = details.slug || details.id || details.name;
+                if (monsterKey && window.DND_MONSTERS) {
+                    window.DND_MONSTERS[monsterKey] = details;
+                }
             }
             
             renderTooltipContent(tooltip, entityName, details, isCharacter, encounterIndex, entityUrl);

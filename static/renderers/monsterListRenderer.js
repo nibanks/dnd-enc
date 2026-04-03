@@ -253,13 +253,14 @@ export async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterNam
                 if (details.cr) {
                     combatant.cr = details.cr;
                 }
-                // Store initiative bonus for proper sorting
-                if (details.initiativeModifier !== undefined) {
-                    combatant.initiativeBonus = details.initiativeModifier;
+                // Store initiative bonus for proper sorting (format v2: initBonus, old format: initiativeModifier)
+                const initBonus = details.initBonus !== undefined ? details.initBonus : details.initiativeModifier;
+                if (initBonus !== undefined) {
+                    combatant.initiativeBonus = initBonus;
                 }
-                // Store DEX score for tiebreaker sorting
-                if (details.abilities && details.abilities.dex) {
-                    combatant.dexScore = details.abilities.dex.score;
+                // Store DEX score for tiebreaker sorting (format v2: flat number, old format: nested object)
+                if (details.abilities && details.abilities.dex !== undefined) {
+                    combatant.dexScore = typeof details.abilities.dex === 'number' ? details.abilities.dex : details.abilities.dex.score;
                 }
                 // Store avatar URL if available
                 if (details.avatarUrl) {
@@ -273,8 +274,9 @@ export async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterNam
             const statsMsg = [];
             if (details.ac) statsMsg.push(`AC ${details.ac}`);
             if (details.hp) statsMsg.push(`HP ${details.hp}`);
-            if (details.initiativeModifier !== undefined) {
-                statsMsg.push(`Init ${details.initiativeModifier >= 0 ? '+' : ''}${details.initiativeModifier}`);
+            const initBonus = details.initBonus !== undefined ? details.initBonus : details.initiativeModifier;
+            if (initBonus !== undefined) {
+                statsMsg.push(`Init ${initBonus >= 0 ? '+' : ''}${initBonus}`);
             }
             showToast(`✓ ${monsterName}: ${statsMsg.join(', ')}`, 'success');
             
@@ -285,8 +287,9 @@ export async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterNam
             showToast(`No combatants updated for ${monsterName}`, 'warning');
         }
         
-        // Roll initiative for newly added monsters if we have the modifier
-        if (details.initiativeModifier !== undefined) {
+        // Roll initiative for newly added monsters if we have the modifier (format v2: initBonus, old: initiativeModifier)
+        const initBonus = details.initBonus !== undefined ? details.initBonus : details.initiativeModifier;
+        if (initBonus !== undefined) {
             encounter.combatants.forEach(combatant => {
                 // Skip player combatants (they don't have a name field)
                 if (!combatant.name) return;
@@ -297,7 +300,7 @@ export async function fetchMonsterDetails(monsterUrl, encounterIndex, monsterNam
                 if (isMatch && combatant.dndBeyondUrl === monsterUrl && combatant.initiative === 0) {
                     // Roll d20 + modifier
                     const d20 = Math.floor(Math.random() * 20) + 1;
-                    combatant.initiative = d20 + details.initiativeModifier;
+                    combatant.initiative = d20 + initBonus;
                 }
             });
             

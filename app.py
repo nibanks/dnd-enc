@@ -978,15 +978,25 @@ def get_monster_details(monster_url):
             # First, protect dice notation and D20 references
             text = re.sub(r'(\d+)d(\d+)', r'\1‡DICE‡\2', text, flags=re.I)  # Protect XdY dice notation
             text = re.sub(r'([^a-z]|^)(D)(\d+)', r'\1\2‡NUM‡\3', text, flags=re.I)  # Protect D20, D10, etc. (uppercase D + number)
+            # Protect ordinal numbers (1st, 2nd, 3rd, 4th, etc.)
+            text = re.sub(r'(\d+)(st|nd|rd|th)', r'\1‡ORD‡\2', text, flags=re.I)  # Protect 1st, 2nd, 3rd, etc.
             # Now add spaces between letters and digits (but not between D and ‡NUM‡)
             text = re.sub(r'([a-z])(\d)', r'\1 \2', text, flags=re.I)  # letter followed by digit
             text = re.sub(r'(\d)([a-z])', r'\1 \2', text, flags=re.I)  # digit followed by letter
             # Restore protected patterns (may have spaces around markers now)
             text = re.sub(r'(\d+)\s*‡DICE‡\s*(\d+)', r'\1d\2', text)
             text = re.sub(r'(D)\s*‡NUM‡\s*(\d+)', r'\1\2', text, flags=re.I)
+            text = re.sub(r'(\d+)\s*‡ORD‡\s*(st|nd|rd|th)', r'\1\2', text, flags=re.I)
             
-            # Fix missing space after colons (but not in time formats like "5:30")
-            text = re.sub(r':([A-Z])|:(\d+\()', r': \1\2', text)
+            # Fix missing space after colons (but not in time formats like "5:30" or URLs)
+            # Handle :The, :DC, :any, etc.
+            text = re.sub(r':([A-Z][a-z])', r': \1', text)  # :The → : The
+            text = re.sub(r':([A-Z]{2,})', r': \1', text)  # :DC → : DC
+            text = re.sub(r':(\d+\()', r': \1', text)  # :7(1d6) → : 7(1d6)
+            text = re.sub(r':\+(\d+)', r': +\1', text)  # :+6 → : +6
+            
+            # Fix missing space after commas in certain contexts
+            text = re.sub(r',\+(\d+)', r', +\1', text)  # DC 14,+6 → DC 14, +6
             
             # Fix specific D&D Beyond text concatenation issues
             # These need to be done carefully to avoid breaking valid compound words
@@ -996,10 +1006,48 @@ def get_monster_details(monster_url):
             text = re.sub(r'Concentrationand', 'Concentration and', text)
             text = re.sub(r'Concentrationuntil', 'Concentration until', text)
             text = re.sub(r'Hitsgained', 'Hits gained', text)
+            text = re.sub(r'hasDisadvantageon', 'has Disadvantage on', text)
             text = re.sub(r'Disadvantageon', 'Disadvantage on', text)
+            text = re.sub(r'hasAdvantageon', 'has Advantage on', text)
             text = re.sub(r'Advantageon', 'Advantage on', text)
+            text = re.sub(r'WhileBloodied', 'While Bloodied', text)
+            text = re.sub(r'creatureGrappledby', 'creature Grappled by', text)
             
-            # Fix condition names with missing spaces
+            # Fix missing space before parentheses in certain contexts
+            text = re.sub(r'(\w)\(Recharge', r'\1 (Recharge', text)  # Lightning Breath(Recharge → Lightning Breath (Recharge
+            text = re.sub(r'(\w)\(Costs', r'\1 (Costs', text)  # Action(Costs → Action (Costs
+            
+            # Fix "being" + condition concatenations
+            text = re.sub(r'beingcharmed', 'being charmed', text, flags=re.I)
+            text = re.sub(r'beingfrightened', 'being frightened', text, flags=re.I)
+            text = re.sub(r'beingpoisoned', 'being poisoned', text, flags=re.I)
+            text = re.sub(r'beingparalyzed', 'being paralyzed', text, flags=re.I)
+            text = re.sub(r'beingstunned', 'being stunned', text, flags=re.I)
+            text = re.sub(r'beingrestrained', 'being restrained', text, flags=re.I)
+            text = re.sub(r'beinggrappled', 'being grappled', text, flags=re.I)
+            text = re.sub(r'beingblinded', 'being blinded', text, flags=re.I)
+            text = re.sub(r'beingdeafened', 'being deafened', text, flags=re.I)
+            text = re.sub(r'beingincapacitated', 'being incapacitated', text, flags=re.I)
+            text = re.sub(r'beingpetrified', 'being petrified', text, flags=re.I)
+            text = re.sub(r'beinginvisible', 'being invisible', text, flags=re.I)
+            text = re.sub(r'beingprone', 'being prone', text, flags=re.I)
+            
+            # Fix "the" + condition concatenations
+            text = re.sub(r'thePoisoned', 'the Poisoned', text)
+            text = re.sub(r'theCharmed', 'the Charmed', text)
+            text = re.sub(r'theFrightened', 'the Frightened', text)
+            text = re.sub(r'theParalyzed', 'the Paralyzed', text)
+            text = re.sub(r'theStunned', 'the Stunned', text)
+            text = re.sub(r'theRestrained', 'the Restrained', text)
+            text = re.sub(r'theGrappled', 'the Grappled', text)
+            text = re.sub(r'theBlinded', 'the Blinded', text)
+            text = re.sub(r'theDeafened', 'the Deafened', text)
+            text = re.sub(r'theIncapacitated', 'the Incapacitated', text)
+            text = re.sub(r'thePetrified', 'the Petrified', text)
+            text = re.sub(r'theInvisible', 'the Invisible', text)
+            text = re.sub(r'theProne', 'the Prone', text)
+            
+            # Fix condition names with "condition" suffix
             text = re.sub(r'Incapacitatedcondition', 'Incapacitated condition', text)
             text = re.sub(r'Deafenedcondition', 'Deafened condition', text) 
             text = re.sub(r'Blindedcondition', 'Blinded condition', text)
@@ -1100,8 +1148,8 @@ def get_monster_details(monster_url):
                 if hit_match:
                     action['hit'] = int(hit_match.group(1))
                 
-                # Extract range
-                range_match = re.search(r'range\s+(\d+)/(\d+)\s*ft', description, re.I)
+                # Extract range - handle both "range X/Y ft" and "ranged X ft./Y ft."
+                range_match = re.search(r'ranged?\s+(\d+)\s*(?:ft\.?)?\s*/\s*(\d+)\s*ft', description, re.I)
                 if range_match:
                     action['range'] = f"{range_match.group(1)}/{range_match.group(2)} ft."
                 
@@ -1110,10 +1158,14 @@ def get_monster_details(monster_url):
                 if target_match:
                     action['targets'] = target_match.group(1)
                 
-                # Extract damage
-                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)', description)
+                # Extract damage and any additional effect text
+                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)(.*)$', description, re.DOTALL)
                 if damage_match:
                     action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
+                    # Capture any additional text after damage type (e.g., "of a type chosen by...")
+                    extra_text = damage_match.group(4).strip()
+                    if extra_text and not extra_text.startswith('.'):
+                        action['extra'] = extra_text.lstrip(',. ')
                 
                 return action
             
@@ -1152,10 +1204,14 @@ def get_monster_details(monster_url):
                 if range_match:
                     action['range'] = f"{range_match.group(1)}/{range_match.group(2)} ft."
                 
-                # Extract damage
-                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)', description)
+                # Extract damage and any additional effect text
+                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)(.*)$', description, re.DOTALL)
                 if damage_match:
                     action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
+                    # Capture any additional text after damage type (e.g., "of a type chosen by...")
+                    extra_text = damage_match.group(4).strip()
+                    if extra_text and not extra_text.startswith('.'):
+                        action['extra'] = extra_text.lstrip(',. ')
                 
                 return action
             
@@ -1488,6 +1544,7 @@ def get_monster_details(monster_url):
         
         # Extract Traits (Special Abilities) from description blocks
         traits = []
+        spellcasting_from_traits = None
         
         # Try 2024 format first
         stat_block_2024 = soup.find('div', class_='mon-stat-block-2024')
@@ -1512,7 +1569,32 @@ def get_monster_details(monster_url):
                                     description = normalize_text(p.get_text(strip=True))
                                     if description.startswith(name):
                                         description = description[len(name):].lstrip('. ')
-                                    traits.append({'name': name, 'description': description})
+                                    
+                                    # Check if this is Spellcasting
+                                    if re.search(r'^Spellcasting', name, re.I):
+                                        # Extract spellcasting separately with following lists/paragraphs
+                                        # Get any following list items OR paragraphs
+                                        next_elem = p.find_next_sibling()
+                                        while next_elem:
+                                            if next_elem.name in ['ul', 'ol']:
+                                                # List items - these are the spell lists
+                                                for li in next_elem.find_all('li'):
+                                                    description += ' ' + normalize_text(li.get_text(strip=True))
+                                                next_elem = next_elem.find_next_sibling()
+                                            elif next_elem.name == 'p':
+                                                # Check if it has a strong tag (would be next trait)
+                                                p_strong = next_elem.find('strong')
+                                                if p_strong:
+                                                    # This is a new trait, stop
+                                                    break
+                                                # No strong - this paragraph continues spellcasting
+                                                description += ' ' + normalize_text(next_elem.get_text(strip=True))
+                                                next_elem = next_elem.find_next_sibling()
+                                            else:
+                                                break
+                                        spellcasting_from_traits = {'name': name, 'description': description}
+                                    else:
+                                        traits.append({'name': name, 'description': description})
         else:
             # Legacy 2014 format - look for paragraphs before Actions heading
             # Find all description blocks that come before Actions
@@ -1533,7 +1615,32 @@ def get_monster_details(monster_url):
                                     description = normalize_text(p.get_text(strip=True))
                                     if description.startswith(name):
                                         description = description[len(name):].lstrip('. ')
-                                    traits.append({'name': name, 'description': description})
+                                    
+                                    # Check if this is Spellcasting
+                                    if re.search(r'^Spellcasting', name, re.I):
+                                        # Extract spellcasting separately with following lists/paragraphs
+                                        # Get any following list items OR paragraphs
+                                        next_elem = p.find_next_sibling()
+                                        while next_elem:
+                                            if next_elem.name in ['ul', 'ol']:
+                                                # List items - these are the spell lists
+                                                for li in next_elem.find_all('li'):
+                                                    description += ' ' + normalize_text(li.get_text(strip=True))
+                                                next_elem = next_elem.find_next_sibling()
+                                            elif next_elem.name == 'p':
+                                                # Check if it has a strong tag (would be next trait)
+                                                p_strong = next_elem.find('strong')
+                                                if p_strong:
+                                                    # This is a new trait, stop
+                                                    break
+                                                # No strong - this paragraph continues spellcasting
+                                                description += ' ' + normalize_text(next_elem.get_text(strip=True))
+                                                next_elem = next_elem.find_next_sibling()
+                                            else:
+                                                break
+                                        spellcasting_from_traits = {'name': name, 'description': description}
+                                    else:
+                                        traits.append({'name': name, 'description': description})
         
         if traits:
             details['traits'] = traits
@@ -1739,8 +1846,8 @@ def get_monster_details(monster_url):
                 # Create melee version
                 melee_name = f"{parsed['name']} (Melee)"
                 melee_desc = re.sub(r'Melee\s*or\s*Ranged\s+Weapon\s+Attack', 'Melee Weapon Attack', desc, flags=re.I)
-                # Remove the "or range X/Y ft." part for melee
-                melee_desc = re.sub(r'\s+or\s+range\s+\d+/\d+\s*ft\.', '', melee_desc, flags=re.I)
+                # Remove the "or ranged X ft./Y ft." part for melee (handles both "range" and "ranged")
+                melee_desc = re.sub(r'\s+or\s+ranged?\s+\d+\s*(?:ft\\.?)?\s*/\\s*\d+\s*ft\\.?', '', melee_desc, flags=re.I)
                 melee_parsed = parse_action(melee_name, melee_desc)
                 if melee_parsed and not melee_parsed.get('isDualMode'):
                     actions.append(melee_parsed)
@@ -1748,8 +1855,8 @@ def get_monster_details(monster_url):
                 # Create ranged version
                 ranged_name = f"{parsed['name']} (Ranged)"
                 ranged_desc = re.sub(r'Melee\s*or\s*Ranged\s+Weapon\s+Attack', 'Ranged Weapon Attack', desc, flags=re.I)
-                # Remove the "reach X ft." part for ranged (keep the actual range)
-                ranged_desc = re.sub(r'reach\s+\d+\s*ft\.\s+or\s+', '', ranged_desc, flags=re.I)
+                # Remove the "reach X ft. or" part for ranged (keep the actual range)
+                ranged_desc = re.sub(r'reach\s+\d+\s*ft\\.\s+or\\s+', '', ranged_desc, flags=re.I)
                 ranged_parsed = parse_action(ranged_name, ranged_desc)
                 if ranged_parsed and not ranged_parsed.get('isDualMode'):
                     actions.append(ranged_parsed)
@@ -1761,10 +1868,87 @@ def get_monster_details(monster_url):
             details['actions'] = actions
             print(f"  Found {len(actions)} Actions (parsed)")
         
+        # Handle spellcasting from actions or traits
         if spellcasting:
             details['spellcasting'] = spellcasting
             spell_count = sum(len(spells) for spells in spellcasting.get('spells', {}).values())
             print(f"  Found Spellcasting ({spell_count} spells)")
+        elif spellcasting_from_traits:
+            # Parse spellcasting from traits section
+            spell_content_text = spellcasting_from_traits['description']
+            
+            # DEBUG: Print spell text to see format
+            print(f"  DEBUG Spell text (first 300 chars): {spell_content_text[:300]}")
+            
+            # Extract just the intro text for description (before spell lists)
+            # Stop at "Cantrips (", "At will:", "1st level", etc.
+            intro_match = re.search(r'^(.+?)(?=Cantrips?\s*\(|At[\s-]?[Ww]ill:|\d+(?:st|nd|rd|th)\s+level|\d+/[Dd]ay|$)', spell_content_text, re.I | re.DOTALL)
+            if intro_match:
+                spell_intro = intro_match.group(1).strip().rstrip(':')
+            else:
+                spell_intro = spell_content_text
+            
+            # Extract spellcasting info
+            spell_info = {'description': spell_intro}
+            
+            # Try to extract spell save DC
+            dc_match = re.search(r'spell\s+save\s+DC\s+(\d+)', spell_content_text, re.I)
+            if dc_match:
+                spell_info['spellSaveDC'] = int(dc_match.group(1))
+            
+            # Try to extract spell attack bonus
+            attack_match = re.search(r'\+(\d+)\s+to\s+hit\s+with\s+spell\s+attacks', spell_content_text, re.I)
+            if attack_match:
+                spell_info['spellAttackBonus'] = int(attack_match.group(1))
+            
+            # Try to extract spellcasting ability
+            ability_match = re.search(r'using\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+as\s+(?:her|his|its|their)\s+spellcasting\s+ability', spell_content_text, re.I)
+            if ability_match:
+                spell_info['spellcastingAbility'] = ability_match.group(1)
+            
+            # Extract spell lists
+            spell_lists = {}
+            
+            # Cantrips (at will)
+            cantrip_match = re.search(r'Cantrips?\s*\([^)]*\):\s*([^\n]+?)(?=\d+(?:st|nd|rd|th)\s+level|$)', spell_content_text, re.I | re.DOTALL)
+            if cantrip_match:
+                spells_text = cantrip_match.group(1).strip()
+                spells = [s.strip() for s in re.split(r',\s*(?![^()]*\))', spells_text) if s.strip()]
+                if spells:
+                    spell_lists['cantrips'] = spells
+            
+            # Leveled spells (1st level (4 slots): ...)
+            for level in range(1, 10):
+                # Match "1st level (3 slots): spell1, spell2"
+                level_suffix = 'st' if level == 1 else 'nd' if level == 2 else 'rd' if level == 3 else 'th'
+                level_pattern = rf'{level}{level_suffix}\s+level\s*\([^)]*\):\s*([^\n]+?)(?=\d+(?:st|nd|rd|th)\s+level|$)'
+                level_match = re.search(level_pattern, spell_content_text, re.I | re.DOTALL)
+                if level_match:
+                    spells_text = level_match.group(1).strip()
+                    spells = [s.strip() for s in re.split(r',\s*(?![^()]*\))', spells_text) if s.strip()]
+                    if spells:
+                        spell_lists[f'level{level}'] = spells
+            
+            # At will spells (alternative format)
+            at_will_match = re.search(r'At[\s-]?will:\s*([^\n]+?)(?=\d+/day|$)', spell_content_text, re.I)
+            if at_will_match and 'cantrips' not in spell_lists:
+                spells_text = at_will_match.group(1).strip()
+                spells = [s.strip() for s in re.split(r',\s*(?![^()]*\))', spells_text) if s.strip()]
+                if spells:
+                    spell_lists['atWill'] = spells
+            
+            # X/day each spells
+            for match in re.finditer(r'(\d+)/day(?:\s+each)?:\s*([^\n]+)', spell_content_text, re.I):
+                uses = match.group(1)
+                spells = [s.strip() for s in match.group(2).split(',')]
+                spell_lists[f'{uses}PerDay'] = spells
+            
+            if spell_lists:
+                spell_info['spells'] = spell_lists
+            
+            details['spellcasting'] = spell_info
+            spell_count = sum(len(spells) for spells in spell_info.get('spells', {}).values())
+            print(f"  Found Spellcasting from Traits ({spell_count} spells)")
         
         if special_actions:
             details['specialActions'] = special_actions
@@ -2856,3 +3040,4 @@ if __name__ == '__main__':
             print(f"  Stopping {name} server on port {port}...")
             server.shutdown()
         print("Done!")
+
