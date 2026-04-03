@@ -823,15 +823,15 @@ def get_monster_details(monster_url):
                     print(f"Returning cached details for {monster_id} (age: {cache_age/86400:.1f} days) [cache read: {(cache_read_time - start_time)*1000:.0f}ms]")
                     details = cached_data.get('data', {})
                     
-                    # Cache avatar image if present and not already a local path
-                    if 'avatarUrl' in details and details['avatarUrl']:
-                        if not details['avatarUrl'].startswith('/cached/images/'):
-                            avatar_cache_start = time.time()
-                            cached_avatar = cache_avatar_image(details['avatarUrl'])
-                            avatar_cache_time = time.time()
-                            print(f"  Avatar caching took: {(avatar_cache_time - avatar_cache_start)*1000:.0f}ms")
-                            if cached_avatar:
-                                details['avatarUrl'] = cached_avatar
+                    # Cache avatar image if present and not already a local path (disabled for bulk processing)
+                    # if 'avatarUrl' in details and details['avatarUrl']:
+                    #     if not details['avatarUrl'].startswith('/cached/images/'):
+                    #         avatar_cache_start = time.time()
+                    #         cached_avatar = cache_avatar_image(details['avatarUrl'])
+                    #         avatar_cache_time = time.time()
+                    #         print(f"  Avatar caching took: {(avatar_cache_time - avatar_cache_start)*1000:.0f}ms")
+                    #         if cached_avatar:
+                    #             details['avatarUrl'] = cached_avatar
                     
                     total_time = time.time() - start_time
                     print(f"  TOTAL response time: {total_time*1000:.0f}ms")
@@ -942,6 +942,9 @@ def get_monster_details(monster_url):
         
         details = {}
         
+        # Mark new format version
+        details['formatVersion'] = 2
+        
         # Check for legacy badge on the monster details page
         is_legacy = False
         legacy_badge = soup.select_one('.badge .badge-label#legacy-badge, [aria-label="legacy"]')
@@ -950,6 +953,275 @@ def get_monster_details(monster_url):
             print(f"  Detected LEGACY monster")
         
         details['isLegacy'] = is_legacy
+        
+        # Helper function to normalize Unicode characters to ASCII equivalents
+        def normalize_text(text):
+            """Replace Unicode characters with ASCII equivalents and fix missing spaces"""
+            if not text:
+                return text
+            # Replace curly quotes
+            text = text.replace('\u2018', "'")  # Left single quote
+            text = text.replace('\u2019', "'")  # Right single quote
+            text = text.replace('\u201c', '"')  # Left double quote
+            text = text.replace('\u201d', '"')  # Right double quote
+            # Replace dashes
+            text = text.replace('\u2013', '-')  # En dash
+            text = text.replace('\u2014', '-')  # Em dash
+            # Replace other common characters
+            text = text.replace('\u2026', '...')  # Ellipsis
+            
+            # Fix common missing spaces between words
+            # Handle lowercase followed by uppercase (camelCase)
+            text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)
+            
+            # Fix missing spaces around numbers (while preserving dice notation and D20 system references)
+            # First, protect dice notation and D20 references
+            text = re.sub(r'(\d+)d(\d+)', r'\1‡DICE‡\2', text, flags=re.I)  # Protect XdY dice notation
+            text = re.sub(r'([^a-z]|^)(D)(\d+)', r'\1\2‡NUM‡\3', text, flags=re.I)  # Protect D20, D10, etc. (uppercase D + number)
+            # Now add spaces between letters and digits (but not between D and ‡NUM‡)
+            text = re.sub(r'([a-z])(\d)', r'\1 \2', text, flags=re.I)  # letter followed by digit
+            text = re.sub(r'(\d)([a-z])', r'\1 \2', text, flags=re.I)  # digit followed by letter
+            # Restore protected patterns (may have spaces around markers now)
+            text = re.sub(r'(\d+)\s*‡DICE‡\s*(\d+)', r'\1d\2', text)
+            text = re.sub(r'(D)\s*‡NUM‡\s*(\d+)', r'\1\2', text, flags=re.I)
+            
+            # Fix missing space after colons (but not in time formats like "5:30")
+            text = re.sub(r':([A-Z])|:(\d+\()', r': \1\2', text)
+            
+            # Fix specific D&D Beyond text concatenation issues
+            # These need to be done carefully to avoid breaking valid compound words
+            text = re.sub(r'Pointsgained', 'Points gained', text)
+            text = re.sub(r'Pointsrequired', 'Points required', text)
+            text = re.sub(r'Concentrationor', 'Concentration or', text)
+            text = re.sub(r'Concentrationand', 'Concentration and', text)
+            text = re.sub(r'Concentrationuntil', 'Concentration until', text)
+            text = re.sub(r'Hitsgained', 'Hits gained', text)
+            text = re.sub(r'Disadvantageon', 'Disadvantage on', text)
+            text = re.sub(r'Advantageon', 'Advantage on', text)
+            
+            # Fix condition names with missing spaces
+            text = re.sub(r'Incapacitatedcondition', 'Incapacitated condition', text)
+            text = re.sub(r'Deafenedcondition', 'Deafened condition', text) 
+            text = re.sub(r'Blindedcondition', 'Blinded condition', text)
+            text = re.sub(r'Pronecon dition', 'Prone condition', text)
+            text = re.sub(r'Stunnedcondition', 'Stunned condition', text)
+            text = re.sub(r'Paralyzedcondition', 'Paralyzed condition', text)
+            text = re.sub(r'Frightenedcondition', 'Frightened condition', text)
+            text = re.sub(r'Restrainedcondition', 'Restrained condition', text)
+            text = re.sub(r'Grappledcondition', 'Grappled condition', text)
+            text = re.sub(r'Poisonedcondition', 'Poisoned condition', text)
+            text = re.sub(r'Charmedcondition', 'Charmed condition', text)
+            text = re.sub(r'Invisiblecondition', 'Invisible condition', text)
+            text = re.sub(r'Exhaustioncondition', 'Exhaustion condition', text)
+            text = re.sub(r'Petrifiedcondition', 'Petrified condition', text)
+            
+            # Generic fix for "word+gained/required/until" patterns (but avoid "on" as it breaks words like Dragon, action, Poison)
+            text = re.sub(r'([a-z])gained\b', r'\1 gained', text, flags=re.I)
+            text = re.sub(r'([a-z])required\b', r'\1 required', text, flags=re.I)
+            text = re.sub(r'([a-z])until\b', r'\1 until', text, flags=re.I)
+            
+            # Fix space before opening parenthesis when missing
+            text = re.sub(r'([a-zA-Z])\(', r'\1 (', text)
+            
+            return text
+        
+        # Helper function to parse action descriptions into structured data
+        def parse_action(name, description):
+            """Parse action description into structured fields.
+            
+            Returns dict with structured fields if parseable, or None for special actions.
+            Description is NOT stored - all info should be regeneratable from structured fields.
+            """
+            action = {'name': name}
+            
+            # Check for dual-mode (Melee or Ranged) - handle "orRanged" without space
+            if re.search(r'Melee\s*or\s*Ranged\s+Weapon\s+Attack', description, re.I):
+                # Will be split into two separate actions by caller
+                action['isDualMode'] = True
+                action['_originalDescription'] = description  # Temporarily store for splitting
+                return action
+            
+            # Check for Melee Weapon Attack
+            if re.search(r'Melee\s+Weapon\s+Attack', description, re.I):
+                action['type'] = 'Melee Weapon Attack'
+                
+                # Extract hit bonus
+                hit_match = re.search(r'\+(\d+)\s*to\s+hit', description)
+                if hit_match:
+                    action['hit'] = int(hit_match.group(1))
+                
+                # Extract reach
+                reach_match = re.search(r'reach\s+(\d+)\s*ft', description, re.I)
+                if reach_match:
+                    action['reach'] = f"{reach_match.group(1)} ft."
+                
+                # Extract targets
+                target_match = re.search(r'(one|two|three|\d+)\s+target', description, re.I)
+                if target_match:
+                    action['targets'] = target_match.group(1)
+                
+                # Extract damage - handle multiple damage types
+                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)', description)
+                if damage_match:
+                    action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
+                    
+                    # Check for additional damage ("plus X (YdZ) type damage")
+                    plus_damage = re.search(r'plus\s+(\d+)\s*\(([^)]+)\)\s*(\w+)\s+damage', description, re.I)
+                    if plus_damage:
+                        action['damage2'] = f"{plus_damage.group(1)} ({plus_damage.group(2)}) {plus_damage.group(3)}"
+                        
+                        # Extract extra text after the second damage (if present)
+                        extra_start_pos = plus_damage.end()
+                        extra_text = description[extra_start_pos:].strip('. \t\n')
+                        if extra_text and len(extra_text) > 0:
+                            action['extra'] = extra_text
+                    else:
+                        # Check for alternative damage (e.g., two-handed)
+                        alt_damage = re.search(r'or\s+(\d+)\s*\(([^)]+)\)\s*(\w+)\s+damage\s+if\s+used\s+with\s+two\s+hands', description, re.I)
+                        if alt_damage:
+                            action['damage2'] = f"{alt_damage.group(1)} ({alt_damage.group(2)}) {alt_damage.group(3)} if used with two hands"
+                        else:
+                            # No second damage, extract extra text after first damage
+                            first_damage_match = re.search(r'Hit:\s*\d+\s*\([^)]+\)\s*\w+\s+damage', description, re.I)
+                            if first_damage_match:
+                                extra_start_pos = first_damage_match.end()
+                                extra_text = description[extra_start_pos:].strip('. \t\n')
+                                if extra_text and len(extra_text) > 0:
+                                    action['extra'] = extra_text
+                
+                return action
+            
+            # Check for Ranged Weapon Attack
+            if re.search(r'Ranged\s+Weapon\s+Attack', description, re.I):
+                action['type'] = 'Ranged Weapon Attack'
+                
+                # Extract hit bonus
+                hit_match = re.search(r'\+(\d+)\s*to\s+hit', description)
+                if hit_match:
+                    action['hit'] = int(hit_match.group(1))
+                
+                # Extract range
+                range_match = re.search(r'range\s+(\d+)/(\d+)\s*ft', description, re.I)
+                if range_match:
+                    action['range'] = f"{range_match.group(1)}/{range_match.group(2)} ft."
+                
+                # Extract targets
+                target_match = re.search(r'(one|two|three|\d+)\s+target', description, re.I)
+                if target_match:
+                    action['targets'] = target_match.group(1)
+                
+                # Extract damage
+                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)', description)
+                if damage_match:
+                    action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
+                
+                return action
+            
+            # Check for Melee Attack (2024 format)
+            if re.search(r'Melee\s+Attack\s+Roll', description, re.I):
+                action['type'] = 'Melee Attack'
+                
+                # Extract hit bonus
+                hit_match = re.search(r'\+(\d+)\s*,\s*reach', description)
+                if hit_match:
+                    action['hit'] = int(hit_match.group(1))
+                
+                # Extract reach
+                reach_match = re.search(r'reach\s+(\d+)\s*ft', description, re.I)
+                if reach_match:
+                    action['reach'] = f"{reach_match.group(1)} ft."
+                
+                # Extract damage
+                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)', description)
+                if damage_match:
+                    action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
+                
+                return action
+            
+            # Check for Ranged Attack (2024 format)
+            if re.search(r'Ranged\s+Attack\s+Roll', description, re.I):
+                action['type'] = 'Ranged Attack'
+                
+                # Extract hit bonus
+                hit_match = re.search(r'\+(\d+)\s*,\s*range', description)
+                if hit_match:
+                    action['hit'] = int(hit_match.group(1))
+                
+                # Extract range
+                range_match = re.search(r'range\s+(\d+)/(\d+)\s*ft', description, re.I)
+                if range_match:
+                    action['range'] = f"{range_match.group(1)}/{range_match.group(2)} ft."
+                
+                # Extract damage
+                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)', description)
+                if damage_match:
+                    action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
+                
+                return action
+            
+            # Check for Saving Throw attacks
+            save_match = re.search(r'(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+Saving\s+Throw.*?DC\s+(\d+)', description, re.I)
+            if save_match:
+                action['type'] = 'Saving Throw'
+                action['save'] = {
+                    'ability': save_match.group(1),
+                    'dc': int(save_match.group(2))
+                }
+                
+                # Extract area of effect (e.g., "each creature in a 60-foot Cone" or "60-foot-long, 5-foot-wide Line")
+                area_match = re.search(r'each\s+creature\s+in\s+(?:an?\s+)?([^.]+?\.)', description, re.I)
+                if area_match:
+                    action['area'] = area_match.group(1).strip('.')
+                
+                # Extract damage
+                damage_match = re.search(r'(Failure|Success)?:?\s*(\d+)\s*\(([^)]+)\)\s*(\w+)', description)
+                if damage_match:
+                    action['damage'] = f"{damage_match.group(2)} ({damage_match.group(3)}) {damage_match.group(4)}"
+                
+                # Extract full effect description for failures
+                failure_match = re.search(r'Failure:\s*(.+?)(?=Success:|Failure\s+or\s+Success:|$)', description, re.I | re.DOTALL)
+                if failure_match:
+                    effect_text = failure_match.group(1).strip()
+                    
+                    # Remove damage text from the beginning if present
+                    effect_text = re.sub(r'^\d+\s*\([^)]+\)\s*\w+\s*damage\.?\s*', '', effect_text, flags=re.I)
+                    
+                    # Remove leading connectors like ", and" or ", " left over from damage removal
+                    effect_text = re.sub(r'^,\s*and\s+', '', effect_text, flags=re.I)
+                    effect_text = re.sub(r'^,\s+', '', effect_text)
+                    
+                    # Only store if there's actual effect text remaining
+                    if effect_text:
+                        action['failureEffect'] = effect_text
+                
+                # Check for "Failure or Success" combined effect first
+                both_match = re.search(r'Failure\s+or\s+Success:\s*(.+?)$', description, re.I | re.DOTALL)
+                if both_match:
+                    both_text = both_match.group(1).strip()
+                    # Store in both fields since it applies to both cases
+                    if 'failureEffect' in action:
+                        action['failureEffect'] += ' ' + both_text
+                    else:
+                        action['failureEffect'] = both_text
+                    if 'successEffect' in action:
+                        action['successEffect'] += ' ' + both_text
+                    else:
+                        action['successEffect'] = both_text
+                else:
+                    # Only look for standalone "Success:" if there's no "Failure or Success:"
+                    success_match = re.search(r'Success:\s*(.+?)$', description, re.I | re.DOTALL)
+                    if success_match:
+                        success_text = success_match.group(1).strip()
+                        action['successEffect'] = success_text
+                
+                # Check for half damage on success
+                if re.search(r'Success:\s*Half\s+damage', description, re.I):
+                    action['halfDamageOnSave'] = True
+                
+                return action
+            
+            # If we can't parse it, mark as special action
+            return None
         
         # Helper function to find stat labels (supports both 2014 and 2024 formats)
         def find_stat_label(soup_obj, label_pattern):
@@ -976,6 +1248,25 @@ def get_monster_details(monster_url):
             if label_2014:
                 return label_2014, 'old'
             return None, None
+        
+        # Extract Type/Size/Alignment (e.g., "Huge Dragon (Metallic), Chaotic Good")
+        # This appears in different places depending on format
+        # Try multiple selectors as D&D Beyond structure varies
+        type_size_elem = (
+            soup.find('div', class_='mon-stat-block-2024__meta') or
+            soup.find('div', class_='mon-stat-block__meta') or
+            soup.find('span', class_='mon-stat-block-2024__type') or 
+            soup.find('span', class_='mon-stat-block__type') or
+            soup.find('div', class_='mon-stat-block-2024__type') or
+            soup.find('div', class_='mon-stat-block__type') or
+            soup.find('p', class_='mon-stat-block-2024__type') or
+            soup.find('p', class_='mon-stat-block__type')
+        )
+        if type_size_elem:
+            type_text = normalize_text(type_size_elem.get_text(strip=True))
+            if type_text:
+                details['typeAndAlignment'] = type_text
+                print(f"  Found Type: {type_text}")
         
         # Extract AC with type
         ac_label, ac_format = find_stat_label(soup, r'Armor\s+Class|^AC$')
@@ -1027,9 +1318,6 @@ def get_monster_details(monster_url):
             if speed_elem:
                 speed_text = speed_elem.get_text(strip=True)
                 details['speed'] = speed_text
-                speed_match = re.search(r'(\d+)\s*ft', speed_text)
-                if speed_match:
-                    details['walkSpeed'] = int(speed_match.group(1))
                 print(f"  Found Speed: {speed_text}")
         
         # Extract Ability Scores
@@ -1051,13 +1339,14 @@ def get_monster_details(monster_url):
                             modifier = int(cells[2].get_text(strip=True))
                             # cells[3] is the saving throw modifier
                             if ability_name in ability_names:
-                                details['abilities'][ability_name] = {
-                                    'score': score,
-                                    'modifier': modifier
-                                }
-                details['initiativeModifier'] = details['abilities']['dex']['modifier']
-                print(f"  Found Abilities (2024): STR {details['abilities']['str']['score']}, DEX {details['abilities']['dex']['score']}, CON {details['abilities']['con']['score']}, INT {details['abilities']['int']['score']}, WIS {details['abilities']['wis']['score']}, CHA {details['abilities']['cha']['score']}")
-                print(f"  Initiative Modifier: {details['initiativeModifier']:+d}")
+                                details['abilities'][ability_name] = score
+                details['initBonus'] = details['abilities']['dex']
+                if details['initBonus'] >= 10:
+                    details['initBonus'] = (details['initBonus'] - 10) // 2
+                else:
+                    details['initBonus'] = -((10 - details['initBonus'] + 1) // 2)
+                print(f"  Found Abilities (2024): STR {details['abilities']['str']}, DEX {details['abilities']['dex']}, CON {details['abilities']['con']}, INT {details['abilities']['int']}, WIS {details['abilities']['wis']}, CHA {details['abilities']['cha']}")
+                print(f"  Initiative Modifier: {details['initBonus']:+d}")
         else:
             # Try legacy 2014 format
             stat_scores = soup.find_all('span', class_='ability-block__score')
@@ -1067,15 +1356,12 @@ def get_monster_details(monster_url):
                 details['abilities'] = {}
                 for i, ability in enumerate(ability_names):
                     score = int(stat_scores[i].get_text(strip=True))
-                    modifier_text = stat_modifiers[i].get_text(strip=True).strip('()')
-                    modifier = int(modifier_text)
-                    details['abilities'][ability] = {
-                        'score': score,
-                        'modifier': modifier
-                    }
-                details['initiativeModifier'] = details['abilities']['dex']['modifier']
-                print(f"  Found Abilities (2014): STR {details['abilities']['str']['score']}, DEX {details['abilities']['dex']['score']}, CON {details['abilities']['con']['score']}, INT {details['abilities']['int']['score']}, WIS {details['abilities']['wis']['score']}, CHA {details['abilities']['cha']['score']}")
-                print(f"  Initiative Modifier: {details['initiativeModifier']:+d}")
+                    details['abilities'][ability] = score
+                # Calculate initiative from dex
+                dex = details['abilities']['dex']
+                details['initBonus'] = (dex - 10) // 2
+                print(f"  Found Abilities (2014): STR {details['abilities']['str']}, DEX {details['abilities']['dex']}, CON {details['abilities']['con']}, INT {details['abilities']['int']}, WIS {details['abilities']['wis']}, CHA {details['abilities']['cha']}")
+                print(f"  Initiative Modifier: {details['initBonus']:+d}")
         
         # Extract Saving Throws
         saves_label, saves_format = find_tidbit_label(soup, r'Saving Throws')
@@ -1092,8 +1378,24 @@ def get_monster_details(monster_url):
             prefix = 'mon-stat-block-2024' if skills_format == 'new' else 'mon-stat-block'
             skills_data = skills_label.find_next_sibling('span', class_=f'{prefix}__tidbit-data')
             if skills_data:
-                details['skills'] = skills_data.get_text(strip=True)
-                print(f"  Found Skills: {details['skills']}")
+                skills_text = skills_data.get_text(strip=True)
+                # Parse skills into array: "Athletics+5,Perception+2" or "Athletics +5, Perception +2"
+                skills_array = []
+                # Split by comma
+                skill_parts = skills_text.split(',')
+                for part in skill_parts:
+                    part = part.strip()
+                    # Match skill name and modifier: "Athletics +5" or "Athletics+5"
+                    match = re.search(r'([A-Za-z\s]+?)\s*([+\-])\s*(\d+)', part)
+                    if match:
+                        skill_name = match.group(1).strip()
+                        sign = match.group(2)
+                        mod_value = int(match.group(3))
+                        if sign == '-':
+                            mod_value = -mod_value
+                        skills_array.append({'skill': skill_name, 'mod': mod_value})
+                details['skills'] = skills_array
+                print(f"  Found Skills: {len(skills_array)} skills parsed")
         
         # Extract Damage Vulnerabilities
         vuln_label, vuln_format = find_tidbit_label(soup, r'Damage Vulnerabilities')
@@ -1110,7 +1412,7 @@ def get_monster_details(monster_url):
             prefix = 'mon-stat-block-2024' if resist_format == 'new' else 'mon-stat-block'
             resist_data = resist_label.find_next_sibling('span', class_=f'{prefix}__tidbit-data')
             if resist_data:
-                details['damageResistances'] = resist_data.get_text(strip=True)
+                details['damageResistances'] = normalize_text(resist_data.get_text(strip=True))
                 print(f"  Found Resistances: {details['damageResistances']}")
         
         # Extract Damage Immunities
@@ -1119,7 +1421,7 @@ def get_monster_details(monster_url):
             prefix = 'mon-stat-block-2024' if immune_format == 'new' else 'mon-stat-block'
             immune_data = immune_label.find_next_sibling('span', class_=f'{prefix}__tidbit-data')
             if immune_data:
-                details['damageImmunities'] = immune_data.get_text(strip=True)
+                details['damageImmunities'] = normalize_text(immune_data.get_text(strip=True))
                 print(f"  Found Immunities: {details['damageImmunities']}")
         
         # Extract Condition Immunities
@@ -1128,7 +1430,7 @@ def get_monster_details(monster_url):
             prefix = 'mon-stat-block-2024' if cond_format == 'new' else 'mon-stat-block'
             cond_data = cond_label.find_next_sibling('span', class_=f'{prefix}__tidbit-data')
             if cond_data:
-                details['conditionImmunities'] = cond_data.get_text(strip=True)
+                details['conditionImmunities'] = normalize_text(cond_data.get_text(strip=True))
                 print(f"  Found Condition Immunities: {details['conditionImmunities']}")
         
         # Extract Senses
@@ -1137,8 +1439,16 @@ def get_monster_details(monster_url):
             prefix = 'mon-stat-block-2024' if senses_format == 'new' else 'mon-stat-block'
             senses_data = senses_label.find_next_sibling('span', class_=f'{prefix}__tidbit-data')
             if senses_data:
-                details['senses'] = senses_data.get_text(strip=True)
-                print(f"  Found Senses: {details['senses']}")
+                senses_text = normalize_text(senses_data.get_text(strip=True))
+                # Parse senses into array by splitting on comma
+                senses_array = []
+                for sense in senses_text.split(','):
+                    sense = sense.strip()
+                    # Fix spacing for common senses (e.g., "Darkvision60 ft." -> "Darkvision 60 ft.")
+                    sense = re.sub(r'(Darkvision|Blindsight|Tremorsense|Truesight)(\d)', r'\1 \2', sense)
+                    senses_array.append(sense)
+                details['senses'] = senses_array
+                print(f"  Found Senses: {len(senses_array)} senses")
         
         # Extract Languages
         lang_label, lang_format = find_tidbit_label(soup, r'Languages')
@@ -1146,7 +1456,7 @@ def get_monster_details(monster_url):
             prefix = 'mon-stat-block-2024' if lang_format == 'new' else 'mon-stat-block'
             lang_data = lang_label.find_next_sibling('span', class_=f'{prefix}__tidbit-data')
             if lang_data:
-                details['languages'] = lang_data.get_text(strip=True)
+                details['languages'] = normalize_text(lang_data.get_text(strip=True))
                 print(f"  Found Languages: {details['languages']}")
         
         # Extract Challenge Rating
@@ -1159,55 +1469,78 @@ def get_monster_details(monster_url):
                 cr_match = re.search(r'([\d/]+)', cr_text)
                 if cr_match:
                     details['cr'] = cr_match.group(1)
-                xp_match = re.search(r'\(([,\d]+)\s*XP\)', cr_text)
-                if xp_match:
-                    details['xp'] = xp_match.group(1).replace(',', '')
                 if 'cr' in details:
                     print(f"  Found CR: {details.get('cr', 'N/A')}")
         
-        # Extract Traits (Special Abilities)
+        # Extract Proficiency Bonus specially (if present)
+        prof_label = soup.find('span', class_='mon-stat-block-2024__tidbit-label', string=re.compile(r'^Proficiency\s+Bonus$', re.I))
+        if not prof_label:
+            prof_label = soup.find('span', class_='mon-stat-block__tidbit-label', string=re.compile(r'^Proficiency\s+Bonus$', re.I))
+        if prof_label:
+            prof_data = prof_label.find_next_sibling('span')
+            if prof_data:
+                prof_text = prof_data.get_text(strip=True)
+                # Extract just the number from something like "+5"
+                prof_match = re.search(r'\+?(\d+)', prof_text)
+                if prof_match:
+                    details['profBonus'] = int(prof_match.group(1))
+                    print(f"  Found Proficiency Bonus: +{details['profBonus']}")
+        
+        # Extract Traits (Special Abilities) from description blocks
         traits = []
         
-        # Try 2024 format first - check if we're in 2024 mode by looking for the stat block
+        # Try 2024 format first
         stat_block_2024 = soup.find('div', class_='mon-stat-block-2024')
         
         if stat_block_2024:
-            # In 2024, tidbits that aren't standard fields are traits (like Proficiency Bonus)
-            trait_tidbits = stat_block_2024.find_all('div', class_='mon-stat-block-2024__tidbit')
-            for block in trait_tidbits:
-                name_elem = block.find('span', class_='mon-stat-block-2024__tidbit-label')
-                data_elem = block.find('span', class_='mon-stat-block-2024__tidbit-data')
-                
-                if name_elem and data_elem:
-                    name = name_elem.get_text(strip=True)
-                    # Skip standard fields
-                    if name.lower() not in ['saving throws', 'skills', 'damage vulnerabilities', 
-                                           'damage resistances', 'damage immunities', 
-                                           'condition immunities', 'senses', 'languages', 'challenge', 'cr', 'gear']:
-                        description = data_elem.get_text(strip=True)
-                        traits.append({'name': name, 'description': description})
+            # Look for description blocks that are NOT Actions/Bonus Actions/Reactions/Legendary Actions
+            desc_blocks = stat_block_2024.find_all('div', class_='mon-stat-block-2024__description-block')
+            for block in desc_blocks:
+                heading = block.find('div', class_='mon-stat-block-2024__description-block-heading')
+                if heading:
+                    heading_text = heading.get_text(strip=True)
+                    # Skip action-type blocks
+                    if not re.search(r'^(Actions?|Bonus\s+Actions?|Reactions?|Legendary\s+Actions?)$', heading_text, re.I):
+                        # This is a trait block - extract all paragraphs
+                        content_div = block.find('div', class_='mon-stat-block-2024__description-block-content')
+                        if content_div:
+                            trait_paragraphs = content_div.find_all('p')
+                            for p in trait_paragraphs:
+                                strong = p.find('strong')
+                                if strong:
+                                    name = normalize_text(strong.get_text(strip=True).rstrip('.'))
+                                    description = normalize_text(p.get_text(strip=True))
+                                    if description.startswith(name):
+                                        description = description[len(name):].lstrip('. ')
+                                    traits.append({'name': name, 'description': description})
         else:
-            # Legacy 2014 format
-            trait_blocks = soup.find_all('div', class_='mon-stat-block__tidbit')
-            for block in trait_blocks:
-                name_elem = block.find('span', class_='mon-stat-block__tidbit-label')
-                data_elem = block.find('span', class_='mon-stat-block__tidbit-data')
-                
-                if name_elem and data_elem:
-                    name = name_elem.get_text(strip=True)
-                    # Skip standard fields
-                    if name.lower() not in ['saving throws', 'skills', 'damage vulnerabilities', 
-                                           'damage resistances', 'damage immunities', 
-                                           'condition immunities', 'senses', 'languages', 'challenge']:
-                        description = data_elem.get_text(strip=True)
-                        traits.append({'name': name, 'description': description})
+            # Legacy 2014 format - look for paragraphs before Actions heading
+            # Find all description blocks that come before Actions
+            desc_blocks = soup.find_all('div', class_='mon-stat-block__description-block')
+            for block in desc_blocks:
+                heading = block.find('div', class_='mon-stat-block__description-block-heading')
+                if heading:
+                    heading_text = heading.get_text(strip=True)
+                    # Skip action-type blocks
+                    if not re.search(r'^(Actions?|Bonus\s+Actions?|Reactions?|Legendary\s+Actions?)$', heading_text, re.I):
+                        content_div = block.find('div', class_='mon-stat-block__description-block-content')
+                        if content_div:
+                            trait_paragraphs = content_div.find_all('p')
+                            for p in trait_paragraphs:
+                                strong = p.find('strong')
+                                if strong:
+                                    name = normalize_text(strong.get_text(strip=True).rstrip('.'))
+                                    description = normalize_text(p.get_text(strip=True))
+                                    if description.startswith(name):
+                                        description = description[len(name):].lstrip('. ')
+                                    traits.append({'name': name, 'description': description})
         
         if traits:
             details['traits'] = traits
             print(f"  Found {len(traits)} Traits")
         
         # Extract Actions
-        actions = []
+        raw_actions = []
         
         # Try 2024 format first
         if stat_block_2024:
@@ -1218,14 +1551,57 @@ def get_monster_details(monster_url):
                     content_div = block.find('div', class_='mon-stat-block-2024__description-block-content')
                     if content_div:
                         action_paragraphs = content_div.find_all('p')
+                        processed_paragraphs = set()  # Track which paragraphs have been processed
+                        
                         for p in action_paragraphs:
+                            # Skip if already processed as part of spellcasting
+                            if p in processed_paragraphs:
+                                continue
+                                
                             strong = p.find('strong')
                             if strong:
-                                name = strong.get_text(strip=True).rstrip('.')
-                                description = p.get_text(strip=True)
+                                name = normalize_text(strong.get_text(strip=True).rstrip('.'))
+                                
+                                # Skip standalone spell list indicators - they should have been merged with Spellcasting
+                                if re.match(r'^(At[\s-]?Will|At[\s-]?will|\d+/[Dd]ay(\s+[Ee]ach)?):?$', name, re.I):
+                                    continue
+                                
+                                # Fix spacing before parentheses
+                                name = re.sub(r'(\S)\(', r'\1 (', name)  # Add space before (
+                                description = normalize_text(p.get_text(strip=True))
                                 if description.startswith(name):
                                     description = description[len(name):].lstrip('. ')
-                                actions.append({'name': name, 'description': description})
+                                
+                                # For Spellcasting, also get any following list items OR paragraphs without strong
+                                if re.search(r'^Spellcasting', name, re.I):
+                                    next_elem = p.find_next_sibling()
+                                    while next_elem:
+                                        if next_elem.name in ['ul', 'ol']:
+                                            # List items
+                                            for li in next_elem.find_all('li'):
+                                                description += ' ' + normalize_text(li.get_text(strip=True))
+                                        elif next_elem.name == 'p':
+                                            # Check if it has a strong element
+                                            p_strong = next_elem.find('strong')
+                                            if p_strong:
+                                                # Check if the strong tag is a spell list indicator (At Will, X/Day, etc.)
+                                                strong_text = p_strong.get_text(strip=True)
+                                                if re.match(r'^(At[\s-]?Will|At[\s-]?will|\d+/[Dd]ay(\s+[Ee]ach)?):?$', strong_text, re.I):
+                                                    # This is a spell list continuation, include it and mark as processed
+                                                    description += ' ' + normalize_text(next_elem.get_text(strip=True))
+                                                    processed_paragraphs.add(next_elem)
+                                                else:
+                                                    # This is a different action, stop
+                                                    break
+                                            else:
+                                                # Paragraph without strong - part of spellcasting description
+                                                description += ' ' + normalize_text(next_elem.get_text(strip=True))
+                                        else:
+                                            # Some other element, stop
+                                            break
+                                        next_elem = next_elem.find_next_sibling()
+                                
+                                raw_actions.append({'name': name, 'description': description})
         else:
             # Legacy 2014 format
             actions_heading = soup.find('div', class_='mon-stat-block__description-block-heading', string=re.compile(r'^Actions\s*$', re.I))
@@ -1233,45 +1609,292 @@ def get_monster_details(monster_url):
                 content_div = actions_heading.find_next_sibling('div', class_='mon-stat-block__description-block-content')
                 if content_div:
                     action_paragraphs = content_div.find_all('p')
+                    processed_paragraphs = set()  # Track which paragraphs have been processed
+                    
                     for p in action_paragraphs:
+                        # Skip if already processed as part of spellcasting
+                        if p in processed_paragraphs:
+                            continue
+                            
                         strong = p.find('strong')
                         if strong:
-                            name = strong.get_text(strip=True).rstrip('.')
-                            description = p.get_text(strip=True)
+                            name = normalize_text(strong.get_text(strip=True).rstrip('.'))
+                            
+                            # Skip standalone spell list indicators - they should have been merged with Spellcasting
+                            if re.match(r'^(At[\s-]?Will|At[\s-]?will|\d+/[Dd]ay(\s+[Ee]ach)?):?$', name, re.I):
+                                continue
+                            
+                            # Fix spacing before parentheses
+                            name = re.sub(r'(\S)\(', r'\1 (', name)  # Add space before (
+                            description = normalize_text(p.get_text(strip=True))
                             if description.startswith(name):
                                 description = description[len(name):].lstrip('. ')
-                            actions.append({'name': name, 'description': description})
+                            
+                            # For Spellcasting, also get any following list items OR paragraphs without strong
+                            if re.search(r'^Spellcasting', name, re.I):
+                                next_elem = p.find_next_sibling()
+                                while next_elem:
+                                    if next_elem.name in ['ul', 'ol']:
+                                        # List items
+                                        for li in next_elem.find_all('li'):
+                                            description += ' ' + normalize_text(li.get_text(strip=True))
+                                    elif next_elem.name == 'p':
+                                        # Check if it has a strong element
+                                        p_strong = next_elem.find('strong')
+                                        if p_strong:
+                                            # Check if the strong tag is a spell list indicator (At Will, X/Day, etc.)
+                                            strong_text = p_strong.get_text(strip=True)
+                                            if re.match(r'^(At[\s-]?Will|At[\s-]?will|\d+/[Dd]ay(\s+[Ee]ach)?):?$', strong_text, re.I):
+                                                # This is a spell list continuation, include it and mark as processed
+                                                description += ' ' + normalize_text(next_elem.get_text(strip=True))
+                                                processed_paragraphs.add(next_elem)
+                                            else:
+                                                # This is a different action, stop
+                                                break
+                                        else:
+                                            # Paragraph without strong - part of spellcasting description
+                                            description += ' ' + normalize_text(next_elem.get_text(strip=True))
+                                    else:
+                                        # Some other element, stop
+                                        break
+                                    next_elem = next_elem.find_next_sibling()
+                            
+                            raw_actions.append({'name': name, 'description': description})
+        
+        # Parse actions into structured format
+        actions = []
+        special_actions = []
+        spellcasting = None
+        
+        for raw_action in raw_actions:
+            # Check if this is spellcasting
+            if re.search(r'^Spellcasting', raw_action['name'], re.I):
+                # Use the description from raw_action which should have spell lists appended
+                spell_content_text = raw_action['description']
+                
+                # Extract just the intro text for description (before spell lists)
+                intro_match = re.search(r'^(.+?)(?=At[\s-]?[Ww]ill:|\d+/[Dd]ay|$)', spell_content_text, re.I | re.DOTALL)
+                if intro_match:
+                    spell_intro = intro_match.group(1).strip().rstrip(':')
+                else:
+                    spell_intro = spell_content_text
+                
+                # Extract spellcasting info
+                spell_info = {'description': spell_intro}
+                
+                # Try to extract spell save DC
+                dc_match = re.search(r'spell\s+save\s+DC\s+(\d+)', spell_content_text, re.I)
+                if dc_match:
+                    spell_info['spellSaveDC'] = int(dc_match.group(1))
+                
+                # Try to extract spell attack bonus
+                attack_match = re.search(r'\+(\d+)\s+to\s+hit\s+with\s+spell\s+attacks', spell_content_text, re.I)
+                if attack_match:
+                    spell_info['spellAttackBonus'] = int(attack_match.group(1))
+                
+                # Try to extract spellcasting ability
+                ability_match = re.search(r'using\s+(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+as\s+the\s+spellcasting\s+ability', spell_content_text, re.I)
+                if ability_match:
+                    spell_info['spellcastingAbility'] = ability_match.group(1)
+                
+                # Extract spell lists
+                spell_lists = {}
+                
+                # At will spells (handles both "At will:" and "At-will:" and multiline)
+                at_will_match = re.search(r'At[\s-]?will:\s*([^\n]+?)(?=\n|$|\d+/day)', spell_content_text, re.I | re.DOTALL)
+                if at_will_match:
+                    spells_text = at_will_match.group(1).strip()
+                    # Split by comma, handling spell names with parentheses
+                    spells = [s.strip() for s in re.split(r',\s*(?![^()]*\))', spells_text) if s.strip()]
+                    # Normalize spell names: add space before parentheses
+                    spells = [re.sub(r'(\S)\(', r'\1 (', spell) for spell in spells]
+                    if spells:
+                        spell_lists['atWill'] = spells
+                
+                # X/day each spells  
+                for match in re.finditer(r'(\d+)/day\s+each:\s*([^\n]+?)(?=\n|$|\d+/day)', spell_content_text, re.I | re.DOTALL):
+                    uses = match.group(1)
+                    spells_text = match.group(2).strip()
+                    spells = [s.strip() for s in re.split(r',\s*(?![^()]*\))', spells_text) if s.strip()]
+                    # Normalize spell names: add space before parentheses
+                    spells = [re.sub(r'(\S)\(', r'\1 (', spell) for spell in spells]
+                    if spells:
+                        spell_lists[f'{uses}PerDay'] = spells
+                
+                if spell_lists:
+                    spell_info['spells'] = spell_lists
+                
+                spellcasting = spell_info
+                continue
+            
+            parsed = parse_action(raw_action['name'], raw_action['description'])
+            
+            if parsed is None:
+                # Special action (Multiattack, etc.) - no structured fields
+                special_actions.append({'name': raw_action['name'], 'description': raw_action['description']})
+            elif parsed.get('isDualMode'):
+                # Split dual-mode weapon into melee and ranged
+                desc = parsed['_originalDescription']
+                
+                # Create melee version
+                melee_name = f"{parsed['name']} (Melee)"
+                melee_desc = re.sub(r'Melee\s*or\s*Ranged\s+Weapon\s+Attack', 'Melee Weapon Attack', desc, flags=re.I)
+                # Remove the "or range X/Y ft." part for melee
+                melee_desc = re.sub(r'\s+or\s+range\s+\d+/\d+\s*ft\.', '', melee_desc, flags=re.I)
+                melee_parsed = parse_action(melee_name, melee_desc)
+                if melee_parsed and not melee_parsed.get('isDualMode'):
+                    actions.append(melee_parsed)
+                
+                # Create ranged version
+                ranged_name = f"{parsed['name']} (Ranged)"
+                ranged_desc = re.sub(r'Melee\s*or\s*Ranged\s+Weapon\s+Attack', 'Ranged Weapon Attack', desc, flags=re.I)
+                # Remove the "reach X ft." part for ranged (keep the actual range)
+                ranged_desc = re.sub(r'reach\s+\d+\s*ft\.\s+or\s+', '', ranged_desc, flags=re.I)
+                ranged_parsed = parse_action(ranged_name, ranged_desc)
+                if ranged_parsed and not ranged_parsed.get('isDualMode'):
+                    actions.append(ranged_parsed)
+            else:
+                # Regular parsed action
+                actions.append(parsed)
         
         if actions:
             details['actions'] = actions
-            print(f"  Found {len(actions)} Actions")
+            print(f"  Found {len(actions)} Actions (parsed)")
+        
+        if spellcasting:
+            details['spellcasting'] = spellcasting
+            spell_count = sum(len(spells) for spells in spellcasting.get('spells', {}).values())
+            print(f"  Found Spellcasting ({spell_count} spells)")
+        
+        if special_actions:
+            details['specialActions'] = special_actions
+            print(f"  Found {len(special_actions)} Special Actions")
+        
+        # Extract Bonus Actions
+        bonus_actions = []
+        
+        # Try 2024 format first
+        if stat_block_2024:
+            desc_blocks = stat_block_2024.find_all('div', class_='mon-stat-block-2024__description-block')
+            for block in desc_blocks:
+                heading = block.find('div', class_='mon-stat-block-2024__description-block-heading')
+                if heading and re.search(r'^Bonus\s+Actions?\s*$', heading.get_text(strip=True), re.I):
+                    content_div = block.find('div', class_='mon-stat-block-2024__description-block-content')
+                    if content_div:
+                        action_paragraphs = content_div.find_all('p')
+                        for p in action_paragraphs:
+                            strong = p.find('strong')
+                            if strong:
+                                name = normalize_text(strong.get_text(strip=True).rstrip('.'))
+                                # Fix spacing before parentheses
+                                name = re.sub(r'(\S)\(', r'\1 (', name)
+                                description = normalize_text(p.get_text(strip=True))
+                                if description.startswith(name):
+                                    description = description[len(name):].lstrip('. ')
+                                
+                                # Check for additional paragraphs (without strong) that belong to this action
+                                next_elem = p.find_next_sibling()
+                                while next_elem:
+                                    if next_elem.name == 'p':
+                                        # Check if it has a strong element (would be next action)
+                                        if next_elem.find('strong'):
+                                            break
+                                        # Otherwise, it's part of this action's description
+                                        description += ' ' + normalize_text(next_elem.get_text(strip=True))
+                                    else:
+                                        # Some other element, stop
+                                        break
+                                    next_elem = next_elem.find_next_sibling()
+                                
+                                bonus_actions.append({'name': name, 'description': description})
+        else:
+            # Legacy 2014 format
+            bonus_heading = soup.find('div', class_='mon-stat-block__description-block-heading', string=re.compile(r'^Bonus\s+Actions?\s*$', re.I))
+            if bonus_heading:
+                content_div = bonus_heading.find_next_sibling('div', class_='mon-stat-block__description-block-content')
+                if content_div:
+                    action_paragraphs = content_div.find_all('p')
+                    for p in action_paragraphs:
+                        strong = p.find('strong')
+                        if strong:
+                            name = normalize_text(strong.get_text(strip=True).rstrip('.'))
+                            # Fix spacing before parentheses
+                            name = re.sub(r'(\S)\(', r'\1 (', name)
+                            description = normalize_text(p.get_text(strip=True))
+                            if description.startswith(name):
+                                description = description[len(name):].lstrip('. ')
+                            
+                            # Check for additional paragraphs (without strong) that belong to this action
+                            next_elem = p.find_next_sibling()
+                            while next_elem:
+                                if next_elem.name == 'p':
+                                    # Check if it has a strong element (would be next action)
+                                    if next_elem.find('strong'):
+                                        break
+                                    # Otherwise, it's part of this action's description
+                                    description += ' ' + normalize_text(next_elem.get_text(strip=True))
+                                else:
+                                    # Some other element, stop
+                                    break
+                                next_elem = next_elem.find_next_sibling()
+                            
+                            bonus_actions.append({'name': name, 'description': description})
+        
+        if bonus_actions:
+            details['bonusActions'] = bonus_actions
+            print(f"  Found {len(bonus_actions)} Bonus Actions")
         
         # Extract Legendary Actions
         legendary_actions = []
-        legendary_heading = soup.find('div', class_='mon-stat-block__description-block-heading', string=re.compile(r'Legendary Actions', re.I))
+        legendary_uses = None
+        
+        # Try both 2024 and 2014 formats
+        legendary_heading = soup.find('div', class_='mon-stat-block-2024__description-block-heading', string=re.compile(r'Legendary\s+Actions?', re.I))
+        if not legendary_heading:
+            legendary_heading = soup.find('div', class_='mon-stat-block__description-block-heading', string=re.compile(r'Legendary\s+Actions?', re.I))
+        
         if legendary_heading:
+            # Determine format based on which heading was found
+            is_2024 = 'mon-stat-block-2024' in str(legendary_heading.get('class'))
+            content_class = 'mon-stat-block-2024__description-block-content' if is_2024 else 'mon-stat-block__description-block-content'
+            
             # Get the description paragraph (might be before the first action)
-            content_div = legendary_heading.find_next_sibling('div', class_='mon-stat-block__description-block-content')
+            content_div = legendary_heading.find_next_sibling('div', class_=content_class)
             if content_div:
-                # First paragraph might be description
+                # First paragraph might contain uses information
                 first_p = content_div.find('p')
                 if first_p and not first_p.find('strong'):
-                    details['legendaryActionsDescription'] = first_p.get_text(strip=True)
+                    desc_text = normalize_text(first_p.get_text(strip=True))
+                    # Try to extract uses from description like "Legendary Action Uses: 3 (4 in Lair)"
+                    uses_match = re.search(r'Legendary\s+Action\s+Uses:\s*([^.]+)', desc_text, re.I)
+                    if uses_match:
+                        legendary_uses = uses_match.group(1).strip()
                 
                 # Find all action paragraphs
                 action_paragraphs = content_div.find_all('p')
                 for p in action_paragraphs:
                     strong = p.find('strong')
                     if strong:
-                        name = strong.get_text(strip=True).rstrip('.')
-                        description = p.get_text(strip=True)
+                        name = normalize_text(strong.get_text(strip=True).rstrip('.'))
+                        description = normalize_text(p.get_text(strip=True))
                         if description.startswith(name):
                             description = description[len(name):].lstrip('. ')
-                        legendary_actions.append({'name': name, 'description': description})
+                        
+                        # Try to parse as structured action
+                        parsed = parse_action(name, description)
+                        if parsed and not parsed.get('isDualMode'):
+                            # Successfully parsed into structured format
+                            legendary_actions.append(parsed)
+                        else:
+                            # Keep as description-only
+                            legendary_actions.append({'name': name, 'description': description})
         
         if legendary_actions:
-            details['legendaryActions'] = legendary_actions
-            print(f"  Found {len(legendary_actions)} Legendary Actions")
+            legendary_data = {'actions': legendary_actions}
+            if legendary_uses:
+                legendary_data['uses'] = legendary_uses
+            details['legendaryActions'] = legendary_data
+            print(f"  Found {len(legendary_actions)} Legendary Actions{' (uses: ' + legendary_uses + ')' if legendary_uses else ''}")
         
         # Extract Reactions
         reactions = []
@@ -1328,9 +1951,10 @@ def get_monster_details(monster_url):
                         break
         
         if avatar_url:
-            # Cache the avatar image locally
-            cached_avatar_url = cache_avatar_image(avatar_url)
-            details['avatarUrl'] = cached_avatar_url if cached_avatar_url else avatar_url
+            # Cache the avatar image locally (disabled for bulk processing)
+            # cached_avatar_url = cache_avatar_image(avatar_url)
+            # details['avatarUrl'] = cached_avatar_url if cached_avatar_url else avatar_url
+            details['avatarUrl'] = avatar_url
         
         if not details:
             print("  WARNING: No stats found on page - selectors may need updating")
@@ -1342,11 +1966,15 @@ def get_monster_details(monster_url):
         
         # Log what was extracted
         print(f"\n  EXTRACTED DATA:")
+        print(f"    Format Version: {details.get('formatVersion', 'NOT SET')}")
         print(f"    AC: {details.get('ac', 'NOT FOUND')}")
         print(f"    HP: {details.get('hp', 'NOT FOUND')}")
-        print(f"    Initiative: {details.get('initiativeModifier', 'NOT FOUND')}")
+        print(f"    Initiative: {details.get('init', 'NOT FOUND')}")
         print(f"    Abilities: {'YES' if details.get('abilities') else 'NO'}")
+        print(f"    Skills: {len(details.get('skills', []))} found")
+        print(f"    Senses: {len(details.get('senses', []))} found")
         print(f"    Actions: {len(details.get('actions', []))} found")
+        print(f"    Special Actions: {len(details.get('specialActions', []))} found")
         print(f"    Is Legacy: {details.get('isLegacy', False)}")
         
         if not details.get('ac') and not details.get('hp'):
