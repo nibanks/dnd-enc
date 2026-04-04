@@ -1139,6 +1139,40 @@ def get_monster_details(monster_url):
                 
                 return action
             
+            # Check for Melee Spell Attack (similar to Melee Weapon Attack)
+            if re.search(r'Melee\s+Spell\s+Attack', description, re.I):
+                action['type'] = 'Melee Spell Attack'
+                
+                # Extract hit bonus
+                hit_match = re.search(r'\+(\d+)\s*to\s+hit', description)
+                if hit_match:
+                    action['hit'] = int(hit_match.group(1))
+                
+                # Extract reach
+                reach_match = re.search(r'reach\s+(\d+)\s*ft', description, re.I)
+                if reach_match:
+                    action['reach'] = f"{reach_match.group(1)} ft."
+                
+                # Extract targets
+                target_match = re.search(r'(one|two|three|\d+)\s+(target|creature)', description, re.I)
+                if target_match:
+                    action['targets'] = target_match.group(1)
+                
+                # Extract damage
+                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)', description)
+                if damage_match:
+                    action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
+                    
+                    # Extract extra text after damage
+                    first_damage_match = re.search(r'Hit:\s*\d+\s*\([^)]+\)\s*\w+\s+damage', description, re.I)
+                    if first_damage_match:
+                        extra_start_pos = first_damage_match.end()
+                        extra_text = description[extra_start_pos:].strip('. \t\n')
+                        if extra_text and len(extra_text) > 0:
+                            action['extra'] = extra_text
+                
+                return action
+            
             # Check for Ranged Weapon Attack
             if re.search(r'Ranged\s+Weapon\s+Attack', description, re.I):
                 action['type'] = 'Ranged Weapon Attack'
@@ -1163,6 +1197,36 @@ def get_monster_details(monster_url):
                 if damage_match:
                     action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
                     # Capture any additional text after damage type (e.g., "of a type chosen by...")
+                    extra_text = damage_match.group(4).strip()
+                    if extra_text and not extra_text.startswith('.'):
+                        action['extra'] = extra_text.lstrip(',. ')
+                
+                return action
+            
+            # Check for Ranged Spell Attack (similar to Ranged Weapon Attack)
+            if re.search(r'Ranged\s+Spell\s+Attack', description, re.I):
+                action['type'] = 'Ranged Spell Attack'
+                
+                # Extract hit bonus
+                hit_match = re.search(r'\+(\d+)\s*to\s+hit', description)
+                if hit_match:
+                    action['hit'] = int(hit_match.group(1))
+                
+                # Extract range
+                range_match = re.search(r'ranged?\s+(\d+)\s*(?:ft\.?)?\s*/\s*(\d+)\s*ft', description, re.I)
+                if range_match:
+                    action['range'] = f"{range_match.group(1)}/{range_match.group(2)} ft."
+                
+                # Extract targets
+                target_match = re.search(r'(one|two|three|\d+)\s+(target|creature)', description, re.I)
+                if target_match:
+                    action['targets'] = target_match.group(1)
+                
+                # Extract damage
+                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)(.*)$', description, re.DOTALL)
+                if damage_match:
+                    action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
+                    # Capture any additional text after damage type
                     extra_text = damage_match.group(4).strip()
                     if extra_text and not extra_text.startswith('.'):
                         action['extra'] = extra_text.lstrip(',. ')
