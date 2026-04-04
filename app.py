@@ -2264,9 +2264,33 @@ def spectator():
     """Spectator view for players to watch combat"""
     return render_template('spectator.html')
 
+@app.route('/favicon.ico')
+def favicon():
+    """Return 204 No Content for favicon to suppress browser errors"""
+    return '', 204
+
 @app.route('/api/current-encounter')
 def get_current_encounter():
     """Get the current active encounter state for spectator view - NO PIN REQUIRED"""
+    try:
+        return _get_current_encounter_impl()
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"\n{'='*80}")
+        print(f"ERROR in /api/current-encounter:")
+        print(f"{'='*80}")
+        print(error_details)
+        print(f"{'='*80}\n")
+        # Return error as JSON so spectator can see it
+        return jsonify({
+            'active': False,
+            'message': f'Server error: {str(e)}',
+            'error_type': type(e).__name__
+        }), 200  # Return 200 so the JS can parse the JSON
+
+def _get_current_encounter_impl():
+    """Implementation of get_current_encounter with error handling wrapper"""
     
     # Helper function to get avatar URL from cache
     def get_avatar_from_cache(url, cache_type='monster'):
@@ -2372,8 +2396,14 @@ def get_current_encounter():
                         init_mod = monster_data.get('initiativeModifier')
                         if init_mod is None:
                             abilities = monster_data.get('abilities', {})
-                            dex = abilities.get('dex', {})
-                            init_mod = dex.get('modifier', 0)
+                            dex = abilities.get('dex')
+                            if dex is not None:
+                                # Handle both dict format {'modifier': X} and simple int format
+                                if isinstance(dex, dict):
+                                    init_mod = dex.get('modifier', 0)
+                                elif isinstance(dex, int):
+                                    # Calculate modifier from ability score: (score - 10) // 2
+                                    init_mod = (dex - 10) // 2
                         if init_mod is not None:
                             combatant_copy['initiativeBonus'] = init_mod
                 
@@ -2394,6 +2424,7 @@ def get_current_encounter():
         'combatants': enriched_combatants,
         'adventureName': data.get('name', 'Adventure')
     })
+
 
 @app.route('/api/server-info')
 def get_server_info():
