@@ -1383,6 +1383,18 @@ def get_monster_details(monster_url):
                 return label_2014, 'old'
             return None, None
         
+        # Extract monster name
+        name_elem = (
+            soup.find('div', class_='mon-stat-block-2024__name') or
+            soup.find('div', class_='mon-stat-block__name') or
+            soup.find('h1', class_='mon-stat-block-2024__name') or
+            soup.find('span', class_='mon-stat-block__name') or
+            soup.find('h1', class_='mon-stat-block__name')
+        )
+        if name_elem:
+            details['name'] = normalize_text(name_elem.get_text(strip=True))
+            print(f"  Found Name: {details['name']}")
+        
         # Extract Type/Size/Alignment (e.g., "Huge Dragon (Metallic), Chaotic Good")
         # This appears in different places depending on format
         # Try multiple selectors as D&D Beyond structure varies
