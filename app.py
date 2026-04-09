@@ -1407,11 +1407,11 @@ def get_monster_details(monster_url):
         if ac_label:
             # Choose class prefix based on format
             prefix = 'mon-stat-block-2024' if ac_format == 'new' else 'mon-stat-block'
-            # For 2024 format, the value is directly next to the label, not in a sibling
+            # Different sibling class for legacy vs 2024
             if ac_format == 'new':
-                ac_elem = ac_label.find_next_sibling('span', class_=f'{prefix}__attribute-value')
-            else:
                 ac_elem = ac_label.find_next_sibling('span', class_=f'{prefix}__attribute-data')
+            else:
+                ac_elem = ac_label.find_next_sibling('span', class_=f'{prefix}__attribute-value')
             if ac_elem:
                 ac_value = ac_elem.find('span', class_=f'{prefix}__attribute-data-value')
                 if ac_value:
