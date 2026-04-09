@@ -1247,10 +1247,19 @@ def get_monster_details(monster_url):
                 if reach_match:
                     action['reach'] = f"{reach_match.group(1)} ft."
                 
-                # Extract damage
-                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)', description)
+                # Extract damage and any additional effect text
+                damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)(.*)$', description, re.DOTALL)
                 if damage_match:
                     action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
+                    # Capture any additional text after damage type
+                    extra_text = damage_match.group(4).strip()
+                    if extra_text and not extra_text.startswith('.'):
+                        extra_text = extra_text.lstrip(',. ')
+                        # Remove leading "damage" word if present
+                        if extra_text.lower().startswith('damage'):
+                            extra_text = extra_text[6:].lstrip(',. ')
+                        if extra_text:
+                            action['extra'] = extra_text
                 
                 return action
             
@@ -1272,10 +1281,15 @@ def get_monster_details(monster_url):
                 damage_match = re.search(r'Hit:\s*(\d+)\s*\(([^)]+)\)\s*(\w+)(.*)$', description, re.DOTALL)
                 if damage_match:
                     action['damage'] = f"{damage_match.group(1)} ({damage_match.group(2)}) {damage_match.group(3)}"
-                    # Capture any additional text after damage type (e.g., "of a type chosen by...")
+                    # Capture any additional text after damage type
                     extra_text = damage_match.group(4).strip()
                     if extra_text and not extra_text.startswith('.'):
-                        action['extra'] = extra_text.lstrip(',. ')
+                        extra_text = extra_text.lstrip(',. ')
+                        # Remove leading "damage" word if present
+                        if extra_text.lower().startswith('damage'):
+                            extra_text = extra_text[6:].lstrip(',. ')
+                        if extra_text:
+                            action['extra'] = extra_text
                 
                 return action
             
