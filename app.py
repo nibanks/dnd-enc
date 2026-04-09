@@ -1419,17 +1419,24 @@ def get_monster_details(monster_url):
         if ac_label:
             # Choose class prefix based on format
             prefix = 'mon-stat-block-2024' if ac_format == 'new' else 'mon-stat-block'
-            # Different sibling class for legacy vs 2024
-            if ac_format == 'new':
-                ac_elem = ac_label.find_next_sibling('span', class_=f'{prefix}__attribute-data')
-            else:
-                ac_elem = ac_label.find_next_sibling('span', class_=f'{prefix}__attribute-value')
+            # For 2024 format, use __attribute-value (contains clean AC number)
+            # For legacy format, use __attribute-value (same structure)
+            ac_elem = ac_label.find_next_sibling('span', class_=f'{prefix}__attribute-value')
             if ac_elem:
-                ac_value = ac_elem.find('span', class_=f'{prefix}__attribute-data-value')
-                if ac_value:
-                    ac_match = re.search(r'(\d+)', ac_value.get_text(strip=True))
-                    if ac_match:
-                        details['ac'] = int(ac_match.group(1))
+                # For 2024, the value is directly in the ac_elem text
+                # For legacy, it's in a nested __attribute-data-value span
+                ac_value_elem = ac_elem.find('span', class_=f'{prefix}__attribute-data-value')
+                if ac_value_elem:
+                    # Legacy format: extract from nested span
+                    ac_text = ac_value_elem.get_text(strip=True)
+                else:
+                    # 2024 format: value is directly in ac_elem
+                    ac_text = ac_elem.get_text(strip=True)
+                
+                ac_match = re.search(r'(\d+)', ac_text)
+                if ac_match:
+                    details['ac'] = int(ac_match.group(1))
+                
                 ac_extra = ac_elem.find('span', class_=f'{prefix}__attribute-data-extra')
                 if ac_extra:
                     details['acType'] = ac_extra.get_text(strip=True).strip('()')
