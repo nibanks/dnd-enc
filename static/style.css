@@ -234,6 +234,13 @@ input[type="number"]:focus {
     transition: all 0.2s ease;
 }
 
+.encounter-description-editable:empty::before {
+    content: attr(data-placeholder);
+    color: #9aa5b0;
+    font-style: italic;
+    pointer-events: none;
+}
+
 .encounter-card:hover {
     border-color: #3498db;
     box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);

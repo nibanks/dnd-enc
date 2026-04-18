@@ -550,6 +550,57 @@ export function createEncounterCard(encounter, encounterIndex) {
     `;
     card.appendChild(header);
     
+    // Description section (only when encounter is expanded)
+    if (!encounter.minimized) {
+        if (encounter.descriptionCollapsed === undefined) {
+            encounter.descriptionCollapsed = true;
+        }
+
+        const descriptionText = encounter.description || '';
+        const isDescriptionEditable = showControls;
+        const descriptionIcon = encounter.descriptionCollapsed ? '▶' : '▼';
+        const escapeHtml = (s) => String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        const descriptionDiv = document.createElement('div');
+        descriptionDiv.className = 'description-section';
+        descriptionDiv.style.cssText = 'background: #eef3f8; border: 2px solid #5a8bb0; border-radius: 5px; padding: 10px; margin: 10px 0;';
+
+        const previewText = descriptionText
+            ? descriptionText.split('\n')[0].slice(0, 80) + (descriptionText.length > 80 || descriptionText.includes('\n') ? '…' : '')
+            : '';
+
+        const proseStyle = 'color: #7a8a99; font-weight: normal; font-style: italic;';
+        const fullProseStyle = `${proseStyle} white-space: pre-wrap; word-wrap: break-word; outline: none; line-height: 1.5;`;
+
+        descriptionDiv.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;"
+                 onclick="toggleEncounterDescription(${encounterIndex})"
+                 title="${encounter.descriptionCollapsed ? 'Expand description' : 'Collapse description'}">
+                <span style="color: #5a8bb0; font-size: 12px; width: 12px; display: inline-block;">${descriptionIcon}</span>
+                <strong style="color: #34597a;">📜 Description</strong>
+                ${encounter.descriptionCollapsed && previewText ? `<span style="${proseStyle} overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(previewText)}</span>` : ''}
+            </div>
+            ${!encounter.descriptionCollapsed ? `
+                <div style="margin-top: 8px; padding: 4px 2px;">
+                    ${isDescriptionEditable ? `
+                        <div contenteditable="true"
+                             data-placeholder="Add a description for this encounter..."
+                             class="encounter-description-editable"
+                             style="${fullProseStyle} min-height: 1.4em; cursor: text;"
+                             onblur="updateEncounterDescription(${encounterIndex}, this.innerText)">${escapeHtml(descriptionText)}</div>
+                    ` : `
+                        <div style="${fullProseStyle}">${descriptionText ? escapeHtml(descriptionText) : '<span style="color: #999;">No description</span>'}</div>
+                    `}
+                </div>
+            ` : ''}
+        `;
+        card.appendChild(descriptionDiv);
+    }
+
     // Combatants table
     const tableContainer = document.createElement('div');
     tableContainer.className = 'table-container';
@@ -842,6 +893,23 @@ export function toggleEncounterMinimize(encounterIndex) {
 export function updateEncounterName(encounterIndex, name) {
     const currentAdventure = window.currentAdventure;
     currentAdventure.encounters[encounterIndex].name = name;
+    if (window.autoSave) window.autoSave();
+}
+
+export function toggleEncounterDescription(encounterIndex) {
+    const currentAdventure = window.currentAdventure;
+    const encounter = currentAdventure.encounters[encounterIndex];
+    if (!encounter) return;
+    encounter.descriptionCollapsed = !encounter.descriptionCollapsed;
+    if (window.renderEncounters) window.renderEncounters();
+    if (window.autoSave) window.autoSave();
+}
+
+export function updateEncounterDescription(encounterIndex, value) {
+    const currentAdventure = window.currentAdventure;
+    const encounter = currentAdventure.encounters[encounterIndex];
+    if (!encounter) return;
+    encounter.description = value;
     if (window.autoSave) window.autoSave();
 }
 

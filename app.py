@@ -3107,7 +3107,9 @@ def restore_adventure_from_storage(data):
                 'activeCombatant': None,
                 'minimized': False,
                 'treasure': '',
-                'notes': ''
+                'notes': '',
+                'description': '',
+                'descriptionCollapsed': True
             })
             
             if 'combatants' in encounter:
