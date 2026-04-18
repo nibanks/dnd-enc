@@ -81,6 +81,137 @@ class TestDndBeyondCookies:
         data = json.loads(response.data)
         assert data['hasCookies'] is False
 
+    def test_set_cookies_document_cookie_string(self, client, app):
+        """Pasting ``document.cookie`` style strings should be parsed."""
+        raw = 'CobaltId=abc123; CobaltSession=xyz789; Geo=US  '
+        response = client.post(
+            '/api/dndbeyond/set-cookies',
+            data=json.dumps({'cookies': raw}),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+        assert json.loads(response.data)['count'] == 3
+
+        from app import CACHE_DIR
+        saved = json.loads((CACHE_DIR / 'cookies.json').read_text())
+        assert saved == {'CobaltId': 'abc123', 'CobaltSession': 'xyz789', 'Geo': 'US'}
+
+    def test_set_cookies_cookie_editor_json_array_string(self, client, app):
+        """Pasting a Cookie-Editor JSON export (as a string) should be parsed."""
+        array_str = json.dumps([
+            {'name': 'CobaltId', 'value': 'abc', 'domain': '.dndbeyond.com'},
+            {'name': 'Ignored', 'value': ''},
+            {'name': 'CobaltSession', 'value': 'xyz'},
+        ])
+        response = client.post(
+            '/api/dndbeyond/set-cookies',
+            data=json.dumps({'cookies': array_str}),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+        assert json.loads(response.data)['count'] == 2
+
+        from app import CACHE_DIR
+        saved = json.loads((CACHE_DIR / 'cookies.json').read_text())
+        assert saved == {'CobaltId': 'abc', 'CobaltSession': 'xyz'}
+
+    def test_set_cookies_cookie_editor_json_array_list(self, client, app):
+        """Pasting a parsed Cookie-Editor JSON export should be parsed."""
+        payload = [
+            {'name': 'CobaltId', 'value': 'abc'},
+            {'name': 'CobaltSession', 'value': 'xyz'},
+        ]
+        response = client.post(
+            '/api/dndbeyond/set-cookies',
+            data=json.dumps({'cookies': payload}),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+        assert json.loads(response.data)['count'] == 2
+
+    def test_set_cookies_rejects_values_with_newlines(self, client, app):
+        """Values with CR/LF must be rejected (would break HTTP headers)."""
+        response = client.post(
+            '/api/dndbeyond/set-cookies',
+            data=json.dumps({'cookies': {'Bad': 'line1\nline2'}}),
+            content_type='application/json',
+        )
+        assert response.status_code == 400
+        assert json.loads(response.data)['success'] is False
+
+    def test_set_cookies_unwraps_doubly_wrapped_payload(self, client, app):
+        """Legacy bad shape {"cookies": "<raw paste>"} must still be accepted."""
+        raw = 'CobaltId=abc; CobaltSession=xyz'
+        response = client.post(
+            '/api/dndbeyond/set-cookies',
+            data=json.dumps({'cookies': {'cookies': raw}}),
+            content_type='application/json',
+        )
+        assert response.status_code == 200
+        assert json.loads(response.data)['count'] == 2
+
+    def test_parse_cookies_input_empty_string(self):
+        """Empty/whitespace input raises ValueError."""
+        from app import parse_cookies_input
+        with pytest.raises(ValueError):
+            parse_cookies_input('   ')
+
+    def test_parse_cookies_input_invalid_json(self):
+        """Malformed JSON input raises ValueError."""
+        from app import parse_cookies_input
+        with pytest.raises(ValueError):
+            parse_cookies_input('{not json')
+
+
+class TestParseSignedInt:
+    """Tests for the Unicode-tolerant integer parser used on scraped stat blocks."""
+
+    def test_ascii_positive(self):
+        from app import parse_signed_int
+        assert parse_signed_int('+3') == 3
+        assert parse_signed_int('12') == 12
+
+    def test_ascii_negative(self):
+        from app import parse_signed_int
+        assert parse_signed_int('-2') == -2
+
+    def test_unicode_minus_sign(self):
+        """D&D Beyond sometimes uses U+2212 instead of ASCII '-'."""
+        from app import parse_signed_int
+        assert parse_signed_int('\u22122') == -2
+        assert parse_signed_int('\u22125') == -5
+
+    def test_unicode_dashes(self):
+        from app import parse_signed_int
+        assert parse_signed_int('\u20131') == -1   # en dash
+        assert parse_signed_int('\u20143') == -3   # em dash
+
+    def test_fullwidth_signs(self):
+        from app import parse_signed_int
+        assert parse_signed_int('\uff0b4') == 4
+        assert parse_signed_int('\uff0d4') == -4
+
+    def test_wrapped_in_parens(self):
+        from app import parse_signed_int
+        assert parse_signed_int('(+3)') == 3
+        assert parse_signed_int('(\u22122)') == -2
+
+    def test_whitespace_tolerated(self):
+        from app import parse_signed_int
+        assert parse_signed_int('  +5  ') == 5
+
+    def test_default_on_unparseable(self):
+        from app import parse_signed_int
+        assert parse_signed_int('n/a', default=0) == 0
+        assert parse_signed_int(None, default=10) == 10
+
+    def test_raises_without_default(self):
+        from app import parse_signed_int
+        with pytest.raises(ValueError):
+            parse_signed_int('nope')
+        with pytest.raises(ValueError):
+            parse_signed_int(None)
+
 
 @pytest.mark.dndbeyond
 class TestDndBeyondMonsters:
@@ -157,6 +288,30 @@ class TestDndBeyondMonsters:
         response = client.get('/api/dndbeyond/monsters')
         # Should return error or empty list
         assert response.status_code in [200, 401, 403]
+
+    def test_fetch_monsters_cache_only_without_cache(self, client):
+        """cache_only=true must return instantly with an empty list when
+        there's no cached library, not try to scrape."""
+        response = client.get('/api/dndbeyond/monsters?cache_only=true')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['success'] is True
+        assert data['monsters'] == {}
+        assert data['count'] == 0
+        assert data['scraped'] is False
+
+    def test_fetch_monsters_cache_only_with_cache(self, client, app):
+        """cache_only=true returns the existing cache when it's present."""
+        from app import MONSTERS_CACHE
+        MONSTERS_CACHE.write_text(json.dumps({
+            'Goblin': {'cr': '1/4', 'type': 'Humanoid', 'url': 'https://example/goblin'},
+        }))
+        response = client.get('/api/dndbeyond/monsters?cache_only=true')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['success'] is True
+        assert data['count'] == 1
+        assert data['monsters']['Goblin']['cr'] == '1/4'
 
 
 @pytest.mark.dndbeyond

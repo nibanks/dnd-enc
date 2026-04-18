@@ -33,14 +33,128 @@ IMAGES_CACHE_DIR.mkdir(exist_ok=True)
 # Store D&D Beyond cookies
 DNDBEYOND_COOKIES = {}
 
+
+def parse_signed_int(text, default=None):
+    """Parse an integer from text, tolerating Unicode minus/plus variants.
+
+    D&D Beyond sometimes renders ability modifiers with the Unicode minus sign
+    U+2212 ("−") or full-width plus/minus instead of ASCII "-"/"+", which
+    trips up ``int()``. This helper normalizes those and ignores surrounding
+    whitespace/parentheses. Returns ``default`` (or raises ``ValueError`` when
+    ``default is None``) if no integer can be extracted.
+    """
+    if text is None:
+        if default is not None:
+            return default
+        raise ValueError('Cannot parse int from None')
+    # Normalize common Unicode sign variants to ASCII
+    normalized = (
+        str(text)
+        .replace('\u2212', '-')   # minus sign
+        .replace('\u2013', '-')   # en dash
+        .replace('\u2014', '-')   # em dash
+        .replace('\uff0b', '+')   # full-width plus
+        .replace('\uff0d', '-')   # full-width hyphen-minus
+        .strip()
+        .strip('()')
+        .strip()
+    )
+    match = re.match(r'^([+-]?\d+)', normalized)
+    if not match:
+        if default is not None:
+            return default
+        raise ValueError(f'Cannot parse int from {text!r}')
+    return int(match.group(1))
+
+
+def _is_valid_cookie_value(value):
+    """A cookie value must be a string with no CR/LF/NUL (HTTP header safety)."""
+    if not isinstance(value, str) or not value:
+        return False
+    return not any(ch in value for ch in ('\r', '\n', '\0'))
+
+
+def parse_cookies_input(cookies_input):
+    """Normalize any supported cookie input into a flat {name: value} dict.
+
+    Accepts:
+      - dict of {name: value}
+      - list of {"name": ..., "value": ...} (Cookie-Editor / EditThisCookie JSON export)
+      - str: either a Cookie-Editor JSON array, a JSON {name: value} object, or a
+        browser ``document.cookie`` style ``name=value; name2=value2`` string.
+      - dict with a single ``cookies`` key whose value is one of the above
+        (covers malformed saves where the outer wrapper leaked through).
+
+    Returns (cookies_dict, format_label). Raises ValueError on unparseable input.
+    """
+    # Unwrap a single {"cookies": ...} level if present (recover from bad saves)
+    if isinstance(cookies_input, dict) and set(cookies_input.keys()) == {'cookies'}:
+        cookies_input = cookies_input['cookies']
+
+    if isinstance(cookies_input, str):
+        stripped = cookies_input.strip()
+        if not stripped:
+            raise ValueError('Empty cookie input')
+        # Try JSON first (Cookie-Editor array export or {name: value} object)
+        if stripped[0] in '[{':
+            try:
+                cookies_input = json.loads(stripped)
+            except json.JSONDecodeError as e:
+                raise ValueError(f'Invalid JSON cookie input: {e}') from e
+        else:
+            # document.cookie style: "name1=value1; name2=value2"
+            parsed = {}
+            for part in stripped.split(';'):
+                if '=' not in part:
+                    continue
+                name, _, value = part.partition('=')
+                name = name.strip()
+                value = value.strip()
+                if name and _is_valid_cookie_value(value):
+                    parsed[name] = value
+            if not parsed:
+                raise ValueError('Could not parse cookie string')
+            return parsed, 'document.cookie string'
+
+    if isinstance(cookies_input, list):
+        parsed = {}
+        for cookie in cookies_input:
+            if not isinstance(cookie, dict):
+                continue
+            name = cookie.get('name')
+            value = cookie.get('value')
+            if isinstance(name, str) and _is_valid_cookie_value(value):
+                parsed[name] = value
+        if not parsed:
+            raise ValueError('Cookie list contained no usable entries')
+        return parsed, 'Cookie-Editor JSON array'
+
+    if isinstance(cookies_input, dict):
+        parsed = {k: v for k, v in cookies_input.items()
+                  if isinstance(k, str) and _is_valid_cookie_value(v)}
+        if not parsed:
+            raise ValueError('Cookie dict contained no usable entries')
+        return parsed, 'key-value dict'
+
+    raise ValueError(f'Unsupported cookie input type: {type(cookies_input).__name__}')
+
+
 # Load cookies from cache if available
 if COOKIES_CACHE.exists():
     try:
         with open(COOKIES_CACHE, 'r', encoding='utf-8') as f:
-            DNDBEYOND_COOKIES = json.load(f)
-        print(f"Loaded {len(DNDBEYOND_COOKIES)} cookies from cache")
+            raw = json.load(f)
+        DNDBEYOND_COOKIES, fmt = parse_cookies_input(raw)
+        print(f"Loaded {len(DNDBEYOND_COOKIES)} cookies from cache ({fmt})")
+        # If the file was malformed, rewrite it in the clean shape
+        if raw != DNDBEYOND_COOKIES:
+            print("Migrating cookies.json to clean key-value format")
+            with open(COOKIES_CACHE, 'w', encoding='utf-8') as f:
+                json.dump(DNDBEYOND_COOKIES, f, indent=2)
     except Exception as e:
-        print(f"Error loading cookies: {e}")
+        print(f"Error loading cookies from {COOKIES_CACHE}: {e}")
+        print("Ignoring cached cookies; re-import via Settings to fix.")
+        DNDBEYOND_COOKIES = {}
 
 def cache_avatar_image(avatar_url):
     """Download and cache an avatar image, return local path"""
@@ -95,28 +209,21 @@ def serve_cached_image(filename):
 def set_dndbeyond_cookies():
     """Store D&D Beyond authentication cookies - accepts multiple formats"""
     global DNDBEYOND_COOKIES
-    data = request.json
-    cookies_input = data.get('cookies')
-    
-    # Auto-detect and convert cookie format
-    if isinstance(cookies_input, list):
-        # EditThisCookie format (array of cookie objects)
-        print(f"Detected EditThisCookie format ({len(cookies_input)} cookies)")
-        DNDBEYOND_COOKIES = {}
-        for cookie in cookies_input:
-            if isinstance(cookie, dict) and 'name' in cookie and 'value' in cookie:
-                DNDBEYOND_COOKIES[cookie['name']] = cookie['value']
-    elif isinstance(cookies_input, dict):
-        # Already in key-value format
-        print(f"Detected key-value format ({len(cookies_input)} cookies)")
-        DNDBEYOND_COOKIES = cookies_input
-    else:
-        return jsonify({"success": False, "error": "Invalid cookie format"})
-    
-    # Save to file
+    data = request.get_json(silent=True) or {}
+    cookies_input = data.get('cookies', data)
+
+    try:
+        parsed, fmt = parse_cookies_input(cookies_input)
+    except ValueError as e:
+        print(f"Rejected cookie input: {e}")
+        return jsonify({"success": False, "error": str(e)}), 400
+
+    DNDBEYOND_COOKIES = parsed
+    print(f"Detected {fmt} ({len(DNDBEYOND_COOKIES)} cookies)")
+
     with open(COOKIES_CACHE, 'w', encoding='utf-8') as f:
         json.dump(DNDBEYOND_COOKIES, f, indent=2)
-    
+
     print(f"Stored {len(DNDBEYOND_COOKIES)} cookies and saved to cache")
     return jsonify({"success": True, "count": len(DNDBEYOND_COOKIES)})
 
@@ -145,7 +252,17 @@ def check_cookie_status():
 
 @app.route('/api/dndbeyond/monsters', methods=['GET'])
 def get_dndbeyond_monsters():
-    """Scrape monsters from D&D Beyond and cache them"""
+    """Scrape monsters from D&D Beyond and cache them.
+
+    Query params:
+      cache_only=true  Return cached monsters immediately, or an empty list if
+                       no cache exists. Never triggers a scrape. Useful for
+                       pages that only need the library opportunistically (e.g.
+                       the statistics page) and don't want to block on a 3+
+                       minute first-time scrape.
+    """
+    cache_only = request.args.get('cache_only', '').lower() in ('1', 'true', 'yes')
+
     try:
         # Check if we have cached data and it's recent (less than 30 days old)
         if MONSTERS_CACHE.exists():
@@ -155,7 +272,14 @@ def get_dndbeyond_monsters():
                 with open(MONSTERS_CACHE, 'r', encoding='utf-8') as f:
                     cached_data = json.load(f)
                 return jsonify({'success': True, 'monsters': cached_data, 'count': len(cached_data), 'cached': True})
-        
+
+        # No usable cache. If the caller explicitly opted out of a fresh
+        # scrape, return an empty-but-successful payload immediately instead
+        # of blocking for minutes.
+        if cache_only:
+            print("cache_only=true and no cached monsters - returning empty list")
+            return jsonify({'success': True, 'monsters': {}, 'count': 0, 'cached': False, 'scraped': False})
+
         # Need to scrape - check if we have cookies
         if not DNDBEYOND_COOKIES:
             print("No cookies available for scraping")
@@ -585,9 +709,8 @@ def get_character_details_old(character_url):
                 modifier_elem = ability_elem.select_one('.ddbc-ability-summary__secondary')
                 
                 if score_elem and modifier_elem:
-                    score = int(score_elem.get_text(strip=True))
-                    modifier_text = modifier_elem.get_text(strip=True).strip('()+')
-                    modifier = int(modifier_text) if modifier_text else 0
+                    score = parse_signed_int(score_elem.get_text(strip=True), default=0)
+                    modifier = parse_signed_int(modifier_elem.get_text(strip=True), default=0)
                     
                     details['abilities'][ability] = {
                         'score': score,
@@ -1488,8 +1611,10 @@ def get_monster_details(monster_url):
                         cells = row.find_all(['th', 'td'])
                         if len(cells) >= 4:
                             ability_name = cells[0].get_text(strip=True).lower()
-                            score = int(cells[1].get_text(strip=True))
-                            modifier = int(cells[2].get_text(strip=True))
+                            score = parse_signed_int(cells[1].get_text(strip=True), default=10)
+                            # cells[2] is the ability modifier; D&D Beyond may
+                            # render negatives with the Unicode minus sign.
+                            modifier = parse_signed_int(cells[2].get_text(strip=True), default=0)
                             # cells[3] is the saving throw modifier
                             if ability_name in ability_names:
                                 details['abilities'][ability_name] = score
@@ -1508,7 +1633,7 @@ def get_monster_details(monster_url):
             if len(stat_scores) >= 6:
                 details['abilities'] = {}
                 for i, ability in enumerate(ability_names):
-                    score = int(stat_scores[i].get_text(strip=True))
+                    score = parse_signed_int(stat_scores[i].get_text(strip=True), default=10)
                     details['abilities'][ability] = score
                 # Calculate initiative from dex
                 dex = details['abilities']['dex']

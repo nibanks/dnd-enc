@@ -35,6 +35,7 @@ def app():
     original_monsters_cache = flask_app.MONSTERS_CACHE
     original_monster_details_dir = flask_app.MONSTER_DETAILS_DIR
     original_images_cache_dir = flask_app.IMAGES_CACHE_DIR
+    original_cookies = flask_app.DNDBEYOND_COOKIES
     
     # Override paths to use test directory
     flask_app.DATA_DIR = adventures_dir
@@ -43,6 +44,8 @@ def app():
     flask_app.MONSTERS_CACHE = cache_dir / "monsters.json"
     flask_app.MONSTER_DETAILS_DIR = cache_dir / "monsters"
     flask_app.IMAGES_CACHE_DIR = cache_dir / "images"
+    # Reset in-memory cookie state so tests don't leak auth across each other
+    flask_app.DNDBEYOND_COOKIES = {}
     
     # Configure app for testing
     flask_app.app.config.update({
@@ -61,6 +64,7 @@ def app():
     flask_app.MONSTERS_CACHE = original_monsters_cache
     flask_app.MONSTER_DETAILS_DIR = original_monster_details_dir
     flask_app.IMAGES_CACHE_DIR = original_images_cache_dir
+    flask_app.DNDBEYOND_COOKIES = original_cookies
     
     # Cleanup test directory after tests
     shutil.rmtree(test_dir, ignore_errors=True)
