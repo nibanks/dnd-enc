@@ -30,6 +30,20 @@ MONSTER_DETAILS_DIR.mkdir(exist_ok=True)
 IMAGES_CACHE_DIR = CACHE_DIR / "images"
 IMAGES_CACHE_DIR.mkdir(exist_ok=True)
 
+# Bundled monster index (committed to the repo). If the user doesn't have a
+# local scraped cache yet, copy this in so they get a working library on
+# first run instead of waiting minutes for a fresh scrape.
+BUNDLED_MONSTERS = Path("data") / "monsters.json"
+if not MONSTERS_CACHE.exists() and BUNDLED_MONSTERS.exists():
+    try:
+        import shutil
+        shutil.copyfile(BUNDLED_MONSTERS, MONSTERS_CACHE)
+        with open(MONSTERS_CACHE, 'r', encoding='utf-8') as _f:
+            _bundle_count = len(json.load(_f))
+        print(f"Bootstrapped {MONSTERS_CACHE} from bundled {BUNDLED_MONSTERS} ({_bundle_count} monsters)")
+    except Exception as _e:
+        print(f"Could not bootstrap monster cache from bundle: {_e}")
+
 # Store D&D Beyond cookies
 DNDBEYOND_COOKIES = {}
 

@@ -314,6 +314,51 @@ class TestDndBeyondMonsters:
         assert data['monsters']['Goblin']['cr'] == '1/4'
 
 
+class TestMonsterBundleBootstrap:
+    """The bundled ``data/monsters.json`` should seed an empty cache on import."""
+
+    def test_bootstrap_copies_bundle_when_cache_missing(self, tmp_path, monkeypatch):
+        import importlib
+        import app as flask_app
+
+        # Set up a fake project layout: no cache file, but a bundle exists.
+        cache_dir = tmp_path / ".cache"
+        cache_dir.mkdir()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        bundle = data_dir / "monsters.json"
+        bundle.write_text(json.dumps({
+            'Goblin': {'cr': '1/4', 'url': 'https://x/goblin'},
+            'Orc': {'cr': '1/2', 'url': 'https://x/orc'},
+        }))
+
+        monkeypatch.chdir(tmp_path)
+        # Re-import app to re-run the module-level bootstrap under the new cwd
+        importlib.reload(flask_app)
+
+        assert flask_app.MONSTERS_CACHE.exists()
+        restored = json.loads(flask_app.MONSTERS_CACHE.read_text())
+        assert set(restored.keys()) == {'Goblin', 'Orc'}
+
+    def test_bootstrap_skipped_when_cache_exists(self, tmp_path, monkeypatch):
+        import importlib
+        import app as flask_app
+
+        cache_dir = tmp_path / ".cache"
+        cache_dir.mkdir()
+        existing = cache_dir / "monsters.json"
+        existing.write_text(json.dumps({'Existing': {'cr': '5'}}))
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        (data_dir / "monsters.json").write_text(json.dumps({'Bundle': {'cr': '1'}}))
+
+        monkeypatch.chdir(tmp_path)
+        importlib.reload(flask_app)
+
+        # Existing cache must not be overwritten
+        assert json.loads(flask_app.MONSTERS_CACHE.read_text()) == {'Existing': {'cr': '5'}}
+
+
 @pytest.mark.dndbeyond
 class TestDndBeyondCharacters:
     """Tests for D&D Beyond character fetching (requires real API access)."""
