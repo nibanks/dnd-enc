@@ -342,6 +342,7 @@ export function initializeApp(config = {}) {
     win.removeEncounter = encounterRenderer.removeEncounter;
     win.resetEncounter = encounterRenderer.resetEncounter;
     win.toggleEncounterEdit = encounterRenderer.toggleEncounterEdit;
+    win.updateShowMonsterNames = encounterRenderer.updateShowMonsterNames;
     win.addCustomCombatant = encounterRenderer.addCustomCombatant;
     win.updateCombatant = encounterRenderer.updateCombatant;
     win.removeCombatant = encounterRenderer.removeCombatant;

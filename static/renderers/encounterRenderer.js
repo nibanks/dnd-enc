@@ -525,6 +525,12 @@ export function createEncounterCard(encounter, encounterIndex) {
                             📺 <span id="spectatorUrl-${encounterIndex}" style="font-family: monospace; color: #1976d2; user-select: all; cursor: pointer;" onclick="copySpectatorUrl(${encounterIndex})" title="Click to copy">${cachedSpectatorUrl || ''}</span>
                         </span>
                     ` : ''}
+                    <label style="display: flex; align-items: center; gap: 5px; color: #666; font-size: 13px; white-space: nowrap; margin-left: 15px; cursor: pointer; user-select: none;" title="When unchecked, monster names in the spectator view are replaced with 'Unknown A 1', 'Unknown A 2', etc.">
+                        <input type="checkbox" ${encounter.showMonsterNames ? 'checked' : ''}
+                               onchange="updateShowMonsterNames(${encounterIndex}, this.checked)"
+                               style="width: 14px; height: 14px; cursor: pointer;">
+                        Show monster names
+                    </label>
                 </div>
                 <div class="encounter-controls">
                     ${!encounter.minimized ? `
@@ -881,6 +887,12 @@ export function resetEncounter(encounterIndex) {
     delete encounterEditMode[encounterIndex];
     
     if (window.renderEncounters) window.renderEncounters();
+    if (window.autoSave) window.autoSave();
+}
+
+export function updateShowMonsterNames(encounterIndex, value) {
+    const currentAdventure = window.currentAdventure;
+    currentAdventure.encounters[encounterIndex].showMonsterNames = !!value;
     if (window.autoSave) window.autoSave();
 }
 

@@ -2547,7 +2547,38 @@ def _get_current_encounter_impl():
             players_dict[url] = p
     
     enriched_combatants = []
-    
+
+    # When showMonsterNames is disabled (the default), substitute monster names
+    # with "Unknown <letter> <number>" so spectators can't see what they're fighting.
+    # Letters are assigned per distinct monster type (base name) in order of first
+    # appearance; numbers increment within each type.
+    show_monster_names = active_encounter.get('showMonsterNames', False)
+    monster_name_map = {}
+    if not show_monster_names:
+        type_letters = {}
+        type_counts = {}
+        next_letter_index = 0
+        for c in active_encounter.get('combatants', []):
+            # Only monsters have a 'name' field; players use numeric 'id'
+            if not c.get('name'):
+                continue
+            original = c['name']
+            base_name = re.sub(r'\s+\d+$', '', original).strip() or original
+            if base_name not in type_letters:
+                # A, B, ..., Z, AA, AB, ...
+                idx = next_letter_index
+                letters = ''
+                while True:
+                    letters = chr(ord('A') + (idx % 26)) + letters
+                    idx = idx // 26 - 1
+                    if idx < 0:
+                        break
+                type_letters[base_name] = letters
+                type_counts[base_name] = 0
+                next_letter_index += 1
+            type_counts[base_name] += 1
+            monster_name_map[original] = f"Unknown {type_letters[base_name]} {type_counts[base_name]}"
+
     for combatant in active_encounter.get('combatants', []):
         combatant_copy = combatant.copy()
         # If combatant is a player (has numeric ID), add character name and initiative bonus
@@ -2594,15 +2625,28 @@ def _get_current_encounter_impl():
                 if avatar:
                     combatant_copy['avatarUrl'] = avatar
         
+        # Replace monster name when names are hidden (avatar/image is kept)
+        if not show_monster_names and combatant_copy.get('name'):
+            original_name = combatant_copy['name']
+            if original_name in monster_name_map:
+                combatant_copy['name'] = monster_name_map[original_name]
+            # Strip the D&D Beyond link so spectators can't click through to the monster page
+            combatant_copy.pop('dndBeyondUrl', None)
+
         enriched_combatants.append(combatant_copy)
-    
+
+    # Translate active combatant name if it refers to a hidden monster
+    active_combatant_name = active_encounter.get('activeCombatant', '')
+    if not show_monster_names and active_combatant_name in monster_name_map:
+        active_combatant_name = monster_name_map[active_combatant_name]
+
     # Return encounter data
     return jsonify({
         'active': True,
         'name': active_encounter.get('name', 'Combat'),
         'round': active_encounter.get('currentRound', 1),
         'state': active_encounter.get('state'),
-        'activeCombatant': active_encounter.get('activeCombatant', ''),
+        'activeCombatant': active_combatant_name,
         'combatants': enriched_combatants,
         'adventureName': data.get('name', 'Adventure')
     })
