@@ -215,7 +215,30 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false,
     }
     html += '</div>'; // Close monster-tooltip-header-text
     html += '</div>'; // Close monster-tooltip-header
-    
+
+    // "Players have identified this monster" checkbox (monsters only)
+    // The setting is stored per-adventure by base monster name so that once the players
+    // learn to identify any instance of a monster type, every encounter reveals it.
+    if (!isCharacter) {
+        const baseName = (entityName || '').replace(/\s+\d+$/, '').trim() || entityName || '';
+        const identifiedList = (currentAdventure && Array.isArray(currentAdventure.identifiedMonsters))
+            ? currentAdventure.identifiedMonsters
+            : [];
+        const isIdentified = baseName && identifiedList.includes(baseName);
+        const escapedBaseName = baseName
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '&quot;');
+        html += `<div class="monster-tooltip-identify" style="margin: 8px 0; padding: 6px 8px; background: #f3f1e8; border: 1px solid #d9d2bb; border-radius: 4px;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; font-size: 12px; color: #5a4a2a;" title="When checked, the players can see this monster's real name on the spectator view. Applies to every instance of this monster across all encounters in this adventure.">
+                <input type="checkbox" ${isIdentified ? 'checked' : ''}
+                    onchange="toggleMonsterIdentified('${escapedBaseName}', this.checked)"
+                    style="width: 14px; height: 14px; cursor: pointer; margin: 0;">
+                Players have identified this monster
+            </label>
+        </div>`;
+    }
+
     // Basic Stats
     html += '<div class="monster-tooltip-stats">';
     if (details.ac) {
@@ -1042,6 +1065,31 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
 }
 
 /**
+ * Toggle whether players have identified a monster (by base name).
+ * When identified, the spectator view reveals the monster's real name for
+ * every instance of that monster across all encounters in the adventure.
+ */
+function toggleMonsterIdentified(baseName, checked) {
+    const currentAdventure = window.currentAdventure;
+    if (!currentAdventure || !baseName) return;
+
+    if (!Array.isArray(currentAdventure.identifiedMonsters)) {
+        currentAdventure.identifiedMonsters = [];
+    }
+
+    const list = currentAdventure.identifiedMonsters;
+    const index = list.indexOf(baseName);
+
+    if (checked && index === -1) {
+        list.push(baseName);
+    } else if (!checked && index !== -1) {
+        list.splice(index, 1);
+    }
+
+    if (window.autoSave) window.autoSave();
+}
+
+/**
  * Hide the tooltip with a short delay
  */
 function hideMonsterTooltip() {
@@ -1057,6 +1105,7 @@ function hideMonsterTooltip() {
 export const tooltipManager = {
     showMonsterTooltip,
     hideMonsterTooltip,
+    toggleMonsterIdentified,
     createTooltipElement,
     formatModifier,
     formatActionDescription,

@@ -525,12 +525,6 @@ export function createEncounterCard(encounter, encounterIndex) {
                             📺 <span id="spectatorUrl-${encounterIndex}" style="font-family: monospace; color: #1976d2; user-select: all; cursor: pointer;" onclick="copySpectatorUrl(${encounterIndex})" title="Click to copy">${cachedSpectatorUrl || ''}</span>
                         </span>
                     ` : ''}
-                    <label style="display: flex; align-items: center; gap: 5px; color: #666; font-size: 13px; white-space: nowrap; margin-left: 15px; cursor: pointer; user-select: none;" title="When unchecked, monster names in the spectator view are replaced with 'Unknown A 1', 'Unknown A 2', etc.">
-                        <input type="checkbox" ${encounter.showMonsterNames ? 'checked' : ''}
-                               onchange="updateShowMonsterNames(${encounterIndex}, this.checked)"
-                               style="width: 14px; height: 14px; cursor: pointer;">
-                        Show monster names
-                    </label>
                 </div>
                 <div class="encounter-controls">
                     ${!encounter.minimized ? `
@@ -568,7 +562,7 @@ export function createEncounterCard(encounter, encounterIndex) {
         <thead>
             <tr>
                 <th style="width: 30px;">Turn</th>
-                <th style="width: 170px;">Name</th>
+                <th style="width: 220px;">Name</th>
                 <th style="width: 60px; text-align: center;">CR</th>
                 <th style="width: 60px; text-align: center;">Init</th>
                 <th style="width: 60px; text-align: center;">AC</th>
@@ -887,12 +881,6 @@ export function resetEncounter(encounterIndex) {
     delete encounterEditMode[encounterIndex];
     
     if (window.renderEncounters) window.renderEncounters();
-    if (window.autoSave) window.autoSave();
-}
-
-export function updateShowMonsterNames(encounterIndex, value) {
-    const currentAdventure = window.currentAdventure;
-    currentAdventure.encounters[encounterIndex].showMonsterNames = !!value;
     if (window.autoSave) window.autoSave();
 }
 
