@@ -947,6 +947,22 @@ def get_monster_details(monster_url):
         monster_id = monster_url.split('/')[-1]  # e.g., "16835-cultist"
         cache_file = MONSTER_DETAILS_DIR / f"{monster_id}.json"
         
+        # If the client sent a bare slug ("acolyte") or display name ("Acolyte")
+        # without the numeric prefix, try to find an existing cache file that
+        # ends with "-<slug>.json" before falling through to a live scrape.
+        # Matches the "<numericId>-<slug>.json" convention used by this endpoint.
+        if not cache_file.exists() and not re.match(r'^\d+-', monster_id):
+            slug_lower = monster_id.lower().replace(' ', '-')
+            try:
+                candidates = sorted(MONSTER_DETAILS_DIR.glob(f"*-{slug_lower}.json"))
+                if candidates:
+                    cache_file = candidates[0]
+                    monster_id = cache_file.stem
+                    monster_url = f"https://www.dndbeyond.com/monsters/{monster_id}"
+                    print(f"  Resolved bare slug to cached entry: {monster_id}")
+            except Exception as e:
+                print(f"  Slug resolution failed: {e}")
+        
         # Check cache first
         if cache_file.exists():
             with open(cache_file, 'r', encoding='utf-8') as f:

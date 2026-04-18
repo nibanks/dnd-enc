@@ -381,8 +381,7 @@ export function initializeApp(config = {}) {
     // Initialize attack roll event handler with dependencies
     initializeAttackRollHandler({
         hideMonsterTooltip: tooltipManager.hideMonsterTooltip,
-        openAttackResultModal: handlers.openAttackResultModal,
-        DND_MONSTERS: win.DND_MONSTERS
+        openAttackResultModal: handlers.openAttackResultModal
     });
 
     // ==================== PLAYER RENDERER INTEGRATION ====================

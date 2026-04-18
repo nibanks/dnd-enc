@@ -113,7 +113,7 @@ function applyAttackResultToPlayer(playerIdx, resultHtml) {
  * @param {Object} deps.DND_MONSTERS - Monster data object
  */
 export function initializeAttackRollHandler(deps = {}) {
-    const { hideMonsterTooltip, openAttackResultModal, DND_MONSTERS } = deps;
+    const { hideMonsterTooltip, openAttackResultModal } = deps;
     
     // Expose applyAttackResultToPlayer globally for modal use
     window.applyAttackResultToPlayer = applyAttackResultToPlayer;
@@ -133,32 +133,52 @@ export function initializeAttackRollHandler(deps = {}) {
             const actionIdx = parseInt(e.target.getAttribute('data-action-idx'));
             const entityName = e.target.getAttribute('data-entity-name');
             const monsterId = e.target.getAttribute('data-monster-id');
+            const entityUrl = e.target.getAttribute('data-entity-url');
             
             if (encounterIndex !== null) {
                 window.currentEncounterIndex = encounterIndex;
             }
             
-            // Get monster details from cache
-            let monsterDetails = null;
+            // Read caches live from window so we always see updates from
+            // tooltipManager / loadMonsters (which may reassign the global).
+            const DND_MONSTERS = window.DND_MONSTERS || {};
             const MONSTER_DETAILS_CACHE = window.MONSTER_DETAILS_CACHE || {};
             
-            // Try DND_MONSTERS first (old cache)
-            if (monsterId && DND_MONSTERS && DND_MONSTERS[monsterId]) {
-                monsterDetails = DND_MONSTERS[monsterId];
+            // Extract the canonical "<numericId>-<slug>" segment from a URL, if any.
+            // Falls back to the bare slug when the numeric prefix is absent.
+            function urlSlugSegment(url) {
+                if (!url) return null;
+                const m = url.match(/\/monsters\/((?:\d+-)?[^/?#]+)/);
+                return m ? m[1] : null;
             }
             
-            // Try MONSTER_DETAILS_CACHE if not found (new cache from tooltips)
-            if (!monsterDetails && monsterId && MONSTER_DETAILS_CACHE) {
-                // Try exact match first
-                monsterDetails = MONSTER_DETAILS_CACHE[monsterId];
-                
-                // If not found, try to match by URL pattern (monsterId might be a slug)
-                if (!monsterDetails) {
-                    for (const url in MONSTER_DETAILS_CACHE) {
-                        if (url.includes(`/${monsterId}`) || url.endsWith(monsterId)) {
-                            monsterDetails = MONSTER_DETAILS_CACHE[url];
-                            break;
-                        }
+            const urlSlug = urlSlugSegment(entityUrl);
+            
+            // Get monster details from cache
+            let monsterDetails = null;
+            
+            // MONSTER_DETAILS_CACHE is keyed by full entityUrl — preferred lookup.
+            if (entityUrl && MONSTER_DETAILS_CACHE[entityUrl]) {
+                monsterDetails = MONSTER_DETAILS_CACHE[entityUrl];
+            }
+            
+            // Fall back to the URL path segment, the display name, and any
+            // cache URL whose path segment matches what we have.
+            if (!monsterDetails) {
+                const candidateKeys = [urlSlug, monsterId, entityName].filter(Boolean);
+                for (const key of candidateKeys) {
+                    if (DND_MONSTERS[key]) { monsterDetails = DND_MONSTERS[key]; break; }
+                    if (MONSTER_DETAILS_CACHE[key]) { monsterDetails = MONSTER_DETAILS_CACHE[key]; break; }
+                }
+            }
+            
+            if (!monsterDetails && (urlSlug || monsterId)) {
+                const needle = urlSlug || monsterId;
+                for (const url in MONSTER_DETAILS_CACHE) {
+                    const seg = urlSlugSegment(url);
+                    if (seg === needle || (seg && seg.endsWith(`-${needle}`)) || url.endsWith(`/${needle}`)) {
+                        monsterDetails = MONSTER_DETAILS_CACHE[url];
+                        break;
                     }
                 }
             }
@@ -304,11 +324,14 @@ export function initializeAttackRollHandler(deps = {}) {
                 }
             }
             
-            // Use cached details or fetch from API
+            // Use cached details or fetch from API. Prefer the URL slug
+            // ("<numericId>-<slug>") because that's what the server keys its
+            // disk cache by; falling back to monsterId risks scraping again.
+            const fetchKey = urlSlug || monsterId;
             if (monsterDetails && monsterDetails.actions && monsterDetails.actions.length > actionIdx) {
                 handleRollWithDetails(monsterDetails);
-            } else if (monsterId) {
-                fetch(`/api/dndbeyond/monster/${encodeURIComponent(monsterId)}`)
+            } else if (fetchKey) {
+                fetch(`/api/dndbeyond/monster/${encodeURIComponent(fetchKey)}`)
                     .then(response => response.json())
                     .then(data => {
                         const details = data.details || data.data || data;

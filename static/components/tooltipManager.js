@@ -500,15 +500,22 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false,
                 const hasDescription = action.description && (/\d+d\d+|to hit|DC \d+/i.test(action.description));
                 const hasStructuredData = action.type || action.hit || action.damage;
                 if ((hasDescription || hasStructuredData) && currentAdventure) {
-                    // Extract monster slug from entityUrl (e.g., "https://www.dndbeyond.com/monsters/5174957-scout" -> "scout")
-                    let monsterIdForBtn = details.slug || details.id || details.name;
-                    if (!monsterIdForBtn && entityUrl) {
-                        const urlMatch = entityUrl.match(/\/monsters\/(\d+-)?([^/?#]+)/);
+                    // Prefer the "<numericId>-<slug>" segment from the URL — that's how
+                    // both MONSTER_DETAILS_CACHE (by full URL) and the server-side disk
+                    // cache (by "<numericId>-<slug>.json") are keyed. Falling back to
+                    // details.name here would otherwise force a re-scrape on click.
+                    let monsterIdForBtn = null;
+                    if (entityUrl) {
+                        const urlMatch = entityUrl.match(/\/monsters\/((?:\d+-)?[^/?#]+)/);
                         if (urlMatch) {
-                            monsterIdForBtn = urlMatch[2]; // Extract just the slug without ID prefix
+                            monsterIdForBtn = urlMatch[1];
                         }
                     }
-                    html += ` <button class="roll-attack-btn" data-action-idx="${actionIdx}" data-entity-name="${entityName}" data-monster-id="${monsterIdForBtn}" style="margin-left:8px; padding:2px 6px; font-size:11px; background:#3498db; color:white; border:none; border-radius:3px; cursor:pointer;">[roll]</button>`;
+                    if (!monsterIdForBtn) {
+                        monsterIdForBtn = details.slug || details.id || details.name;
+                    }
+                    const entityUrlAttr = entityUrl ? ` data-entity-url="${entityUrl}"` : '';
+                    html += ` <button class="roll-attack-btn" data-action-idx="${actionIdx}" data-entity-name="${entityName}" data-monster-id="${monsterIdForBtn}"${entityUrlAttr} style="margin-left:8px; padding:2px 6px; font-size:11px; background:#3498db; color:white; border:none; border-radius:3px; cursor:pointer;">[roll]</button>`;
                 }
                 
                 html += `</div>`;
