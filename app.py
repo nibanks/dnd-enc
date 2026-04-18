@@ -960,15 +960,25 @@ def get_monster_details(monster_url):
                     print(f"Returning cached details for {monster_id} (age: {cache_age/86400:.1f} days) [cache read: {(cache_read_time - start_time)*1000:.0f}ms]")
                     details = cached_data.get('data', {})
                     
-                    # Cache avatar image if present and not already a local path (disabled for bulk processing)
-                    # if 'avatarUrl' in details and details['avatarUrl']:
-                    #     if not details['avatarUrl'].startswith('/cached/images/'):
-                    #         avatar_cache_start = time.time()
-                    #         cached_avatar = cache_avatar_image(details['avatarUrl'])
-                    #         avatar_cache_time = time.time()
-                    #         print(f"  Avatar caching took: {(avatar_cache_time - avatar_cache_start)*1000:.0f}ms")
-                    #         if cached_avatar:
-                    #             details['avatarUrl'] = cached_avatar
+                    # Lazily cache avatar image on the load path: first serve of a
+                    # monster fetches+stores the image, subsequent serves short-circuit
+                    # via the existence check inside cache_avatar_image().
+                    if 'avatarUrl' in details and details['avatarUrl']:
+                        if not details['avatarUrl'].startswith('/cached/images/'):
+                            avatar_cache_start = time.time()
+                            cached_avatar = cache_avatar_image(details['avatarUrl'])
+                            avatar_cache_time = time.time()
+                            print(f"  Avatar caching took: {(avatar_cache_time - avatar_cache_start)*1000:.0f}ms")
+                            if cached_avatar and cached_avatar.startswith('/cached/images/'):
+                                details['avatarUrl'] = cached_avatar
+                                # Persist the local path back into the monster cache so
+                                # future loads skip the remote URL entirely.
+                                cached_data['data'] = details
+                                try:
+                                    with open(cache_file, 'w', encoding='utf-8') as f:
+                                        json.dump(cached_data, f, indent=2)
+                                except Exception as persist_err:
+                                    print(f"  Warning: failed to persist cached avatar path: {persist_err}")
                     
                     total_time = time.time() - start_time
                     print(f"  TOTAL response time: {total_time*1000:.0f}ms")
