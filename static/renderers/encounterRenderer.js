@@ -35,6 +35,62 @@ export function getCombatantName(combatant) {
 }
 
 /**
+ * Get the player record matching a player combatant
+ */
+export function getPlayerForCombatant(combatant) {
+    const currentAdventure = window.currentAdventure;
+    if (!isPlayerCombatant(combatant)) return null;
+    if (!combatant.id || !currentAdventure?.players) return null;
+    return currentAdventure.players.find(p => {
+        const playerId = p.dndBeyondUrl?.split('/').pop() || p.dndBeyondUrl;
+        return playerId === combatant.id;
+    }) || null;
+}
+
+/**
+ * Get avatar URL for a combatant (player or monster)
+ * Monsters store avatarUrl on the combatant; players store it on the player record.
+ */
+export function getCombatantAvatarUrl(combatant) {
+    if (!isPlayerCombatant(combatant)) {
+        return combatant.avatarUrl || null;
+    }
+    const player = getPlayerForCombatant(combatant);
+    return player?.avatarUrl || null;
+}
+
+// Track in-flight player avatar fetches keyed by dndBeyondUrl
+const playerAvatarFetchStatus = {};
+
+/**
+ * Lazily fetch a player's avatarUrl from the character API and
+ * persist it on the player record, then re-render.
+ */
+export async function fetchPlayerAvatar(player) {
+    if (!player || !player.dndBeyondUrl) return;
+    if (player.avatarUrl) return;
+    if (playerAvatarFetchStatus[player.dndBeyondUrl]) return;
+    playerAvatarFetchStatus[player.dndBeyondUrl] = true;
+
+    try {
+        const encodedUrl = encodeURIComponent(player.dndBeyondUrl);
+        const response = await fetch(`/api/dndbeyond/character/${encodedUrl}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        // The character endpoint returns avatarUrl at the top level
+        const avatarUrl = data.avatarUrl || data.details?.avatarUrl;
+        if (data.success !== false && avatarUrl) {
+            player.avatarUrl = avatarUrl;
+            if (window.renderEncounters) window.renderEncounters();
+            if (window.autoSave) window.autoSave();
+        }
+    } catch (e) {
+        console.log(`Could not fetch avatar for ${player.name || player.dndBeyondUrl}:`, e.message);
+    }
+}
+
+/**
  * Get DEX score for sorting tiebreaker
  */
 export function getDexScore(combatant) {
@@ -506,7 +562,7 @@ export function createEncounterCard(encounter, encounterIndex) {
         <thead>
             <tr>
                 <th style="width: 30px;">Turn</th>
-                <th style="width: 120px;">Name</th>
+                <th style="width: 170px;">Name</th>
                 <th style="width: 60px; text-align: center;">CR</th>
                 <th style="width: 60px; text-align: center;">Init</th>
                 <th style="width: 60px; text-align: center;">AC</th>
@@ -560,10 +616,11 @@ export function createEncounterCard(encounter, encounterIndex) {
                 if (!combatant.dndBeyondUrl) dndBeyondUrl = monster.url || '';
             }
             
-            if (!cr && (combatant.dndBeyondUrl || combatant.id)) {
+            if ((!cr || !combatant.avatarUrl) && (combatant.dndBeyondUrl || combatant.id)) {
                 const monsterUrl = combatant.dndBeyondUrl || combatant.id;
                 const fetchKey = `${encounterIndex}_${combatantIndex}`;
-                // Only fetch CR after initial load completes to prevent network flooding
+                // Only fetch after initial load completes to prevent network flooding.
+                // fetchCRFromCache also populates avatarUrl when available.
                 if (window.initialLoadComplete && monsterUrl && monsterUrl.includes('dndbeyond.com') && !crFetchStatus[fetchKey] && window.fetchCRFromCache) {
                     crFetchStatus[fetchKey] = true;
                     window.fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex);
@@ -580,6 +637,27 @@ export function createEncounterCard(encounter, encounterIndex) {
         const isUnconscious = (combatant.hp || 0) <= 0;
         const textColor = isUnconscious ? '#e74c3c' : '#2c5aa0';
         const inheritColor = isUnconscious ? '#e74c3c' : 'inherit';
+
+        // Build avatar HTML (image for players and monsters, initial-letter placeholder fallback)
+        const avatarUrl = getCombatantAvatarUrl(combatant);
+        const avatarInitial = (combatantName || combatant.name || '?').charAt(0).toUpperCase();
+        let avatarHTML;
+        if (avatarUrl) {
+            // If the image fails to load, hide it and reveal the sibling placeholder
+            avatarHTML = `<img src="${avatarUrl}" alt="" class="combatant-avatar-inline"
+                onerror="this.style.display='none'; var p=this.nextElementSibling; if(p)p.style.display='flex';">
+                <div class="combatant-avatar-inline placeholder" style="display:none;">${avatarInitial}</div>`;
+        } else {
+            avatarHTML = `<div class="combatant-avatar-inline placeholder">${avatarInitial}</div>`;
+        }
+
+        // Lazily fetch missing avatar for players with a D&D Beyond URL
+        if (isPlayer && !avatarUrl && window.initialLoadComplete) {
+            const player = getPlayerForCombatant(combatant);
+            if (player && player.dndBeyondUrl && !playerAvatarFetchStatus[player.dndBeyondUrl]) {
+                fetchPlayerAvatar(player);
+            }
+        }
         
         if (isPlayer) {
             // Escape for JavaScript string literals: backslashes first, then quotes
@@ -700,7 +778,7 @@ export function createEncounterCard(encounter, encounterIndex) {
         
         row.innerHTML = `
             <td style="text-align: center;">${(encounter.state === 'started' && encounter.activeCombatant === combatantName) ? '▶' : ''}</td>
-            <td>${nameHTML}${deathSavesCell}</td>
+            <td><div class="combatant-name-cell">${avatarHTML}<div class="combatant-name-content">${nameHTML}${deathSavesCell}</div></div></td>
             <td style="text-align: center;">${isPlayer ? '<span style="color: #999;">-</span>' : `<span id="cr-${encounterIndex}-${combatantIndex}" style="color: #666; font-weight: 500;">${cr}</span>`}</td>
             <td style="text-align: center;">${!encounter.state || encounterEditMode[encounterIndex] ? `<input type="number" value="${combatant.initiative || 0}" style="text-align: center;" onchange="updateCombatant(${encounterIndex}, ${combatantIndex}, 'initiative', parseInt(this.value))">` : `<span style="color: #666; font-weight: 500;">${initiativeDisplay}</span>`}</td>
             <td style="text-align: center;"><span style="color: #666; font-weight: 500;">${ac}</span></td>
@@ -1377,8 +1455,8 @@ export async function fetchAllMissingCRs() {
         for (let combatantIndex = 0; combatantIndex < encounter.combatants.length; combatantIndex++) {
             const combatant = encounter.combatants[combatantIndex];
             
-            // Skip if already has CR or if it's a player
-            if (combatant.cr || !combatant.name || combatant.name.includes('(Player)')) continue;
+            // Skip if we have both CR and avatar, or if it's a player combatant
+            if ((combatant.cr && combatant.avatarUrl) || !combatant.name || combatant.name.includes('(Player)')) continue;
             
             const monsterUrl = combatant.dndBeyondUrl || combatant.id;
             const fetchKey = `${encounterIndex}_${combatantIndex}`;
@@ -1409,23 +1487,30 @@ export async function fetchCRFromCache(monsterUrl, encounterIndex, combatantInde
         
         const data = await response.json();
         
-        if (data.success && data.details && data.details.cr) {
+        if (data.success && data.details) {
             const encounter = currentAdventure.encounters[encounterIndex];
             if (encounter && encounter.combatants[combatantIndex]) {
                 const combatant = encounter.combatants[combatantIndex];
+                let changed = false;
+
                 const newCR = data.details.cr;
-                
-                if (combatant.cr !== newCR) {
+                if (newCR && combatant.cr !== newCR) {
                     combatant.cr = newCR;
-                    
-                    // Update the specific CR element directly instead of full re-render
                     const crElement = document.getElementById(`cr-${encounterIndex}-${combatantIndex}`);
                     if (crElement) {
                         crElement.textContent = newCR;
                     }
-                    
-                    if (window.autoSave) window.autoSave();
+                    changed = true;
                 }
+
+                // Also opportunistically cache the avatar so images show without a full refresh
+                if (data.details.avatarUrl && !combatant.avatarUrl) {
+                    combatant.avatarUrl = data.details.avatarUrl;
+                    changed = true;
+                    if (window.renderEncounters) window.renderEncounters();
+                }
+
+                if (changed && window.autoSave) window.autoSave();
             }
         }
     } catch (error) {
