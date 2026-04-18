@@ -82,24 +82,45 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
 
 1. **Install Python** (3.8 or higher)
 
-2. **Install dependencies**:
+2. **Create a virtual environment and install dependencies**:
+
+   **Linux / macOS:**
    ```bash
+   # On Debian/Ubuntu you may first need: sudo apt install python3-venv
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+   **Windows (PowerShell):**
+   ```powershell
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1
    pip install -r requirements.txt
    ```
 
 3. **Run the application**:
+
+   **Linux / macOS:**
    ```bash
    python app.py
+   # or use the convenience script:
+   ./scripts/start.sh
    ```
-   
+
+   **Windows (PowerShell):**
+   ```powershell
+   python app.py
+   # or use the convenience script:
+   .\scripts\start.ps1
+   ```
+
    **Command Line Options:**
    - `--enable-upnp` or `--enable-external`: Enable UPnP port forwarding and dynamic DNS updates (off by default)
      ```bash
      python app.py --enable-upnp
-     ```
-   - Alternatively, if using PowerShell:
-     ```powershell
-     .\start.ps1 -EnableUpnp
+     # or: ./scripts/start.sh --enable-upnp
+     # or (PowerShell): .\scripts\start.ps1 -EnableUpnp
      ```
 
 4. **Open in browser**:
@@ -307,7 +328,11 @@ Adventures are stored in the `adventures/` directory as JSON files. The format i
 dnd-enc/
 ├── app.py                      # Flask backend with D&D Beyond integration
 ├── requirements.txt            # Python dependencies (Flask, requests, BeautifulSoup4)
-├── start.ps1                   # PowerShell startup script
+├── scripts/
+│   ├── start.ps1              # Windows PowerShell startup script
+│   ├── start.sh               # Linux/macOS startup script
+│   ├── run_tests.py           # Cross-platform test runner
+│   └── setup_cookies.py       # Cross-platform D&D Beyond cookie helper
 ├── templates/
 │   └── index.html             # Main HTML template
 ├── static/
@@ -358,9 +383,12 @@ The project includes comprehensive test suites for both backend and frontend cod
 
 ### Quick Start
 
-```powershell
-# Run all tests (backend + frontend)
+```bash
+# Run all tests (backend + frontend) - works on Linux, macOS, and Windows
 pytest && npm test
+
+# Or use the cross-platform Python runner:
+python scripts/run_tests.py
 ```
 
 **Current Status:**
@@ -381,7 +409,7 @@ pytest && npm test
 
 To enable the 6 skipped D&D Beyond API integration tests:
 1. Set up cookies in the production app (via Settings)
-2. Or run: `.\scripts\setup_cookies.ps1` to configure them manually
+2. Or run: `python scripts/setup_cookies.py` (cross-platform) or `.\scripts\setup_cookies.ps1` (Windows)
 
 ### Documentation
 
@@ -396,12 +424,16 @@ See [docs/TESTING.md](docs/TESTING.md) for detailed information on:
 
 Verify code changes don't break functionality:
 
-```powershell
-# Add Node.js to PATH (if needed in current session)
-$env:Path += ';C:\Program Files\nodejs\'
-
-# Run all tests
+```bash
+# Run all tests (Linux/macOS/Windows - make sure the venv is activated)
 pytest && npm test
+```
+
+On Windows PowerShell, you may first need to add Node.js to the session PATH:
+
+```powershell
+$env:Path += ';C:\Program Files\nodejs\'
+pytest; npm test
 ```
 
 All tests should pass (except 6 D&D Beyond tests if cookies aren't configured).
