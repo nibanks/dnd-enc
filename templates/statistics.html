@@ -136,6 +136,25 @@
         }
 
         // Helper functions
+
+        // Strip trailing numbers and parenthetical labels from a combatant name
+        // so we can look the base monster up in DND_MONSTERS. Handles either
+        // ordering, e.g. "Veteran (Disguised) 1" and "Veteran 1 (Disguised)"
+        // both resolve to "Veteran".
+        function stripCombatantLabels(name) {
+            if (!name) return '';
+            let result = String(name);
+            let prev;
+            do {
+                prev = result;
+                result = result
+                    .replace(/\s*\([^)]*\)\s*$/, '')
+                    .replace(/\s+\d+$/, '')
+                    .trim();
+            } while (result !== prev);
+            return result;
+        }
+
         function isPlayerCombatant(combatant) {
             return !combatant.hasOwnProperty('name');
         }
@@ -165,9 +184,12 @@
             const totalXP = monsters.reduce((sum, combatant) => {
                 let cr = combatant.cr || '';
                 
-                // If no CR on combatant, try looking up in monster database
+                // If no CR on combatant, try looking up in monster database.
+                // Strip trailing numbers AND parenthetical labels so combatants
+                // like "Doppelganger (Zelina)" and "Veteran (Disguised) 1" both
+                // resolve to their base monster name.
                 if (!cr && combatant.name) {
-                    const baseName = combatant.name.replace(/\s+\d+$/, '');
+                    const baseName = stripCombatantLabels(combatant.name);
                     const monster = DND_MONSTERS[baseName];
                     cr = monster?.cr || '';
                 }
@@ -509,7 +531,7 @@
                     const totalXP = monsters.reduce((sum, combatant) => {
                         let cr = combatant.cr || '';
                         if (!cr && combatant.name) {
-                            const baseName = combatant.name.replace(/\s+\d+$/, '');
+                            const baseName = stripCombatantLabels(combatant.name);
                             const monster = DND_MONSTERS[baseName];
                             cr = monster?.cr || '';
                         }
@@ -716,10 +738,15 @@
             // Use ALL encounters (no chapter filter)
             const allEncounters = currentAdventure.encounters || [];
             
+            // Only count damage for encounters that have actually been run.
+            // Unstarted encounters can have stale/auto-filled HP that would
+            // otherwise look like damage on the charts.
+            const isActiveEncounter = (encounter) => encounter && (encounter.state === 'started' || encounter.state === 'complete');
+
             // Total enemy damage
             const totalEnemyDamageData = [];
             allEncounters.forEach((encounter, index) => {
-                if (!encounter.combatants) {
+                if (!encounter.combatants || !isActiveEncounter(encounter)) {
                     totalEnemyDamageData.push({ x: index + 1, y: 0 });
                     return;
                 }
@@ -749,7 +776,7 @@
                 const playerData = [];
                 
                 allEncounters.forEach((encounter, index) => {
-                    if (!encounter.combatants) {
+                    if (!encounter.combatants || !isActiveEncounter(encounter)) {
                         playerData.push({ x: index + 1, y: 0 });
                         return;
                     }
@@ -780,7 +807,7 @@
             // "Other" dataset
             const otherData = [];
             allEncounters.forEach((encounter, index) => {
-                if (!encounter.combatants) {
+                if (!encounter.combatants || !isActiveEncounter(encounter)) {
                     otherData.push({ x: index + 1, y: 0 });
                     return;
                 }
@@ -882,6 +909,8 @@
             
             allEncounters.forEach(encounter => {
                 if (!encounter.combatants) return;
+                // Skip unstarted encounters so the totals reflect actual play.
+                if (encounter.state !== 'started' && encounter.state !== 'complete') return;
                 
                 // Sum player damage
                 encounter.combatants.forEach(combatant => {

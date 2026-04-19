@@ -5,6 +5,7 @@
  */
 
 import { CR_TO_XP, DND_CONDITIONS, CONDITION_ICONS } from '../utils/constants.js';
+import { getMonsterBaseName } from '../utils/helpers.js';
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -140,8 +141,9 @@ export function calculateEncounterXP(encounter) {
         
         // If no CR stored, try looking up from monster database
         if (!cr && combatant.name) {
-            // Extract base monster name (remove numbering like "Cultist 1" -> "Cultist")
-            const baseName = combatant.name.replace(/\s+\d+$/, '');
+            // Extract base monster name (strips "Kobold 1" -> "Kobold" and
+            // "Doppelganger (Zelina)" -> "Doppelganger")
+            const baseName = getMonsterBaseName(combatant.name);
             const monster = DND_MONSTERS[baseName];
             cr = monster?.cr || '';
             
@@ -193,7 +195,7 @@ export function calculateDefaultEncounterCR(encounter) {
         let cr = combatant.cr || '';
         
         if (!cr && combatant.name) {
-            const baseName = combatant.name.replace(/\s+\d+$/, '');
+            const baseName = getMonsterBaseName(combatant.name);
             const monster = DND_MONSTERS[baseName];
             cr = monster?.cr || '';
             
@@ -347,11 +349,12 @@ export function renderEncounters() {
         currentAdventure.encounters.forEach(encounter => {
             if (!encounter.combatants) return;
             
-            // Group combatants by base name (without numbers)
+            // Group combatants by base monster name (ignoring trailing
+            // numbers or parenthetical NPC labels)
             const combatantsByBaseName = {};
             encounter.combatants.forEach(combatant => {
                 if (!combatant.name) return;
-                const baseName = combatant.name.replace(/\s+\d+$/, '').trim();
+                const baseName = getMonsterBaseName(combatant.name);
                 if (!combatantsByBaseName[baseName]) {
                     combatantsByBaseName[baseName] = [];
                 }
@@ -1405,7 +1408,18 @@ export function updateTreasure(encounterIndex, value) {
 export function startEncounter(encounterIndex) {
     const currentAdventure = window.currentAdventure;
     const encounter = currentAdventure.encounters[encounterIndex];
-    
+
+    // Roll initiative for any combatant that hasn't been given one yet.
+    // Treat 0 / null / undefined as "not rolled" so the DM can still
+    // pre-fill specific values (e.g. players) and have them respected.
+    encounter.combatants.forEach(combatant => {
+        if (!combatant.initiative) {
+            const bonus = combatant.initiativeBonus || 0;
+            const d20 = Math.floor(Math.random() * 20) + 1;
+            combatant.initiative = d20 + bonus;
+        }
+    });
+
     encounter.combatants.sort((a, b) => {
         const initA = a.initiative || 0;
         const initB = b.initiative || 0;

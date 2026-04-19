@@ -2894,9 +2894,9 @@ def clean_adventure_for_storage(data):
     
     # Helper to get monster defaults from cache
     def get_monster_defaults(monster_id):
-        """Get default HP and AC for a monster from cache"""
+        """Get default HP, AC, initiative bonus and dex score for a monster from cache"""
         if not monster_id or '/' in monster_id:
-            return None, None
+            return None, None, None, None
         
         cache_file = MONSTER_DETAILS_DIR / f"{monster_id}.json"
         if cache_file.exists():
@@ -2906,10 +2906,14 @@ def clean_adventure_for_storage(data):
                     monster_data = cached.get('data', {})
                     default_hp = monster_data.get('hp')
                     default_ac = monster_data.get('ac')
-                    return default_hp, default_ac
+                    default_init = monster_data.get('initBonus')
+                    if default_init is None:
+                        default_init = monster_data.get('initiativeModifier')
+                    default_dex = (monster_data.get('abilities') or {}).get('dex')
+                    return default_hp, default_ac, default_init, default_dex
             except Exception:
                 pass
-        return None, None
+        return None, None, None, None
     
     # Helper to recursively remove empty strings, empty lists, empty dicts, None values, and zeros
     # BUT preserve important fields like 'pin' and 'pinVersion'
@@ -2992,27 +2996,34 @@ def clean_adventure_for_storage(data):
                             if url.startswith(monster_prefix):
                                 monster_id = url[len(monster_prefix):]
                                 combatant['id'] = monster_id
-                                
-                                # Get monster defaults and remove if matching
-                                default_hp, default_ac = get_monster_defaults(monster_id)
-                                
-                                if default_hp is not None and combatant.get('maxHp') == default_hp:
-                                    del combatant['maxHp']
-                                
-                                if default_ac is not None and combatant.get('ac') == default_ac:
-                                    del combatant['ac']
                             else:
-                                # Already shortened, check for defaults
-                                default_hp, default_ac = get_monster_defaults(url)
-                                
-                                if default_hp is not None and combatant.get('maxHp') == default_hp:
-                                    del combatant['maxHp']
-                                
-                                if default_ac is not None and combatant.get('ac') == default_ac:
-                                    del combatant['ac']
+                                monster_id = url
+
+                            # Get monster defaults and remove if matching
+                            default_hp, default_ac, default_init, default_dex = get_monster_defaults(monster_id)
+
+                            if default_hp is not None and combatant.get('maxHp') == default_hp:
+                                del combatant['maxHp']
+
+                            if default_ac is not None and combatant.get('ac') == default_ac:
+                                del combatant['ac']
+
+                            if default_init is not None and combatant.get('initiativeBonus') == default_init:
+                                del combatant['initiativeBonus']
+
+                            if default_dex is not None and combatant.get('dexScore') == default_dex:
+                                del combatant['dexScore']
                     else:
                         # No URL means it's a monster without URL - keep maxHp/ac as is
                         pass
+
+                    # If hp equals maxHp (or either is falsey/matches), drop hp so
+                    # that on reload we can unambiguously treat this combatant as
+                    # "at full health" and fill hp from the authoritative maxHp.
+                    hp_val = combatant.get('hp')
+                    max_hp_val = combatant.get('maxHp')
+                    if hp_val is not None and max_hp_val is not None and hp_val == max_hp_val:
+                        del combatant['hp']
     
     # Clean players - extract only character IDs
     if 'players' in data:
@@ -3033,9 +3044,9 @@ def restore_adventure_from_storage(data):
     
     # Helper to get monster defaults from cache
     def get_monster_defaults(monster_id):
-        """Get default HP and AC for a monster from cache"""
+        """Get default HP, AC, initiative bonus and dex score for a monster from cache"""
         if not monster_id or '/' in monster_id:
-            return None, None
+            return None, None, None, None
         
         cache_file = MONSTER_DETAILS_DIR / f"{monster_id}.json"
         if cache_file.exists():
@@ -3045,10 +3056,14 @@ def restore_adventure_from_storage(data):
                     monster_data = cached.get('data', {})
                     default_hp = monster_data.get('hp')
                     default_ac = monster_data.get('ac')
-                    return default_hp, default_ac
+                    default_init = monster_data.get('initBonus')
+                    if default_init is None:
+                        default_init = monster_data.get('initiativeModifier')
+                    default_dex = (monster_data.get('abilities') or {}).get('dex')
+                    return default_hp, default_ac, default_init, default_dex
             except Exception:
                 pass
-        return None, None
+        return None, None, None, None
     
     # Helper to ensure default values for missing fields
     def ensure_defaults(obj, defaults):
@@ -3111,7 +3126,13 @@ def restore_adventure_from_storage(data):
                 'description': '',
                 'descriptionCollapsed': True
             })
-            
+
+            # For unstarted encounters, any combatant without a saved hp should be
+            # treated as "at full health" rather than "dead". Otherwise the stats
+            # page sees maxHp filled from the monster cache while hp defaulted to 0
+            # and mis-reports that damage has already been taken.
+            encounter_unstarted = encounter.get('state') in (None, '', 'unstarted')
+
             if 'combatants' in encounter:
                 for combatant in encounter['combatants']:
                     # Restore full field names
@@ -3126,6 +3147,9 @@ def restore_adventure_from_storage(data):
                     
                     # Provide combatant-level defaults
                     # Note: maxHp is handled separately for monsters (filled from cache)
+                    # hp is intentionally NOT defaulted here so we can distinguish
+                    # "hp was never saved" from "hp was explicitly saved as 0".
+                    hp_missing_on_disk = 'hp' not in combatant or combatant.get('hp') is None
                     ensure_defaults(combatant, {
                         'initiative': 0,
                         'hp': 0,
@@ -3156,14 +3180,20 @@ def restore_adventure_from_storage(data):
                                 # Extract ID from full URL
                                 monster_id = url.split('/')[-1]
                             
-                            # Fill in default HP and AC from monster cache if missing
-                            default_hp, default_ac = get_monster_defaults(monster_id)
+                            # Fill in default HP, AC and initiative stats from monster cache if missing
+                            default_hp, default_ac, default_init, default_dex = get_monster_defaults(monster_id)
                             
                             if 'maxHp' not in combatant and default_hp is not None:
                                 combatant['maxHp'] = default_hp
                             
                             if 'ac' not in combatant and default_ac is not None:
                                 combatant['ac'] = default_ac
+
+                            if combatant.get('initiativeBonus') is None and default_init is not None:
+                                combatant['initiativeBonus'] = default_init
+
+                            if combatant.get('dexScore') is None and default_dex is not None:
+                                combatant['dexScore'] = default_dex
                             
                             # Ensure name exists for monsters (presence of 'name' indicates monster)
                             if 'name' not in combatant:
@@ -3175,6 +3205,14 @@ def restore_adventure_from_storage(data):
                     # Final fallback for maxHp if still missing (e.g., for players or if cache lookup failed)
                     if 'maxHp' not in combatant:
                         combatant['maxHp'] = 0
+
+                    # If the encounter has never started, treat any combatant
+                    # that has no hp on disk as being at full health. This avoids
+                    # spurious "damage taken" readings when maxHp was auto-filled
+                    # from the monster cache but hp was still sitting at its 0
+                    # default.
+                    if encounter_unstarted and hp_missing_on_disk and combatant.get('maxHp', 0) > 0:
+                        combatant['hp'] = combatant['maxHp']
     
     # Provide top-level defaults
     ensure_defaults(data, {

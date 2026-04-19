@@ -287,6 +287,30 @@ export function setURLParameter(name, value) {
 }
 
 /**
+ * Extract the base monster name from a combatant display name so we can
+ * look it up in the D&D Beyond monster list. Strips, in either order:
+ *   - a trailing parenthetical label, e.g. "Doppelganger (Zelina)"      -> "Doppelganger"
+ *   - a trailing instance number,    e.g. "Kobold 3"                     -> "Kobold"
+ * Handles both orderings so "Veteran (Disguised) 1" and "Veteran 1 (Disguised)"
+ * both collapse to "Veteran".
+ * @param {string} name - Combatant name
+ * @returns {string} Base monster name suitable for lookup
+ */
+export function getMonsterBaseName(name) {
+    if (!name) return '';
+    let result = String(name);
+    let prev;
+    do {
+        prev = result;
+        result = result
+            .replace(/\s*\([^)]*\)\s*$/, '')
+            .replace(/\s+\d+$/, '')
+            .trim();
+    } while (result !== prev);
+    return result;
+}
+
+/**
  * Parse CR string to numeric value for sorting/comparison
  * @param {string} cr - Challenge Rating (e.g., "1/4", "5", "1/2")
  * @returns {number} Numeric CR value

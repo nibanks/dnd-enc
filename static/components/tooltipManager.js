@@ -2,7 +2,7 @@
  * Tooltip Manager - Handles monster/character tooltips on hover
  */
 
-import { showCookieExpirationWarning } from '../utils/helpers.js';
+import { showCookieExpirationWarning, getMonsterBaseName } from '../utils/helpers.js';
 
 let tooltipElement = null;
 let tooltipTimeout = null;
@@ -220,7 +220,7 @@ function renderTooltipContent(tooltip, entityName, details, isCharacter = false,
     // The setting is stored per-adventure by base monster name so that once the players
     // learn to identify any instance of a monster type, every encounter reveals it.
     if (!isCharacter) {
-        const baseName = (entityName || '').replace(/\s+\d+$/, '').trim() || entityName || '';
+        const baseName = getMonsterBaseName(entityName) || entityName || '';
         const identifiedList = (currentAdventure && Array.isArray(currentAdventure.identifiedMonsters))
             ? currentAdventure.identifiedMonsters
             : [];
@@ -782,14 +782,16 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
             ? [currentAdventure.encounters[encounterIndex]]
             : currentAdventure.encounters;
         
-        // Strip trailing numbers to get base name (e.g., "Cultist 2" -> "Cultist")
-        const baseEntityName = entityName.replace(/\s+\d+$/, '').trim();
+        // Strip trailing numbers and parenthetical labels to get the base
+        // monster name (e.g., "Cultist 2" -> "Cultist",
+        // "Doppelganger (Zelina)" -> "Doppelganger")
+        const baseEntityName = getMonsterBaseName(entityName);
         
         for (const encounter of encountersToSearch) {
             if (encounter && encounter.combatants) {
                 // First check if any combatants with this base name NOW HAVE a URL (from previous hover)
                 const combatantsWithUrl = encounter.combatants.filter(combatant => {
-                    const combatantBaseName = (combatant.name || '').replace(/\s+\d+$/, '').trim();
+                    const combatantBaseName = getMonsterBaseName(combatant.name);
                     return combatantBaseName === baseEntityName && combatant.dndBeyondUrl && combatant.dndBeyondUrl !== '';
                 });
                 
@@ -806,7 +808,7 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
                     const combatantBaseName = combatant.name || combatant.monster;
                     if (!combatantBaseName) return false;
                     
-                    const baseCombatantName = combatantBaseName.replace(/\s+\d+$/, '').trim();
+                    const baseCombatantName = getMonsterBaseName(combatantBaseName);
                     return baseCombatantName === baseEntityName && !combatant.dndBeyondUrl;
                 });
                 
@@ -834,7 +836,7 @@ function showMonsterTooltip(entityName, entityUrl, event, encounterIndex = null)
                         currentAdventure.encounters.forEach(encounter => {
                             if (encounter.combatants) {
                                 encounter.combatants.forEach(c => {
-                                    const cBaseName = (c.name || '').replace(/\s+\d+$/, '').trim();
+                                    const cBaseName = getMonsterBaseName(c.name);
                                     if (cBaseName === baseEntityName && !c.dndBeyondUrl) {
                                         c.dndBeyondUrl = data.url;
                                         if (data.ac) c.ac = data.ac;
