@@ -256,6 +256,44 @@
             color: #9b59b6;
             position: relative;
         }
+
+        .image-tooltip {
+            position: fixed;
+            display: none;
+            z-index: 10000;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 8px;
+            border-radius: 12px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+
+        .image-tooltip.visible {
+            display: block;
+            opacity: 1;
+        }
+
+        .image-tooltip img {
+            display: block;
+            max-width: 500px;
+            max-height: 70vh;
+            width: auto;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .image-tooltip-name {
+            text-align: center;
+            color: #fff;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-top: 8px;
+            padding: 4px 8px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+        }
     </style>
 </head>
 <body>
@@ -276,6 +314,11 @@
             <div style="opacity: 0.85;">📺 Share this spectator view:</div>
             <div id="spectatorUrlDisplay" class="url-display" onclick="copyUrl()" title="Click to copy">Loading...</div>
         </div>
+    </div>
+
+    <div id="imageTooltip" class="image-tooltip" aria-hidden="true">
+        <img id="imageTooltipImg" src="" alt="">
+        <div id="imageTooltipName" class="image-tooltip-name"></div>
     </div>
 
     <script>
@@ -394,15 +437,13 @@
                     `;
                 }
                 
-                // Generate avatar HTML
                 let avatarHtml = '';
                 if (combatant.avatarUrl) {
                     avatarHtml = `<a href="${combatant.avatarUrl}" target="_blank" rel="noopener noreferrer">
-                                      <img src="${combatant.avatarUrl}" alt="${name}" class="combatant-avatar" onerror="this.style.display='none'; this.parentElement.nextSibling.style.display='flex';">
+                                      <img src="${combatant.avatarUrl}" alt="${name}" class="combatant-avatar" data-avatar-url="${combatant.avatarUrl}" data-combatant-name="${name}" onerror="this.style.display='none'; this.parentElement.nextSibling.style.display='flex';">
                                   </a>
                                   <div class="combatant-avatar placeholder" style="display:none;">${name.charAt(0).toUpperCase()}</div>`;
                 } else {
-                    // Placeholder with first letter of name
                     avatarHtml = `<div class="combatant-avatar placeholder">${name.charAt(0).toUpperCase()}</div>`;
                 }
 
@@ -418,6 +459,7 @@
                 `);
             });
 
+            if (window.hideImageTooltip) window.hideImageTooltip();
             document.getElementById('encounterContent').innerHTML = `
                 <div class="initiative-list">
                     ${htmlParts.join('')}
@@ -426,6 +468,7 @@
         }
 
         function showNoEncounter(message) {
+            if (window.hideImageTooltip) window.hideImageTooltip();
             document.getElementById('adventureName').textContent = '';
             document.getElementById('roundIndicator').textContent = '';
             document.getElementById('encounterContent').innerHTML = `
@@ -511,6 +554,83 @@
                 });
             }
         }
+
+        // Image tooltip - shows a large preview when hovering over a combatant avatar
+        (function setupImageTooltip() {
+            const tooltip = document.getElementById('imageTooltip');
+            const tooltipImg = document.getElementById('imageTooltipImg');
+            const tooltipName = document.getElementById('imageTooltipName');
+            const content = document.getElementById('encounterContent');
+            let currentUrl = null;
+
+            function positionTooltip(event) {
+                const offset = 20;
+                const padding = 16;
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+                const rect = tooltip.getBoundingClientRect();
+                const tw = rect.width || 300;
+                const th = rect.height || 300;
+
+                let x = event.clientX + offset;
+                let y = event.clientY + offset;
+
+                if (x + tw + padding > vw) {
+                    x = event.clientX - tw - offset;
+                }
+                if (x < padding) x = padding;
+
+                if (y + th + padding > vh) {
+                    y = event.clientY - th - offset;
+                }
+                if (y < padding) y = padding;
+
+                tooltip.style.left = x + 'px';
+                tooltip.style.top = y + 'px';
+            }
+
+            function hideImageTooltip() {
+                tooltip.classList.remove('visible');
+                currentUrl = null;
+            }
+            window.hideImageTooltip = hideImageTooltip;
+
+            content.addEventListener('mouseover', (event) => {
+                const img = event.target.closest('img.combatant-avatar');
+                if (!img) return;
+                const url = img.dataset.avatarUrl;
+                if (!url) return;
+
+                if (currentUrl !== url) {
+                    currentUrl = url;
+                    tooltipImg.src = url;
+                    tooltipName.textContent = img.dataset.combatantName || '';
+                }
+                tooltip.classList.add('visible');
+                positionTooltip(event);
+            });
+
+            content.addEventListener('mousemove', (event) => {
+                if (!tooltip.classList.contains('visible')) return;
+                const img = event.target.closest('img.combatant-avatar');
+                if (!img) return;
+                positionTooltip(event);
+            });
+
+            content.addEventListener('mouseout', (event) => {
+                const img = event.target.closest('img.combatant-avatar');
+                if (!img) return;
+                const related = event.relatedTarget;
+                if (related && img.contains(related)) return;
+                tooltip.classList.remove('visible');
+                currentUrl = null;
+            });
+
+            tooltipImg.addEventListener('error', () => {
+                tooltip.classList.remove('visible');
+                currentUrl = null;
+            });
+        })();
 
         // Auto-refresh every 3 seconds
         setInterval(() => {
