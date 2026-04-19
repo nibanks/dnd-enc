@@ -21,6 +21,15 @@ done
 
 printf '\n\033[32mStarting D&D Encounter Tracker...\033[0m\n'
 
+# Warn if ufw is active but port 5000 is not allowed (other machines won't be able to connect)
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi '^Status: active'; then
+    if ! ufw status 2>/dev/null | grep -Eq '(^|\s)5000(/tcp)?\s'; then
+        printf '\n\033[33mHeads up: ufw is active but port 5000 is not open.\033[0m\n'
+        printf '  Other machines (e.g. spectator view) will not be able to connect.\n'
+        printf '  To allow LAN access:  \033[36msudo ./scripts/setup-firewall.sh --lan\033[0m\n'
+    fi
+fi
+
 if [ -d ".venv" ] && [ -f ".venv/bin/activate" ]; then
     printf '\033[36mActivating virtual environment...\033[0m\n'
     # shellcheck disable=SC1091
