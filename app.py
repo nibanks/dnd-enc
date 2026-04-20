@@ -1231,8 +1231,10 @@ def get_monster_details(monster_url):
             """
             action = {'name': name}
             
-            # Check for dual-mode (Melee or Ranged) - handle "orRanged" without space
-            if re.search(r'Melee\s*or\s*Ranged\s+Weapon\s+Attack', description, re.I):
+            # Check for dual-mode (Melee or Ranged) - handle both 2014 format
+            # ("Melee or Ranged Weapon Attack") and 2024 format
+            # ("Melee or Ranged Attack Roll"). Also tolerates "orRanged" without space.
+            if re.search(r'Melee\s*or\s*Ranged\s+(?:Weapon\s+Attack|Attack\s+Roll)', description, re.I):
                 # Will be split into two separate actions by caller
                 action['isDualMode'] = True
                 action['_originalDescription'] = description  # Temporarily store for splitting
@@ -2088,23 +2090,28 @@ def get_monster_details(monster_url):
                 # Special action (Multiattack, etc.) - no structured fields
                 special_actions.append({'name': raw_action['name'], 'description': raw_action['description']})
             elif parsed.get('isDualMode'):
-                # Split dual-mode weapon into melee and ranged
+                # Split dual-mode weapon into melee and ranged. Handles both
+                # 2014 format ("Melee or Ranged Weapon Attack: ... reach X ft.
+                # or range Y/Z ft.") and 2024 format ("Melee or Ranged Attack
+                # Roll: +N, reach X ft. or range Y/Z ft.").
                 desc = parsed['_originalDescription']
-                
+
                 # Create melee version
                 melee_name = f"{parsed['name']} (Melee)"
                 melee_desc = re.sub(r'Melee\s*or\s*Ranged\s+Weapon\s+Attack', 'Melee Weapon Attack', desc, flags=re.I)
-                # Remove the "or ranged X ft./Y ft." part for melee (handles both "range" and "ranged")
-                melee_desc = re.sub(r'\s+or\s+ranged?\s+\d+\s*(?:ft\\.?)?\s*/\\s*\d+\s*ft\\.?', '', melee_desc, flags=re.I)
+                melee_desc = re.sub(r'Melee\s*or\s*Ranged\s+Attack\s+Roll', 'Melee Attack Roll', melee_desc, flags=re.I)
+                # Remove the "or range(d) X ft./Y ft." part for melee
+                melee_desc = re.sub(r'\s+or\s+ranged?\s+\d+\s*(?:ft\.?)?\s*/\s*\d+\s*ft\.?', '', melee_desc, flags=re.I)
                 melee_parsed = parse_action(melee_name, melee_desc)
                 if melee_parsed and not melee_parsed.get('isDualMode'):
                     actions.append(melee_parsed)
-                
+
                 # Create ranged version
                 ranged_name = f"{parsed['name']} (Ranged)"
                 ranged_desc = re.sub(r'Melee\s*or\s*Ranged\s+Weapon\s+Attack', 'Ranged Weapon Attack', desc, flags=re.I)
-                # Remove the "reach X ft. or" part for ranged (keep the actual range)
-                ranged_desc = re.sub(r'reach\s+\d+\s*ft\\.\s+or\\s+', '', ranged_desc, flags=re.I)
+                ranged_desc = re.sub(r'Melee\s*or\s*Ranged\s+Attack\s+Roll', 'Ranged Attack Roll', ranged_desc, flags=re.I)
+                # Remove the "reach X ft. or " part for ranged (keep the actual range)
+                ranged_desc = re.sub(r'reach\s+\d+\s*ft\.?\s+or\s+', '', ranged_desc, flags=re.I)
                 ranged_parsed = parse_action(ranged_name, ranged_desc)
                 if ranged_parsed and not ranged_parsed.get('isDualMode'):
                     actions.append(ranged_parsed)
@@ -2902,16 +2909,26 @@ def clean_adventure_for_storage(data):
         return None, None, None, None
     
     # Helper to recursively remove empty strings, empty lists, empty dicts, None values, and zeros
-    # BUT preserve important fields like 'pin' and 'pinVersion'
+    # BUT preserve important fields like 'pin' and 'pinVersion'.
+    # 'hp' is also preserved-when-zero so that a downed combatant (explicit
+    # hp == 0) survives the round-trip. Full-HP combatants already get their
+    # hp stripped earlier in clean_adventure_for_storage when hp == maxHp,
+    # so a missing hp on reload still unambiguously means "at full".
     def strip_empty(obj, parent_key=None):
         # Fields to preserve even if they have "empty" values
         preserve_fields = {'pin', 'pinVersion'}
-        
+        # Fields where a literal 0 is meaningful and must not be stripped.
+        # (None / "" / [] / {} are still treated as empty for these.)
+        preserve_zero_fields = {'hp'}
+
         if isinstance(obj, dict):
             result = {}
             for k, v in obj.items():
                 # Always preserve pin and pinVersion
                 if k in preserve_fields:
+                    result[k] = v
+                # Preserve hp == 0 (it means "downed"), but still drop None/"" etc.
+                elif k in preserve_zero_fields and v in (0, 0.0):
                     result[k] = v
                 # Strip empty values for other fields
                 elif v not in (None, "", [], {}, 0, 0.0):
@@ -3113,11 +3130,12 @@ def restore_adventure_from_storage(data):
                 'descriptionCollapsed': True
             })
 
-            # For unstarted encounters, any combatant without a saved hp should be
-            # treated as "at full health" rather than "dead". Otherwise the stats
-            # page sees maxHp filled from the monster cache while hp defaulted to 0
-            # and mis-reports that damage has already been taken.
-            encounter_unstarted = encounter.get('state') in (None, '', 'unstarted')
+            # Any combatant without a saved hp should be treated as "at full
+            # health" rather than "dead". Full-HP combatants have their hp
+            # stripped on save (since hp == maxHp), and strip_empty now
+            # preserves a literal hp == 0 so downed combatants round-trip
+            # correctly. A missing hp on disk therefore unambiguously means
+            # "was at full health when saved" -- regardless of encounter state.
 
             if 'combatants' in encounter:
                 for combatant in encounter['combatants']:
@@ -3192,12 +3210,10 @@ def restore_adventure_from_storage(data):
                     if 'maxHp' not in combatant:
                         combatant['maxHp'] = 0
 
-                    # If the encounter has never started, treat any combatant
-                    # that has no hp on disk as being at full health. This avoids
-                    # spurious "damage taken" readings when maxHp was auto-filled
-                    # from the monster cache but hp was still sitting at its 0
-                    # default.
-                    if encounter_unstarted and hp_missing_on_disk and combatant.get('maxHp', 0) > 0:
+                    # Restore hp from maxHp when hp is missing on disk. See
+                    # the comment on the save side: missing hp means the
+                    # combatant was at full health when the file was written.
+                    if hp_missing_on_disk and combatant.get('maxHp', 0) > 0:
                         combatant['hp'] = combatant['maxHp']
     
     # Provide top-level defaults
