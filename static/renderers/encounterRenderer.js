@@ -1522,6 +1522,9 @@ export async function fetchAllMissingCRs() {
     if (!currentAdventure || !currentAdventure.encounters) return;
     
     let fetchCount = 0;
+    // Track URLs scheduled in this pass so duplicate combatants don't each
+    // consume a stagger slot; they all await the same in-flight request.
+    const scheduledUrls = new Set();
     
     // Only process encounters in the current chapter
     for (let encounterIndex = 0; encounterIndex < currentAdventure.encounters.length; encounterIndex++) {
@@ -1546,13 +1549,23 @@ export async function fetchAllMissingCRs() {
             if (monsterUrl && monsterUrl.includes('dndbeyond.com') && !crFetchStatus[fetchKey] && window.fetchCRFromCache) {
                 crFetchStatus[fetchKey] = true;
                 window.crFetchStatus = crFetchStatus;
-                
-                // Add small delay between fetches to avoid overwhelming the network
+
+                // Stagger only across unique URLs. Duplicates coalesce on the
+                // client via the shared MONSTER_DETAILS_CACHE / in-flight map,
+                // so they don't need their own network slot.
+                const cache = window.MONSTER_DETAILS_CACHE || {};
+                const alreadyCached = !!cache[monsterUrl];
+                const alreadyScheduled = scheduledUrls.has(monsterUrl);
+                const stagger = (alreadyCached || alreadyScheduled) ? 0 : fetchCount * 50;
+
                 setTimeout(() => {
                     window.fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex);
-                }, fetchCount * 50); // Stagger by 50ms each
-                
-                fetchCount++;
+                }, stagger);
+
+                if (!alreadyCached && !alreadyScheduled) {
+                    scheduledUrls.add(monsterUrl);
+                    fetchCount++;
+                }
             }
         }
     }
@@ -1560,44 +1573,75 @@ export async function fetchAllMissingCRs() {
 
 export async function fetchCRFromCache(monsterUrl, encounterIndex, combatantIndex) {
     const currentAdventure = window.currentAdventure;
-    
+
     try {
-        const encodedUrl = encodeURIComponent(monsterUrl);
-        const response = await fetch(`/api/dndbeyond/monster/${encodedUrl}`);
-        
-        if (!response.ok) return;
-        
-        const data = await response.json();
-        
-        if (data.success && data.details) {
-            const encounter = currentAdventure.encounters[encounterIndex];
-            if (encounter && encounter.combatants[combatantIndex]) {
-                const combatant = encounter.combatants[combatantIndex];
-                let changed = false;
+        const details = await getMonsterDetailsCached(monsterUrl);
+        if (!details) return;
 
-                const newCR = data.details.cr;
-                if (newCR && combatant.cr !== newCR) {
-                    combatant.cr = newCR;
-                    const crElement = document.getElementById(`cr-${encounterIndex}-${combatantIndex}`);
-                    if (crElement) {
-                        crElement.textContent = newCR;
-                    }
-                    changed = true;
+        const encounter = currentAdventure.encounters[encounterIndex];
+        if (encounter && encounter.combatants[combatantIndex]) {
+            const combatant = encounter.combatants[combatantIndex];
+            let changed = false;
+
+            const newCR = details.cr;
+            if (newCR && combatant.cr !== newCR) {
+                combatant.cr = newCR;
+                const crElement = document.getElementById(`cr-${encounterIndex}-${combatantIndex}`);
+                if (crElement) {
+                    crElement.textContent = newCR;
                 }
-
-                // Also opportunistically cache the avatar so images show without a full refresh
-                if (data.details.avatarUrl && !combatant.avatarUrl) {
-                    combatant.avatarUrl = data.details.avatarUrl;
-                    changed = true;
-                    if (window.renderEncounters) window.renderEncounters();
-                }
-
-                if (changed && window.autoSave) window.autoSave();
+                changed = true;
             }
+
+            // Also opportunistically cache the avatar so images show without a full refresh
+            if (details.avatarUrl && !combatant.avatarUrl) {
+                combatant.avatarUrl = details.avatarUrl;
+                changed = true;
+                if (window.renderEncounters) window.renderEncounters();
+            }
+
+            if (changed && window.autoSave) window.autoSave();
         }
     } catch (error) {
         console.log(`Could not fetch CR for ${monsterUrl}:`, error.message);
     }
+}
+
+/**
+ * Resolve monster details via the shared client-side cache, coalescing
+ * concurrent requests for the same URL so the server is hit at most once.
+ * Returns the details object, or null when unavailable.
+ */
+async function getMonsterDetailsCached(monsterUrl) {
+    if (!monsterUrl) return null;
+
+    window.MONSTER_DETAILS_CACHE = window.MONSTER_DETAILS_CACHE || {};
+    window.monsterDetailsInFlight = window.monsterDetailsInFlight || {};
+    const cache = window.MONSTER_DETAILS_CACHE;
+    const inFlight = window.monsterDetailsInFlight;
+
+    if (cache[monsterUrl]) {
+        return cache[monsterUrl];
+    }
+
+    if (!inFlight[monsterUrl]) {
+        const encodedUrl = encodeURIComponent(monsterUrl);
+        inFlight[monsterUrl] = fetch(`/api/dndbeyond/monster/${encodedUrl}`)
+            .then(response => (response.ok ? response.json() : null))
+            .then(data => {
+                if (data && data.success && data.details) {
+                    cache[monsterUrl] = data.details;
+                    return data.details;
+                }
+                return null;
+            })
+            .catch(() => null)
+            .finally(() => {
+                delete inFlight[monsterUrl];
+            });
+    }
+
+    return inFlight[monsterUrl];
 }
 
 export async function updateSpectatorUrl(encounterIndex) {

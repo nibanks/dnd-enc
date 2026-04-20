@@ -203,7 +203,6 @@ def cache_avatar_image(avatar_url):
         if response.status_code == 200:
             with open(cache_path, 'wb') as f:
                 f.write(response.content)
-            print(f"  Cached avatar as: {filename}")
             return f"/cached/images/{filename}"
         else:
             print(f"  Failed to download avatar: HTTP {response.status_code}")
@@ -941,8 +940,6 @@ def get_monster_details(monster_url):
             else:
                 monster_url = f"https://www.dndbeyond.com/{monster_url}"
         
-        print(f"Fetching monster details from: {monster_url}")
-        
         # Generate cache filename from monster ID
         monster_id = monster_url.split('/')[-1]  # e.g., "16835-cultist"
         cache_file = MONSTER_DETAILS_DIR / f"{monster_id}.json"
@@ -981,10 +978,7 @@ def get_monster_details(monster_url):
                     # via the existence check inside cache_avatar_image().
                     if 'avatarUrl' in details and details['avatarUrl']:
                         if not details['avatarUrl'].startswith('/cached/images/'):
-                            avatar_cache_start = time.time()
                             cached_avatar = cache_avatar_image(details['avatarUrl'])
-                            avatar_cache_time = time.time()
-                            print(f"  Avatar caching took: {(avatar_cache_time - avatar_cache_start)*1000:.0f}ms")
                             if cached_avatar and cached_avatar.startswith('/cached/images/'):
                                 details['avatarUrl'] = cached_avatar
                                 # Persist the local path back into the monster cache so
@@ -996,8 +990,6 @@ def get_monster_details(monster_url):
                                 except Exception as persist_err:
                                     print(f"  Warning: failed to persist cached avatar path: {persist_err}")
                     
-                    total_time = time.time() - start_time
-                    print(f"  TOTAL response time: {total_time*1000:.0f}ms")
                     return jsonify({'success': True, 'details': details, 'cached': True})
                 else:
                     print(f"Cache expired for {monster_id} (age: {cache_age/86400:.1f} days)")
@@ -1006,14 +998,10 @@ def get_monster_details(monster_url):
         # Use a session to properly handle cookies and redirects
         session = requests.Session()
         
-        # Try to establish session like a browser: visit homepage first
-        print(f"Establishing session - visiting D&D Beyond homepage first...")
-        
         # Add cookies if we have them
         if DNDBEYOND_COOKIES:
             for cookie_name, cookie_value in DNDBEYOND_COOKIES.items():
                 session.cookies.set(cookie_name, cookie_value, domain='.dndbeyond.com')
-            print(f"  Loaded {len(DNDBEYOND_COOKIES)} cookies from cache")
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0',
@@ -1035,9 +1023,7 @@ def get_monster_details(monster_url):
         
         # Visit homepage first to establish session (like a browser would)
         try:
-            homepage_response = session.get('https://www.dndbeyond.com/', headers=headers, timeout=10)
-            print(f"  Homepage: Status {homepage_response.status_code}")
-            print(f"  Session now has {len(session.cookies)} cookies")
+            session.get('https://www.dndbeyond.com/', headers=headers, timeout=10)
         except Exception as e:
             print(f"  Warning: Homepage visit failed: {e}")
         
