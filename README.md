@@ -51,6 +51,13 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
     - Enemy damage dealt to players
     - "Other" category for environmental/untracked damage
 - 🔄 **Initiative System** - Automatic initiative rolling with DEX modifiers
+- 🎵 **Encounter Music** - Per-chapter and per-encounter background music:
+  - Drop audio files into the local `music/` folder (gitignored)
+  - One track per chapter, optional override per encounter
+  - Encounter starts swap to combat music; ending/resetting reverts to chapter music
+  - Global player in the header (play/pause, mute, volume, rescan)
+  - Volume and mute persist across sessions (localStorage)
+  - Plays fully offline once tracks are downloaded
 - 🐉 **D&D Beyond Integration**:
   - Cookie-based authentication
   - 2,824+ monsters from D&D Beyond
@@ -226,6 +233,59 @@ A web-based Dungeons & Dragons encounter tracker with D&D Beyond integration, fe
 - XP automatically calculated and displayed
 - Monster names link to D&D Beyond pages (hover for tooltip)
 
+## Encounter Music
+
+The app can play background music tied to chapters and encounters. Everything is local: tracks are served from a `music/` folder in the repo so playback works fully offline, and the folder is gitignored so your library doesn't bloat the repo or get committed.
+
+### How playback works
+
+There are two layers of background music:
+
+1. **Chapter music** - One track per chapter. Plays when the chapter is loaded and loops indefinitely.
+2. **Encounter music** - Optional per-encounter override. When an encounter is **started**, playback hard-cuts to the encounter's track. When the encounter **ends** or is **reset**, playback reverts to the chapter track.
+
+If an encounter has no music attached, starting it does nothing to playback - the chapter track keeps going.
+
+A small global player in the adventure header shows the currently playing track and exposes play/pause, mute, volume, and a rescan (↻) button to pick up newly added files without restarting the server.
+
+> **Note on autoplay:** browsers block audio playback until the user interacts with the page. The first time you load an adventure with music, the player will show a small "Click to enable music" prompt - click anywhere (or press any key) and playback starts.
+
+### Setting it up
+
+1. **Create the folder** (it's auto-created the first time the app starts, but you can do it manually):
+
+   ```bash
+   mkdir -p music
+   ```
+
+2. **Drop audio files in**. Supported extensions: `.mp3`, `.ogg`, `.oga`, `.m4a`, `.aac`, `.wav`, `.flac`, `.opus`, `.webm`. `.mp3` and `.ogg` are the safest bets across browsers.
+
+3. **Pick tracks in the UI**:
+   - Open a chapter and choose a track from the **🎵 Chapter Music** dropdown.
+   - Open an encounter in edit mode and choose a track from its music dropdown (leave blank to inherit chapter music).
+   - The ▶ buttons next to each dropdown play an ~8-second preview without changing the actual playback state.
+
+4. **Add new files later** - drop them in `music/` and click the ↻ button on the global player. The dropdowns repopulate from the live folder via `GET /api/music`.
+
+### Where to get music
+
+I deliberately chose not to integrate with commercial streaming services (Spotify/Apple Music/etc.) - their APIs forbid offline use and DRM makes embedding impossible. Instead, here are good free or one-time-purchase sources for fantasy/TTRPG music that allow personal use:
+
+- **[Tabletop Audio](https://tabletopaudio.com/)** - Long, seamlessly looping tracks built specifically for TTRPGs. Free downloads (CC license; verify each track's terms) and a Patreon for higher-quality WAVs. Tens of minutes per track or designed to loop without an obvious seam - exactly what we want.
+- **[Michael Ghelfi Studios](https://www.youtube.com/c/MichaelGhelfi)** / **[Adrian von Ziegler](https://www.youtube.com/user/adrianvonziegler)** / **[Derek & Brandon Fiechter](https://www.youtube.com/c/DerekFiechter)** on YouTube - hour-long ambient/fantasy mixes. Some have official Bandcamp/Patreon downloads; check each artist's terms before downloading from YouTube.
+- **[Kevin MacLeod (incompetech.com)](https://incompetech.com/music/royalty-free/music.html)** - royalty-free under CC-BY 4.0; great for short combat tracks that you'll loop.
+- **[Free Music Archive](https://freemusicarchive.org/)** and **[OpenGameArt.org](https://opengameart.org/art-search-advanced?keys=&field_art_type_tid%5B%5D=12)** - searchable libraries with explicit licensing per track.
+- **[Battlebards](https://battlebards.com/)** and **[Syrinscape](https://syrinscape.com/)** - paid TTRPG-focused libraries; you generally need to export/download the tracks for offline use here.
+
+A few practical tips:
+
+- **Prefer long, looping tracks** (10+ minutes, or designed to loop seamlessly) for chapter music - you'll be on a chapter for an entire session.
+- **Combat tracks can be shorter** (3-5 min) and will loop. Look for ones whose start/end mesh well, or fade them yourself in Audacity.
+- **Normalize loudness** if your sources vary wildly. The player has a single volume slider, so having tracks at consistent levels keeps you out of the mixer mid-session.
+- **Convert obscure formats to .mp3 or .ogg** with `ffmpeg -i input.flac -b:a 192k output.mp3` if a particular file won't play in your browser.
+
+Always double-check the license on individual tracks before redistributing - the folder is gitignored precisely because most music has terms that don't allow uploading copies elsewhere.
+
 ## File Format
 
 Adventures are stored in the `adventures/` directory as JSON files. The format is optimized for storage efficiency while remaining human-readable.
@@ -246,6 +306,9 @@ Adventures are stored in the `adventures/` directory as JSON files. The format i
   "chapterNotes": {
     "Chapter 1": "Notes about this chapter..."
   },
+  "chapterMusic": {
+    "Chapter 1": "forest-ambience.mp3"
+  },
   "players": [
     {
       "playerName": "John",
@@ -264,6 +327,7 @@ Adventures are stored in the `adventures/` directory as JSON files. The format i
       "chapter": "Chapter 1",
       "state": "complete",
       "currentRound": 3,
+      "music": "boss-battle.mp3",
       "combatants": [
         {
           "init": 15,
@@ -341,6 +405,8 @@ dnd-enc/
 │   └── chart.umd.min.js       # Chart.js library (local)
 ├── adventures/                 # JSON data files (auto-created)
 │   └── Sample Adventure.json  # Example adventure (included)
+├── music/                      # User-supplied music library (auto-created, gitignored)
+│   └── *.mp3 / *.ogg / ...    # Drop tracks here for chapter/encounter music
 └── .cache/                     # Cache directory (auto-created, gitignored)
     ├── cookies.json           # D&D Beyond authentication
     ├── monsters.json          # Monster library index
@@ -392,8 +458,8 @@ python scripts/run_tests.py
 ```
 
 **Current Status:**
-- ✅ **Backend**: 34/34 core tests passing (6 D&D Beyond API tests skip without cookies)
-- ✅ **Frontend**: 52/52 tests passing
+- ✅ **Backend**: 79 tests passing (6 D&D Beyond API tests skip without cookies)
+- ✅ **Frontend**: 516 tests passing across 17 suites
 
 ### Test Suites
 

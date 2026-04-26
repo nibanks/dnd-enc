@@ -21,7 +21,12 @@
  * @returns {Object} Event handler functions
  */
 export function createEventHandlers(deps) {
-    const { state, api, dom, modalManager, helpers, renderers } = deps;
+    const { state, api, dom, modalManager, helpers, renderers, musicService } = deps;
+
+    // Optional music service - swallow no-ops gracefully so the rest of
+    // the event handlers still work in test environments that don't pass
+    // one in.
+    function music() { return musicService || null; }
 
     // ==================== ADVENTURE MANAGEMENT ====================
 
@@ -66,7 +71,16 @@ export function createEventHandlers(deps) {
         // Clear URL parameters
         helpers.setURLParameter('adventure', null);
         helpers.setURLParameter('chapter', null);
-        
+
+        // Stop music and hide the global player when we leave the adventure.
+        if (music()) {
+            music().stopAll();
+        }
+        const playerEl = dom.getElementById && dom.getElementById('musicPlayer');
+        if (playerEl) {
+            playerEl.style.display = 'none';
+        }
+
         // Show selection view
         showSelectionView();
     }
@@ -159,6 +173,31 @@ export function createEventHandlers(deps) {
                 renderers.renderEncounters();
             }
 
+            // Initialize music for the loaded adventure: refresh the catalog,
+            // populate chapter selector, and start playing the chapter's track.
+            if (music()) {
+                music().refreshAvailable().then(() => {
+                    if (renderers.updateChapterMusicDisplay) {
+                        renderers.updateChapterMusicDisplay();
+                    }
+                    // Re-render encounters so their music selectors get the
+                    // freshly-loaded catalog. Cheap; only happens once per
+                    // adventure load.
+                    if (renderers.renderEncounters) {
+                        renderers.renderEncounters();
+                    }
+                });
+                const chapterTrack = (adventure.chapterMusic && adventure.chapterMusic[currentChapter]) || null;
+                music().clearEncounterTrack();
+                music().setChapterTrack(chapterTrack);
+            }
+
+            // Show the global music player now that we're inside an adventure.
+            const playerEl = dom.getElementById && dom.getElementById('musicPlayer');
+            if (playerEl) {
+                playerEl.style.display = 'flex';
+            }
+
             // Restore scroll position
             const scrollPos = sessionStorage.getItem('scrollPosition');
             if (scrollPos) {
@@ -222,6 +261,15 @@ export function createEventHandlers(deps) {
             helpers.setURLParameter('adventure', null);
             helpers.setURLParameter('chapter', null);
 
+            // Stop music and hide the global player.
+            if (music()) {
+                music().stopAll();
+            }
+            const playerEl = dom.getElementById && dom.getElementById('musicPlayer');
+            if (playerEl) {
+                playerEl.style.display = 'none';
+            }
+
             helpers.showToast('Adventure deleted', 'success');
         } catch (error) {
             console.error('Error deleting adventure:', error);
@@ -252,11 +300,60 @@ export function createEventHandlers(deps) {
         if (renderers.updateChapterNotesDisplay) {
             renderers.updateChapterNotesDisplay();
         }
-        
+
+        // Update chapter music selector and start the chapter's track. We
+        // clear any encounter override first so switching chapters mid-combat
+        // (which would be unusual but possible) reverts to the new chapter.
+        if (renderers.updateChapterMusicDisplay) {
+            renderers.updateChapterMusicDisplay();
+        }
+        if (music()) {
+            const adv = state.get('currentAdventure');
+            const track = (adv && adv.chapterMusic && adv.chapterMusic[chapter]) || null;
+            music().clearEncounterTrack();
+            music().setChapterTrack(track);
+        }
+
         // Fetch missing CRs for the new chapter's visible encounters
         if (window.initialLoadComplete && window.fetchAllMissingCRs) {
             setTimeout(() => window.fetchAllMissingCRs(), 100);
         }
+    }
+
+    function handleChapterMusicChange(event) {
+        const adventure = state.get('currentAdventure');
+        const currentChapter = state.get('currentChapter');
+        if (!adventure || !currentChapter) return;
+
+        const filename = event.target.value || '';
+        if (!adventure.chapterMusic) {
+            adventure.chapterMusic = {};
+        }
+        if (filename) {
+            adventure.chapterMusic[currentChapter] = filename;
+        } else {
+            delete adventure.chapterMusic[currentChapter];
+        }
+        state.updateAdventure({ chapterMusic: adventure.chapterMusic });
+
+        // If no encounter override is currently active, switch the playing
+        // background track immediately. The music service handles the case
+        // where encounterTrack is set: it'll just remember the new chapter
+        // track for when the encounter ends.
+        if (music()) {
+            music().setChapterTrack(filename || null);
+        }
+
+        if (renderers.autoSave) {
+            renderers.autoSave();
+        }
+    }
+
+    function handleChapterMusicPreview() {
+        const select = dom.getElementById('chapterMusicSelect');
+        const filename = select ? select.value : '';
+        if (!filename || !music()) return;
+        music().preview(filename);
     }
 
     function handleChapterNotesChange(event) {
@@ -1427,6 +1524,8 @@ export function createEventHandlers(deps) {
         // Chapter
         handleChapterChange,
         handleChapterNotesChange,
+        handleChapterMusicChange,
+        handleChapterMusicPreview,
         addChapter,
         deleteChapter,
 

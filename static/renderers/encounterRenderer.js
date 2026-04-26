@@ -6,6 +6,7 @@
 
 import { CR_TO_XP, DND_CONDITIONS, CONDITION_ICONS } from '../utils/constants.js';
 import { getMonsterBaseName } from '../utils/helpers.js';
+import { musicService } from '../services/musicService.js';
 
 // ==================== UTILITY FUNCTIONS ====================
 
@@ -552,7 +553,33 @@ export function createEncounterCard(encounter, encounterIndex) {
         </div>
     `;
     card.appendChild(header);
-    
+
+    // Music selector - shown only when the encounter is being edited (either
+    // in unstarted state or in explicit edit mode) and not minimized.
+    const showMusicEditor = !encounter.minimized && (showControls || encounterEditMode[encounterIndex]);
+    if (showMusicEditor) {
+        const musicStatus = (musicService && musicService.getStatus()) || { available: [] };
+        const available = musicStatus.available || [];
+        const currentMusic = encounter.music || '';
+        const escapeAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const optionsHtml = ['<option value="">— none —</option>']
+            .concat(available.map(name => {
+                const sel = name === currentMusic ? ' selected' : '';
+                return `<option value="${escapeAttr(name)}"${sel}>${escapeAttr(name)}</option>`;
+            }))
+            .join('');
+        const musicRow = document.createElement('div');
+        musicRow.className = 'encounter-music-row';
+        musicRow.innerHTML = `
+            <label>🎵 Encounter music:</label>
+            <select onchange="updateEncounterMusic(${encounterIndex}, this.value)" title="Track plays when this encounter starts; reverts to chapter music when it ends">
+                ${optionsHtml}
+            </select>
+            <button class="btn-small" style="background: #3498db;" onclick="previewEncounterMusic(${encounterIndex})" title="Preview selected track for ~8 seconds">▶</button>
+        `;
+        card.appendChild(musicRow);
+    }
+
     // Description section (only when encounter is expanded)
     if (!encounter.minimized) {
         if (encounter.descriptionCollapsed === undefined) {
@@ -950,7 +977,12 @@ export function resetEncounter(encounterIndex) {
     encounter.activeCombatant = null;
     
     delete encounterEditMode[encounterIndex];
-    
+
+    // Revert to chapter music since combat is no longer active.
+    if (musicService) {
+        musicService.clearEncounterTrack();
+    }
+
     if (window.renderEncounters) window.renderEncounters();
     if (window.autoSave) window.autoSave();
 }
@@ -1403,6 +1435,32 @@ export function updateTreasure(encounterIndex, value) {
     if (window.autoSave) window.autoSave();
 }
 
+export function updateEncounterMusic(encounterIndex, filename) {
+    const currentAdventure = window.currentAdventure;
+    const encounter = currentAdventure.encounters[encounterIndex];
+    if (filename) {
+        encounter.music = filename;
+    } else {
+        delete encounter.music;
+    }
+    // If this encounter is currently active, switch the override track now.
+    if (musicService && encounter.state === 'started') {
+        if (filename) {
+            musicService.setEncounterTrack(filename);
+        } else {
+            musicService.clearEncounterTrack();
+        }
+    }
+    if (window.autoSave) window.autoSave();
+}
+
+export function previewEncounterMusic(encounterIndex) {
+    const currentAdventure = window.currentAdventure;
+    const encounter = currentAdventure.encounters[encounterIndex];
+    if (!musicService || !encounter || !encounter.music) return;
+    musicService.preview(encounter.music);
+}
+
 // ==================== ENCOUNTER STATE ====================
 
 export function startEncounter(encounterIndex) {
@@ -1445,7 +1503,14 @@ export function startEncounter(encounterIndex) {
     if (encounter.combatants.length > 0) {
         encounter.activeCombatant = getCombatantName(encounter.combatants[0]);
     }
-    
+
+    // Switch to the encounter's music override if it has one. If not, the
+    // chapter track keeps playing - intentional, so a chapter-wide ambient
+    // can carry into combat for encounters you didn't pick a track for.
+    if (musicService && encounter.music) {
+        musicService.setEncounterTrack(encounter.music);
+    }
+
     if (window.renderEncounters) window.renderEncounters();
     if (window.autoSave) window.autoSave();
     
@@ -1460,7 +1525,12 @@ export function endEncounter(encounterIndex) {
     encounter.state = 'complete';
     encounter.currentTurn = 0;
     encounter.activeCombatant = null;
-    
+
+    // Revert to chapter background music when combat ends.
+    if (musicService) {
+        musicService.clearEncounterTrack();
+    }
+
     if (window.renderEncounters) window.renderEncounters();
     if (window.autoSave) window.autoSave();
 }

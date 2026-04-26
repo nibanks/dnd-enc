@@ -12,6 +12,7 @@ import { createModalManager } from './components/modalManager.js';
 import { createEventHandlers } from './core/eventHandlers.js';
 import { createAdventureRenderer } from './renderers/adventureRenderer.js';
 import { createAdventureService } from './services/adventureService.js';
+import { musicService } from './services/musicService.js';
 import * as monsterListRenderer from './renderers/monsterListRenderer.js';
 import * as playerRenderer from './renderers/playerRenderer.js';
 import * as encounterRenderer from './renderers/encounterRenderer.js';
@@ -114,13 +115,33 @@ export function initializeApp(config = {}) {
         otherRenderers: legacyRenderers,
     });
 
+    // Renders the chapter music dropdown to match the current chapter's
+    // selected track. Defined here so it can close over `dom`.
+    function updateChapterMusicDisplay() {
+        const select = dom.getElementById('chapterMusicSelect');
+        if (!select) return;
+        const adventure = state.get('currentAdventure');
+        const currentChapter = state.get('currentChapter');
+        const status = musicService.getStatus();
+        const selected = (adventure && adventure.chapterMusic && adventure.chapterMusic[currentChapter]) || '';
+
+        const escapeAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const options = ['<option value="">— none —</option>']
+            .concat((status.available || []).map(name => {
+                const sel = name === selected ? ' selected' : '';
+                return `<option value="${escapeAttr(name)}"${sel}>${escapeAttr(name)}</option>`;
+            }));
+        select.innerHTML = options.join('');
+    }
+
     // Combined renderers object for event handlers
     const renderers = {
         // Modular renderers
         renderAdventure: adventureRenderer.renderAdventure,
         renderChapterSelector: adventureRenderer.renderChapterSelector,
         updateChapterNotesDisplay: adventureRenderer.updateChapterNotesDisplay,
-        
+        updateChapterMusicDisplay,
+
         // Legacy bridges
         renderPlayers: legacyRenderers.renderPlayers,
         renderEncounters: legacyRenderers.renderEncounters,
@@ -139,6 +160,7 @@ export function initializeApp(config = {}) {
         modalManager,
         helpers,
         renderers,
+        musicService,
     });
 
     // ==================== EVENT LISTENER SETUP ====================
@@ -173,6 +195,19 @@ export function initializeApp(config = {}) {
         if (chapterNotes) {
             dom.addEventListener(chapterNotes, 'input', handlers.handleChapterNotesChange);
         }
+
+        // Chapter music
+        const chapterMusicSelect = dom.getElementById('chapterMusicSelect');
+        if (chapterMusicSelect) {
+            dom.addEventListener(chapterMusicSelect, 'change', handlers.handleChapterMusicChange);
+        }
+        const chapterMusicPreviewBtn = dom.getElementById('chapterMusicPreviewBtn');
+        if (chapterMusicPreviewBtn) {
+            dom.addEventListener(chapterMusicPreviewBtn, 'click', handlers.handleChapterMusicPreview);
+        }
+
+        // Global music player widget
+        setupMusicPlayerUI();
 
         // Player management
         const addPlayerBtn = dom.getElementById('addPlayerBtn');
@@ -218,6 +253,172 @@ export function initializeApp(config = {}) {
         dom.addEventListener(win, 'beforeunload', () => {
             sessionStorage.setItem('scrollPosition', win.scrollY.toString());
         });
+    }
+
+    /**
+     * Wire up the global music player widget at the top of an adventure.
+     * Subscribes to musicService updates so the displayed track / play state
+     * / unlock prompt always reflects reality.
+     */
+    function setupMusicPlayerUI() {
+        const playerEl = dom.getElementById('musicPlayer');
+        const trackEl = dom.getElementById('musicPlayerTrack');
+        const timeEl = dom.getElementById('musicPlayerTime');
+        const playPauseEl = dom.getElementById('musicPlayerPlayPause');
+        const muteEl = dom.getElementById('musicPlayerMute');
+        const volumeEl = dom.getElementById('musicPlayerVolume');
+        const refreshEl = dom.getElementById('musicPlayerRefresh');
+        const unlockEl = dom.getElementById('musicPlayerUnlock');
+        const progressEl = dom.getElementById('musicPlayerProgress');
+        const progressFillEl = dom.getElementById('musicPlayerProgressFill');
+        const sentinelEl = dom.getElementById('musicPlayerSentinel');
+        if (!playerEl || !trackEl) return;
+
+        // Format seconds as M:SS (or H:MM:SS for very long tracks).
+        function fmtTime(seconds) {
+            if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+            const total = Math.floor(seconds);
+            const s = total % 60;
+            const m = Math.floor(total / 60) % 60;
+            const h = Math.floor(total / 3600);
+            const ss = String(s).padStart(2, '0');
+            if (h > 0) {
+                return `${h}:${String(m).padStart(2, '0')}:${ss}`;
+            }
+            return `${m}:${ss}`;
+        }
+
+        function render(status) {
+            const s = status || musicService.getStatus();
+            if (s.currentTrack) {
+                trackEl.textContent = s.currentTrack;
+                trackEl.classList.add('playing');
+            } else {
+                trackEl.textContent = '— silent —';
+                trackEl.classList.remove('playing');
+            }
+            if (timeEl) {
+                if (s.currentTrack && s.duration > 0) {
+                    timeEl.textContent = `${fmtTime(s.currentTime)} / ${fmtTime(s.duration)}`;
+                } else if (s.currentTrack) {
+                    // Track loaded but duration not known yet (e.g. metadata still loading).
+                    timeEl.textContent = fmtTime(s.currentTime);
+                } else {
+                    timeEl.textContent = '';
+                }
+            }
+            if (progressFillEl) {
+                const pct = (s.currentTrack && s.duration > 0)
+                    ? Math.min(100, (s.currentTime / s.duration) * 100)
+                    : 0;
+                progressFillEl.style.width = pct + '%';
+            }
+            if (playPauseEl) {
+                playPauseEl.textContent = s.isPlaying ? '⏸' : '▶';
+                playPauseEl.title = s.isPlaying ? 'Pause' : 'Play';
+            }
+            if (muteEl) {
+                muteEl.textContent = s.muted ? '🔇' : '🔊';
+                muteEl.title = s.muted ? 'Unmute' : 'Mute';
+            }
+            if (volumeEl) {
+                // Only update if the slider isn't currently focused, to avoid
+                // fighting the user mid-drag.
+                if (doc.activeElement !== volumeEl) {
+                    volumeEl.value = String(s.volume);
+                }
+            }
+            if (unlockEl) {
+                unlockEl.style.display = s.needsUnlock ? '' : 'none';
+            }
+            // Pulse the floating icon only while we're actually playing.
+            playerEl.classList.toggle('is-playing', !!s.isPlaying);
+            // When collapsed in floating mode, hovering the pill should
+            // surface the track name as a native browser tooltip - the
+            // expanded controls aren't visible until you hover.
+            const timeSuffix = (s.currentTrack && s.duration > 0)
+                ? ` (${fmtTime(s.currentTime)} / ${fmtTime(s.duration)})`
+                : '';
+            playerEl.title = s.currentTrack
+                ? `🎵 ${s.currentTrack}${s.muted ? ' (muted)' : ''}${timeSuffix}`
+                : '🎵 No music';
+        }
+
+        // Initial paint with persisted volume
+        if (volumeEl) volumeEl.value = String(musicService.getStatus().volume);
+        render();
+
+        musicService.subscribe(render);
+
+        if (playPauseEl) {
+            dom.addEventListener(playPauseEl, 'click', () => {
+                const s = musicService.getStatus();
+                if (s.isPlaying) {
+                    musicService.pause();
+                } else {
+                    musicService.resume();
+                }
+            });
+        }
+        if (muteEl) {
+            dom.addEventListener(muteEl, 'click', () => {
+                const s = musicService.getStatus();
+                musicService.setMuted(!s.muted);
+            });
+        }
+        if (volumeEl) {
+            dom.addEventListener(volumeEl, 'input', (e) => {
+                musicService.setVolume(parseFloat(e.target.value));
+            });
+        }
+        if (refreshEl) {
+            dom.addEventListener(refreshEl, 'click', async () => {
+                await musicService.refreshAvailable();
+                if (renderers.updateChapterMusicDisplay) {
+                    renderers.updateChapterMusicDisplay();
+                }
+                if (win.renderEncounters) win.renderEncounters();
+                helpers.showToast('Music library refreshed', 'success', 1500);
+            });
+        }
+        if (unlockEl) {
+            dom.addEventListener(unlockEl, 'click', () => {
+                musicService.resume();
+            });
+        }
+
+        // Click-to-scrub on the progress bar. We compute the click position
+        // as a fraction of the bar's width and seek to that point in the
+        // current track's duration.
+        if (progressEl) {
+            dom.addEventListener(progressEl, 'click', (e) => {
+                const s = musicService.getStatus();
+                if (!s.currentTrack || !(s.duration > 0)) return;
+                const rect = progressEl.getBoundingClientRect();
+                if (rect.width <= 0) return;
+                const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                musicService.seek(fraction * s.duration);
+            });
+        }
+
+        // Once the user scrolls past the player's natural position, pin it
+        // to the top-right as a compact pill that expands on hover. We
+        // observe a 1px sentinel that lives in the player's normal spot in
+        // the document flow - that way switching the player itself to
+        // position:fixed doesn't confuse the observer.
+        if (sentinelEl && typeof IntersectionObserver !== 'undefined') {
+            const observer = new IntersectionObserver((entries) => {
+                const entry = entries[0];
+                if (!entry) return;
+                // boundingClientRect.top < 0 means the sentinel has scrolled
+                // above the viewport, i.e. the user is below the player's
+                // natural location and we should pin.
+                const scrolledPast = !entry.isIntersecting
+                    && entry.boundingClientRect.top < 0;
+                playerEl.classList.toggle('floating', scrolledPast);
+            }, { threshold: 0 });
+            observer.observe(sentinelEl);
+        }
     }
 
     /**
@@ -362,6 +563,11 @@ export function initializeApp(config = {}) {
     win.endEncounter = encounterRenderer.endEncounter;
     win.nextTurn = encounterRenderer.nextTurn;
     win.previousTurn = encounterRenderer.previousTurn;
+    win.updateEncounterMusic = encounterRenderer.updateEncounterMusic;
+    win.previewEncounterMusic = encounterRenderer.previewEncounterMusic;
+
+    // Expose the music service for inline handlers and debugging.
+    win.musicService = musicService;
     win.fetchCRFromCache = encounterRenderer.fetchCRFromCache;
     win.fetchAllMissingCRs = encounterRenderer.fetchAllMissingCRs;
     win.updateSpectatorUrl = encounterRenderer.updateSpectatorUrl;

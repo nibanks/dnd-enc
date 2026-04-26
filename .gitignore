@@ -28,6 +28,9 @@ Thumbs.db
 adventures/*.json
 !adventures/Sample Adventure.json
 
+# Encounter music library (user-supplied, often large/licensed)
+music/
+
 # Test environment and coverage
 .env.test
 htmlcov/

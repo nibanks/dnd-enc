@@ -752,3 +752,250 @@ input[type="number"]:focus {
 .damage-bludgeoning { color: #deb887; font-weight: bold; }
 .damage-piercing { color: #708090; font-weight: bold; }
 .damage-slashing { color: #b22222; font-weight: bold; }
+
+/* ==================== Music Player ==================== */
+
+.music-player {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    margin-bottom: 20px;
+    background: linear-gradient(90deg, rgba(102, 126, 234, 0.12), rgba(118, 75, 162, 0.12));
+    border: 1px solid rgba(102, 126, 234, 0.4);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    font-size: 14px;
+}
+
+.music-player-time {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #6b7280;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    min-width: 80px;
+    text-align: right;
+}
+
+/* Progress bar / scrubber pinned to the bottom edge of the player. */
+.music-player-progress {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 2px;
+    height: 4px;
+    background: rgba(102, 126, 234, 0.2);
+    border-radius: 2px;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.music-player-progress-fill {
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    border-radius: 2px;
+    transition: width 0.1s linear;
+}
+
+.music-player-progress:hover {
+    background: rgba(102, 126, 234, 0.3);
+}
+
+.music-player-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.music-player-track {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #2c3e50;
+    font-style: italic;
+}
+
+.music-player-track.playing {
+    font-style: normal;
+    font-weight: 500;
+    color: #1a5490;
+}
+
+.music-player-btn {
+    flex-shrink: 0;
+    background: #667eea;
+    padding: 4px 10px;
+    font-size: 13px;
+}
+
+.music-player-volume {
+    flex: 0 0 110px;
+    cursor: pointer;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+.music-player-unlock {
+    flex-shrink: 0;
+    color: #b85c00;
+    background: #fff3cd;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+}
+
+.music-player-unlock:hover {
+    background: #ffe69b;
+}
+
+/* ────────── Floating (scrolled past) variant ──────────
+   When the player scrolls out of view, a JS IntersectionObserver
+   adds .floating, which pins it to the top-right as a compact pill.
+   By default the pill shows just the music icon; on hover (or focus)
+   it expands to reveal the track name and full controls. */
+.music-player.floating {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    margin: 0;
+    z-index: 1000;
+    max-width: calc(100vw - 24px);
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    padding: 6px 12px;
+    gap: 0;
+    transition: gap 0.25s ease, padding 0.25s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+.music-player.floating:hover,
+.music-player.floating:focus-within {
+    gap: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+}
+
+/* Pulse the icon while audio is actively playing - subtle hint that
+   something is happening even when the controls are collapsed. */
+.music-player.floating.is-playing .music-player-icon {
+    animation: musicPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes musicPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.18); }
+}
+
+/* Collapse every child except the icon to zero width. We animate
+   max-width / opacity / padding so the pill grows smoothly when
+   the user hovers over it. */
+.music-player.floating .music-player-track,
+.music-player.floating .music-player-time,
+.music-player.floating .music-player-btn,
+.music-player.floating .music-player-volume,
+.music-player.floating .music-player-unlock {
+    max-width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    margin: 0;
+    opacity: 0;
+    overflow: hidden;
+    border-width: 0;
+    pointer-events: none;
+    min-width: 0;
+    transition:
+        max-width 0.25s ease,
+        opacity 0.18s ease 0.05s,
+        padding 0.25s ease;
+}
+
+.music-player.floating:hover .music-player-track,
+.music-player.floating:focus-within .music-player-track {
+    max-width: 240px;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.music-player.floating:hover .music-player-time,
+.music-player.floating:focus-within .music-player-time {
+    max-width: 100px;
+    min-width: 80px;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Progress bar stays visible on the floating pill so the user can see
+   playback progress at a glance even when the controls are collapsed. */
+.music-player.floating .music-player-progress {
+    left: 4px;
+    right: 4px;
+    bottom: 2px;
+    height: 3px;
+}
+
+.music-player.floating:hover .music-player-btn,
+.music-player.floating:focus-within .music-player-btn {
+    max-width: 50px;
+    padding: 4px 10px;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.music-player.floating:hover .music-player-volume,
+.music-player.floating:focus-within .music-player-volume {
+    max-width: 110px;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Unlock prompt is only rendered when needed (display:none toggled by
+   JS); when shown, give it room to expand on hover. */
+.music-player.floating:hover .music-player-unlock,
+.music-player.floating:focus-within .music-player-unlock {
+    max-width: 220px;
+    padding: 4px 10px;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Sentinel is invisible but takes up the full width / 1px height of the
+   spot the player normally occupies, so the IntersectionObserver fires
+   exactly when the player would have left the viewport. */
+#musicPlayerSentinel {
+    height: 1px;
+    width: 100%;
+    margin: 0;
+    pointer-events: none;
+}
+
+/* Encounter music selector (in edit mode) */
+.encounter-music-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    background: rgba(102, 126, 234, 0.06);
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.encounter-music-row label {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.encounter-music-row select {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 13px;
+}

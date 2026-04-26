@@ -22,8 +22,10 @@ def app():
     test_dir = tempfile.mkdtemp()
     adventures_dir = Path(test_dir) / "adventures"
     cache_dir = Path(test_dir) / ".cache"
+    music_dir = Path(test_dir) / "music"
     adventures_dir.mkdir(parents=True)
     cache_dir.mkdir(parents=True)
+    music_dir.mkdir(parents=True)
     (cache_dir / "monsters").mkdir(parents=True)
     (cache_dir / "characters").mkdir(parents=True)
     (cache_dir / "images").mkdir(parents=True)
@@ -35,6 +37,7 @@ def app():
     original_monsters_cache = flask_app.MONSTERS_CACHE
     original_monster_details_dir = flask_app.MONSTER_DETAILS_DIR
     original_images_cache_dir = flask_app.IMAGES_CACHE_DIR
+    original_music_dir = flask_app.MUSIC_DIR
     original_cookies = flask_app.DNDBEYOND_COOKIES
     
     # Override paths to use test directory
@@ -44,6 +47,7 @@ def app():
     flask_app.MONSTERS_CACHE = cache_dir / "monsters.json"
     flask_app.MONSTER_DETAILS_DIR = cache_dir / "monsters"
     flask_app.IMAGES_CACHE_DIR = cache_dir / "images"
+    flask_app.MUSIC_DIR = music_dir
     # Reset in-memory cookie state so tests don't leak auth across each other
     flask_app.DNDBEYOND_COOKIES = {}
     
@@ -64,6 +68,7 @@ def app():
     flask_app.MONSTERS_CACHE = original_monsters_cache
     flask_app.MONSTER_DETAILS_DIR = original_monster_details_dir
     flask_app.IMAGES_CACHE_DIR = original_images_cache_dir
+    flask_app.MUSIC_DIR = original_music_dir
     flask_app.DNDBEYOND_COOKIES = original_cookies
     
     # Cleanup test directory after tests

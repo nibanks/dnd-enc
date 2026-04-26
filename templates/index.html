@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D&D Encounter Tracker</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎲</text></svg>">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260401180457">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20260426141500">
     <script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>
 </head>
 <body>
@@ -40,6 +40,25 @@
                 </div>
             </div>
         </header>
+
+        <!-- Global music player (visible only inside an adventure).
+             The sentinel sits at the player's natural position so an
+             IntersectionObserver can detect when the user has scrolled
+             past it and collapse the player into a top-right tooltip. -->
+        <div id="musicPlayerSentinel" aria-hidden="true"></div>
+        <div id="musicPlayer" class="music-player" style="display: none;">
+            <span class="music-player-icon" title="Encounter music">🎵</span>
+            <span id="musicPlayerTrack" class="music-player-track" title="Currently playing">— silent —</span>
+            <span id="musicPlayerTime" class="music-player-time" title="Elapsed / total"></span>
+            <button id="musicPlayerPlayPause" class="btn-small music-player-btn" title="Play/Pause">▶</button>
+            <button id="musicPlayerMute" class="btn-small music-player-btn" title="Mute">🔊</button>
+            <input id="musicPlayerVolume" type="range" min="0" max="1" step="0.01" value="0.6" class="music-player-volume" title="Volume">
+            <button id="musicPlayerRefresh" class="btn-small music-player-btn" title="Rescan music/ folder">↻</button>
+            <span id="musicPlayerUnlock" class="music-player-unlock" style="display: none;" title="Click to allow music playback">Click to enable music</span>
+            <div id="musicPlayerProgress" class="music-player-progress" title="Click to scrub">
+                <div id="musicPlayerProgressFill" class="music-player-progress-fill"></div>
+            </div>
+        </div>
 
         <div id="adventureContent" style="display: none;">
             <!-- Players Section -->
@@ -95,6 +114,13 @@
                     <select id="chapterSelect" style="padding: 8px 12px; width: 100%;">
                         <option value="">-- Select Chapter --</option>
                     </select>
+                </div>
+                <div style="margin-top: 15px; display: flex; align-items: center; gap: 10px;">
+                    <label for="chapterMusicSelect" style="font-weight: 500; white-space: nowrap;">🎵 Chapter Music:</label>
+                    <select id="chapterMusicSelect" style="flex: 1; padding: 8px 12px;">
+                        <option value="">— none —</option>
+                    </select>
+                    <button id="chapterMusicPreviewBtn" class="btn-small" style="background: #3498db;" title="Preview selected track for ~8 seconds">▶</button>
                 </div>
                 <div style="margin-top: 15px;">
                     <label style="font-weight: 500; display: block; margin-bottom: 5px;">Notes:</label>
@@ -296,6 +322,6 @@
     </div>
 
     <!-- Load modular application -->
-    <script type="module" src="{{ url_for('static', filename='app.js') }}?v=20260402100658"></script>
+    <script type="module" src="{{ url_for('static', filename='app.js') }}?v=20260426141500"></script>
 </body>
 </html>

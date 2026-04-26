@@ -21,6 +21,18 @@ log.setLevel(logging.ERROR)
 DATA_DIR = Path("adventures")
 DATA_DIR.mkdir(exist_ok=True)
 
+# Local music library used for encounter background music. Files dropped in
+# here are served by the /music/<filename> route and listed via /api/music.
+# The directory is gitignored because tracks are large and licensed; users
+# bring their own (see README "Encounter Music").
+MUSIC_DIR = Path("music")
+MUSIC_DIR.mkdir(exist_ok=True)
+
+# Audio file extensions exposed to the UI. Browsers vary; .mp3/.ogg cover
+# everything mainstream, but accept the common alternatives too so users
+# don't have to transcode.
+MUSIC_EXTENSIONS = {'.mp3', '.ogg', '.oga', '.m4a', '.aac', '.wav', '.flac', '.opus', '.webm'}
+
 CACHE_DIR = Path(".cache")
 CACHE_DIR.mkdir(exist_ok=True)
 MONSTERS_CACHE = CACHE_DIR / "monsters.json"
@@ -217,6 +229,36 @@ def serve_cached_image(filename):
     """Serve cached avatar images"""
     from flask import send_from_directory
     return send_from_directory(IMAGES_CACHE_DIR, filename)
+
+@app.route('/music/<path:filename>')
+def serve_music(filename):
+    """Serve a music file from the local music library.
+
+    Files are served with conditional/range support by Flask, which lets the
+    browser seek and stream long tracks efficiently.
+    """
+    from flask import send_from_directory, abort
+    # Reject anything that isn't an allowed audio file - this also doubles
+    # as a coarse guard against directory traversal (send_from_directory
+    # already prevents '..', but we don't want to expose other file types).
+    if Path(filename).suffix.lower() not in MUSIC_EXTENSIONS:
+        abort(404)
+    return send_from_directory(MUSIC_DIR.resolve(), filename, conditional=True)
+
+@app.route('/api/music', methods=['GET'])
+def list_music():
+    """List available music files in the local library.
+
+    Returns a sorted list of filenames (just the basename) the UI can use
+    to populate the chapter/encounter music selectors.
+    """
+    if not MUSIC_DIR.exists():
+        return jsonify([])
+    files = sorted(
+        f.name for f in MUSIC_DIR.iterdir()
+        if f.is_file() and f.suffix.lower() in MUSIC_EXTENSIONS
+    )
+    return jsonify(files)
 
 @app.route('/api/dndbeyond/set-cookies', methods=['POST'])
 def set_dndbeyond_cookies():
@@ -3222,7 +3264,8 @@ def restore_adventure_from_storage(data):
         'players': [],
         'encounters': [],
         'chapters': [],
-        'chapterNotes': {}
+        'chapterNotes': {},
+        'chapterMusic': {}
     })
     
     return data
